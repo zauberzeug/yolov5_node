@@ -1,0 +1,9 @@
+version: "3.9"
+services:
+  trainer:
+    image: "zauberzeug/yolor_trainer_node:${TAG-latest}"
+    volumes:
+      - ./:/yolor
+    build: .
+    ipc: host
+    command: bash
