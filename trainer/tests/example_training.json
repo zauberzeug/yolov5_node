@@ -1,0 +1,390 @@
+{
+  "id": "dacf3669-d6b3-43b2-b9c1-38d331dfd1f3",
+  "context": { "project": "demo", "organization": "zauberzeug" },
+  "project_folder": "./",
+  "images_folder": "example_images",
+  "data": {
+    "image_data": [
+      {
+        "id": "a2852e15-fe1b-2cf7-314f-cb662f37559a",
+        "created": "2021-07-09T14:21:50.834050",
+        "state": "complete",
+        "set": "train",
+        "resource": "/zauberzeug/projects/demo/images/a2852e15-fe1b-2cf7-314f-cb662f37559a/main",
+        "thumbnail": "/zauberzeug/projects/demo/images/a2852e15-fe1b-2cf7-314f-cb662f37559a/thumb",
+        "width": 1600,
+        "height": 1200,
+        "box_annotations": [
+          {
+            "id": "21a63515-d560-f8d6-757f-f17688aa4ed5",
+            "image_id": "a2852e15-fe1b-2cf7-314f-cb662f37559a",
+            "category_id": "0fed34df-2b2a-2421-b278-7b9ad89523d5",
+            "x": 1160,
+            "y": 762,
+            "width": 80,
+            "height": 69
+          },
+          {
+            "id": "73f69f5c-9a4d-c7e8-5a92-d216eb1c7b45",
+            "image_id": "a2852e15-fe1b-2cf7-314f-cb662f37559a",
+            "category_id": "4d1542fb-f723-db86-5c37-29ecc9e39f91",
+            "x": 1080,
+            "y": 762,
+            "width": 80,
+            "height": 69
+          },
+          {
+            "id": "395d9bf7-fcc1-27da-9add-0fef4614b95e",
+            "image_id": "a2852e15-fe1b-2cf7-314f-cb662f37559a",
+            "category_id": "4d1542fb-f723-db86-5c37-29ecc9e39f91",
+            "x": 760,
+            "y": 969,
+            "width": 80,
+            "height": 69
+          }
+        ],
+        "box_detections": [],
+        "segmentation_annotations": [
+          {
+            "id": "1fd80623-8251-cad5-ebef-4fa86f8f89c7",
+            "shape": {
+              "points": [
+                { "x": 1160, "y": 762 },
+                { "x": 1240, "y": 762 },
+                { "x": 1200, "y": 831 }
+              ]
+            },
+            "image_id": "a2852e15-fe1b-2cf7-314f-cb662f37559a",
+            "category_id": "0fed34df-2b2a-2421-b278-7b9ad89523d5"
+          },
+          {
+            "id": "215244d4-6e30-eec4-fce9-03926d862c4d",
+            "shape": {
+              "points": [
+                { "x": 1080, "y": 762 },
+                { "x": 1160, "y": 762 },
+                { "x": 1120, "y": 831 }
+              ]
+            },
+            "image_id": "a2852e15-fe1b-2cf7-314f-cb662f37559a",
+            "category_id": "4d1542fb-f723-db86-5c37-29ecc9e39f91"
+          },
+          {
+            "id": "5e59b54b-f3fe-6b99-0287-42a09c1068b1",
+            "shape": {
+              "points": [
+                { "x": 800, "y": 969 },
+                { "x": 840, "y": 1039 },
+                { "x": 760, "y": 1039 }
+              ]
+            },
+            "image_id": "a2852e15-fe1b-2cf7-314f-cb662f37559a",
+            "category_id": "4d1542fb-f723-db86-5c37-29ecc9e39f91"
+          }
+        ],
+        "skeleton_annotations": [
+          {
+            "id": "0f679a09-e83f-86c5-1fc0-4f4e08818fd0",
+            "image_id": "a2852e15-fe1b-2cf7-314f-cb662f37559a",
+            "keypoints": [
+              { "x": 1200, "y": 802, "id": "front", "visibility": "visible" },
+              { "x": 1120, "y": 802, "id": "mid", "visibility": "visible" },
+              { "x": 800, "y": 1009, "id": "rear", "visibility": "visible" }
+            ]
+          }
+        ],
+        "skeleton_detections": [],
+        "tags": [{ "id": "2d08fb3a-882b-17a9-1821-717d36ed66e8", "name": "image source two" }]
+      },
+      {
+        "id": "214c1ff5-f513-b2e5-fc7c-a2de958dcf34",
+        "created": "2021-07-09T14:21:50.862735",
+        "state": "complete",
+        "set": "train",
+        "resource": "/zauberzeug/projects/demo/images/214c1ff5-f513-b2e5-fc7c-a2de958dcf34/main",
+        "thumbnail": "/zauberzeug/projects/demo/images/214c1ff5-f513-b2e5-fc7c-a2de958dcf34/thumb",
+        "width": 1600,
+        "height": 1200,
+        "box_annotations": [
+          {
+            "id": "9611aa8c-53a9-3fd3-2286-2c02ac0a15a9",
+            "image_id": "214c1ff5-f513-b2e5-fc7c-a2de958dcf34",
+            "category_id": "0fed34df-2b2a-2421-b278-7b9ad89523d5",
+            "x": 1160,
+            "y": 277,
+            "width": 80,
+            "height": 69
+          },
+          {
+            "id": "1bd22bcc-0854-9928-f4a6-850e82afe546",
+            "image_id": "214c1ff5-f513-b2e5-fc7c-a2de958dcf34",
+            "category_id": "4d1542fb-f723-db86-5c37-29ecc9e39f91",
+            "x": 1440,
+            "y": 692,
+            "width": 80,
+            "height": 69
+          },
+          {
+            "id": "14e0b8fd-f0dc-70c9-e3a3-da70aca3f325",
+            "image_id": "214c1ff5-f513-b2e5-fc7c-a2de958dcf34",
+            "category_id": "4d1542fb-f723-db86-5c37-29ecc9e39f91",
+            "x": 80,
+            "y": 207,
+            "width": 80,
+            "height": 69
+          }
+        ],
+        "box_detections": [],
+        "segmentation_annotations": [
+          {
+            "id": "f041b75e-70bd-1475-1af7-51800c874f98",
+            "shape": {
+              "points": [
+                { "x": 1200, "y": 277 },
+                { "x": 1240, "y": 346 },
+                { "x": 1160, "y": 346 }
+              ]
+            },
+            "image_id": "214c1ff5-f513-b2e5-fc7c-a2de958dcf34",
+            "category_id": "0fed34df-2b2a-2421-b278-7b9ad89523d5"
+          },
+          {
+            "id": "2cd6c262-476b-c836-2b4a-f00a11e8b7cd",
+            "shape": {
+              "points": [
+                { "x": 1440, "y": 692 },
+                { "x": 1520, "y": 692 },
+                { "x": 1480, "y": 762 }
+              ]
+            },
+            "image_id": "214c1ff5-f513-b2e5-fc7c-a2de958dcf34",
+            "category_id": "4d1542fb-f723-db86-5c37-29ecc9e39f91"
+          },
+          {
+            "id": "6095cab8-aed5-1e84-5450-fa34ac0b2311",
+            "shape": {
+              "points": [
+                { "x": 120, "y": 207 },
+                { "x": 160, "y": 277 },
+                { "x": 80, "y": 277 }
+              ]
+            },
+            "image_id": "214c1ff5-f513-b2e5-fc7c-a2de958dcf34",
+            "category_id": "4d1542fb-f723-db86-5c37-29ecc9e39f91"
+          }
+        ],
+        "skeleton_annotations": [
+          {
+            "id": "2dd67cfa-9065-1b8f-1c14-65f290ee1a1e",
+            "image_id": "214c1ff5-f513-b2e5-fc7c-a2de958dcf34",
+            "keypoints": [
+              { "x": 1200, "y": 317, "id": "front", "visibility": "visible" },
+              { "x": 1480, "y": 732, "id": "mid", "visibility": "visible" },
+              { "x": 120, "y": 247, "id": "rear", "visibility": "visible" }
+            ]
+          }
+        ],
+        "skeleton_detections": [],
+        "tags": [{ "id": "951b567c-0099-d871-5fb1-99c86c74da94", "name": "image source one" }]
+      },
+      {
+        "id": "af85277c-ad3e-6a52-564b-4a1012cb9922",
+        "created": "2021-07-08T14:21:50.890153",
+        "state": "complete",
+        "set": "train",
+        "resource": "/zauberzeug/projects/demo/images/af85277c-ad3e-6a52-564b-4a1012cb9922/main",
+        "thumbnail": "/zauberzeug/projects/demo/images/af85277c-ad3e-6a52-564b-4a1012cb9922/thumb",
+        "width": 1600,
+        "height": 1200,
+        "box_annotations": [
+          {
+            "id": "3bcf340b-d2f9-d8a2-1991-878d715d3b01",
+            "image_id": "af85277c-ad3e-6a52-564b-4a1012cb9922",
+            "category_id": "0fed34df-2b2a-2421-b278-7b9ad89523d5",
+            "x": 1200,
+            "y": 207,
+            "width": 80,
+            "height": 69
+          },
+          {
+            "id": "654b6173-efeb-5638-087a-1ae8bfeb5677",
+            "image_id": "af85277c-ad3e-6a52-564b-4a1012cb9922",
+            "category_id": "4d1542fb-f723-db86-5c37-29ecc9e39f91",
+            "x": 1240,
+            "y": 623,
+            "width": 80,
+            "height": 69
+          },
+          {
+            "id": "36782d28-ae67-d3d1-d7d7-7d6abe2ef34c",
+            "image_id": "af85277c-ad3e-6a52-564b-4a1012cb9922",
+            "category_id": "4d1542fb-f723-db86-5c37-29ecc9e39f91",
+            "x": 520,
+            "y": 900,
+            "width": 80,
+            "height": 69
+          }
+        ],
+        "box_detections": [],
+        "segmentation_annotations": [
+          {
+            "id": "8ce86d97-ca9a-fe76-5ce8-09c4ca58a1b3",
+            "shape": {
+              "points": [
+                { "x": 1240, "y": 207 },
+                { "x": 1280, "y": 277 },
+                { "x": 1200, "y": 277 }
+              ]
+            },
+            "image_id": "af85277c-ad3e-6a52-564b-4a1012cb9922",
+            "category_id": "0fed34df-2b2a-2421-b278-7b9ad89523d5"
+          },
+          {
+            "id": "c5c124bb-a476-5eba-b12e-ad074e3991e6",
+            "shape": {
+              "points": [
+                { "x": 1240, "y": 623 },
+                { "x": 1320, "y": 623 },
+                { "x": 1280, "y": 692 }
+              ]
+            },
+            "image_id": "af85277c-ad3e-6a52-564b-4a1012cb9922",
+            "category_id": "4d1542fb-f723-db86-5c37-29ecc9e39f91"
+          },
+          {
+            "id": "b13655d4-a384-fd1c-f714-98a2884ede5d",
+            "shape": {
+              "points": [
+                { "x": 520, "y": 900 },
+                { "x": 600, "y": 900 },
+                { "x": 560, "y": 969 }
+              ]
+            },
+            "image_id": "af85277c-ad3e-6a52-564b-4a1012cb9922",
+            "category_id": "4d1542fb-f723-db86-5c37-29ecc9e39f91"
+          }
+        ],
+        "skeleton_annotations": [
+          {
+            "id": "b60ad101-31d4-3e00-9cf4-8dc71bf9de70",
+            "image_id": "af85277c-ad3e-6a52-564b-4a1012cb9922",
+            "keypoints": [
+              { "x": 1240, "y": 247, "id": "front", "visibility": "visible" },
+              { "x": 1280, "y": 663, "id": "mid", "visibility": "visible" },
+              { "x": 560, "y": 940, "id": "rear", "visibility": "visible" }
+            ]
+          }
+        ],
+        "skeleton_detections": [],
+        "tags": [{ "id": "2d08fb3a-882b-17a9-1821-717d36ed66e8", "name": "image source two" }]
+      },
+      {
+        "id": "91b70f3e-89f5-6c62-af3b-6eeb7fafeb23",
+        "created": "2021-07-08T14:21:50.918215",
+        "state": "complete",
+        "set": "test",
+        "resource": "/zauberzeug/projects/demo/images/91b70f3e-89f5-6c62-af3b-6eeb7fafeb23/main",
+        "thumbnail": "/zauberzeug/projects/demo/images/91b70f3e-89f5-6c62-af3b-6eeb7fafeb23/thumb",
+        "width": 1600,
+        "height": 1200,
+        "box_annotations": [
+          {
+            "id": "38cb6e3d-41a7-70f0-0e29-53cb6df4ab90",
+            "image_id": "91b70f3e-89f5-6c62-af3b-6eeb7fafeb23",
+            "category_id": "0fed34df-2b2a-2421-b278-7b9ad89523d5",
+            "x": 880,
+            "y": 1108,
+            "width": 80,
+            "height": 69
+          },
+          {
+            "id": "afc0eded-f2ac-44d5-e268-a764345ebf72",
+            "image_id": "91b70f3e-89f5-6c62-af3b-6eeb7fafeb23",
+            "category_id": "4d1542fb-f723-db86-5c37-29ecc9e39f91",
+            "x": 1320,
+            "y": 623,
+            "width": 80,
+            "height": 69
+          },
+          {
+            "id": "effb4126-cc72-195b-35fd-78c6bd5fc8e0",
+            "image_id": "91b70f3e-89f5-6c62-af3b-6eeb7fafeb23",
+            "category_id": "4d1542fb-f723-db86-5c37-29ecc9e39f91",
+            "x": 800,
+            "y": 138,
+            "width": 80,
+            "height": 69
+          }
+        ],
+        "box_detections": [],
+        "segmentation_annotations": [
+          {
+            "id": "d26ade40-f9e3-fd12-6e81-917c79e935a0",
+            "shape": {
+              "points": [
+                { "x": 880, "y": 1108 },
+                { "x": 960, "y": 1108 },
+                { "x": 920, "y": 1177 }
+              ]
+            },
+            "image_id": "91b70f3e-89f5-6c62-af3b-6eeb7fafeb23",
+            "category_id": "0fed34df-2b2a-2421-b278-7b9ad89523d5"
+          },
+          {
+            "id": "584d11f2-029f-37e5-01ac-6aeac18b04ef",
+            "shape": {
+              "points": [
+                { "x": 1320, "y": 623 },
+                { "x": 1400, "y": 623 },
+                { "x": 1360, "y": 692 }
+              ]
+            },
+            "image_id": "91b70f3e-89f5-6c62-af3b-6eeb7fafeb23",
+            "category_id": "4d1542fb-f723-db86-5c37-29ecc9e39f91"
+          },
+          {
+            "id": "6a693067-e7dd-9798-2a26-21949e47edcf",
+            "shape": {
+              "points": [
+                { "x": 800, "y": 138 },
+                { "x": 880, "y": 138 },
+                { "x": 840, "y": 207 }
+              ]
+            },
+            "image_id": "91b70f3e-89f5-6c62-af3b-6eeb7fafeb23",
+            "category_id": "4d1542fb-f723-db86-5c37-29ecc9e39f91"
+          }
+        ],
+        "skeleton_annotations": [
+          {
+            "id": "f1a0b9a1-9747-9b6f-7ec5-f90c6f91a7ce",
+            "image_id": "91b70f3e-89f5-6c62-af3b-6eeb7fafeb23",
+            "keypoints": [
+              { "x": 920, "y": 1148, "id": "front", "visibility": "visible" },
+              { "x": 1360, "y": 663, "id": "mid", "visibility": "visible" },
+              { "x": 840, "y": 178, "id": "rear", "visibility": "visible" }
+            ]
+          }
+        ],
+        "skeleton_detections": [],
+        "tags": [{ "id": "951b567c-0099-d871-5fb1-99c86c74da94", "name": "image source one" }]
+      }
+    ],
+    "box_categories": [
+      {
+        "id": "0fed34df-2b2a-2421-b278-7b9ad89523d5",
+        "name": "purple",
+        "description": "purple triangle",
+        "hotkey": "1",
+        "color": "#FF00FF"
+      },
+      {
+        "id": "4d1542fb-f723-db86-5c37-29ecc9e39f91",
+        "name": "green",
+        "description": "green triangle",
+        "hotkey": "2",
+        "color": "#00FF00"
+      }
+    ]
+  }
+}

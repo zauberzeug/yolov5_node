@@ -3,7 +3,6 @@ from learning_loop_node.trainer.trainer import Trainer
 from learning_loop_node.trainer.capability import Capability
 from learning_loop_node.trainer.model import BasicModel
 
-
 class YolorTrainer(Trainer):
 
     def __init__(self) -> None:
@@ -15,6 +14,8 @@ class YolorTrainer(Trainer):
         training_data = self.training.data
 
         ic(training_folder, image_folder, training_data)
+        with open('tests/example_training.json', "w") as f:
+            f.write(self.training.json())
         # tbd.
 
     async def start_training(self) -> None:
@@ -30,7 +31,7 @@ class YolorTrainer(Trainer):
         return []  # tbd.
 
     def get_new_model(self) -> Optional[BasicModel]:
-        return BasicModel(confusion_matrix={}, meta_information={})
+        return None  # BasicModel(confusion_matrix={}, meta_information={})
 
     def on_model_published(self, basic_model: BasicModel, uuid: str) -> None:
         pass
