@@ -2,8 +2,11 @@ version: "3.9"
 services:
   trainer:
     image: "zauberzeug/yolor_trainer_node:${TAG-latest}"
+    ipc: host
+    environment:
+      - USERNAME=${USERNAME}
+      - PASSWORD=${PASSWORD}
     volumes:
       - ./trainer:/app
     build: .
-    ipc: host
-    command: start.sh dev
+    command: /app/start.sh debug
