@@ -25,8 +25,10 @@ RUN cd / && git clone https://github.com/JunnYu/mish-cuda && cd mish-cuda && pyt
 # https://github.com/fbcotter/pytorch_wavelets
 RUN cd / && git clone https://github.com/fbcotter/pytorch_wavelets && cd pytorch_wavelets && pip install .
 
-RUN python3 -m pip install "learning_loop_node==0.1.10"
+RUN python3 -m pip install "learning_loop_node==0.1.10" autopep8 debugpy
 
 WORKDIR /yolor
 
 EXPOSE 80
+
+RUN start.sh

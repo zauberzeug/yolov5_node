@@ -3,7 +3,7 @@ services:
   trainer:
     image: "zauberzeug/yolor_trainer_node:${TAG-latest}"
     volumes:
-      - ./:/yolor
+      - ./trainer:/app
     build: .
     ipc: host
-    command: bash
+    command: start.sh dev
