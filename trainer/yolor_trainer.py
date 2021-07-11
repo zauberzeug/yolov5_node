@@ -8,19 +8,7 @@ class YolorTrainer(Trainer):
     def __init__(self) -> None:
         super().__init__(capability=Capability.Box, model_format='yolor')
 
-    async def prepare_training(self) -> None:
-        training_folder = self.training.training_folder
-        image_folder = self.training.images_folder
-        training_data = self.training.data
-
-        ic(training_folder, image_folder, training_data)
-        with open('tests/example_training.json', "w") as f:
-            f.write(self.training.json())
-        # tbd.
-
     async def start_training(self) -> None:
-        await self.prepare_training()
-        training_path = self.training.training_folder
 
         # tbd.
 
