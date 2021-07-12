@@ -11,7 +11,10 @@ services:
     volumes:
       - ./trainer:/app
       - ./data:/data
-    build: .
+    build:
+      context: .
+      args:
+        IMAGE: nvcr.io/nvidia/pytorch:20.11-py3
     command: /app/start.sh debug
 
   detector:
@@ -20,5 +23,8 @@ services:
     volumes:
       - ./detector:/app
       - ./data:/data
-    build: .
+    build:
+      context: .
+      args:
+        IMAGE: nvcr.io/nvidia/l4t-pytorch:r32.5.0-pth1.7-py3
     command: /app/start.sh debug

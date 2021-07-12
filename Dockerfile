@@ -1,4 +1,5 @@
-FROM nvcr.io/nvidia/pytorch:20.11-py3
+ARG IMAGE
+FROM ${IMAGE}
 
 RUN curl -sSL https://gist.githubusercontent.com/b01/0a16b6645ab7921b0910603dfb85e4fb/raw/5186ea07a06eac28937fd914a9c8f9ce077a978e/download-vs-code-server.sh | sh
 
