@@ -6,16 +6,32 @@ import os
 
 
 def create_set(training: Training, set_name: str):
-    path = training.training_folder
-    images_path = f'{path}/images'
+    categories = [c['id']for c in training.data.box_categories]
+    training_path = training.training_folder
+    images_path = f'{training_path}/images'
+    labels_path = f'{training_path}/labels'
     os.makedirs(images_path, exist_ok=True)
-    with open(f'{path}/{set_name}.txt', 'w') as f:
+    os.makedirs(labels_path, exist_ok=True)
+    with open(f'{training_path}/{set_name}.txt', 'w') as f:
         for image in training.data.image_data:
             if image['set'] == set_name:
                 image_name = image['id'] + '.jpg'
                 image_path = f"{images_path}/{image_name}"
                 f.write(f"{image_path}\n")
                 os.symlink(f'{os.path.abspath(training.images_folder)}/{image_name}', image_path)
+
+                yolo_boxes = []
+                for box in image['box_annotations']:
+                    coords = []
+                    coords.append(float(box['width']) / float(image['width']))
+                    coords.append(float(box['height']) / float(image['height']))
+                    coords.append((float((box['x']) + float(box['width']) / 2) / float(image['width'])))
+                    coords.append((float((box['y']) + float(box['height']) / 2) / float(image['height'])))
+
+                    id = str(categories.index(box['category_id']))
+                    yolo_boxes.append(id + ' ' + ' '.join([str("%.6f" % c) for c in coords]) + '\n')
+                with open(f'{labels_path}/{image["id"]}.txt', 'w') as l:
+                    l.writelines(yolo_boxes)
 
 
 def create_yaml(training: Training):
