@@ -16,22 +16,25 @@ RUN python3 -m pip install --upgrade pip
 
 RUN python3 -m pip install seaborn thop
 
+WORKDIR /
+
 # install mish-cuda to use mish activation
 # https://github.com/thomasbrandon/mish-cuda
 # https://github.com/JunnYu/mish-cuda
-RUN cd / && git clone https://github.com/JunnYu/mish-cuda && cd mish-cuda && python setup.py build install
+RUN git clone https://github.com/JunnYu/mish-cuda && cd mish-cuda && python setup.py build install
 
 # install pytorch_wavelets to use dwt down-sampling module
 # https://github.com/fbcotter/pytorch_wavelets
-RUN cd / && git clone https://github.com/fbcotter/pytorch_wavelets && cd pytorch_wavelets && pip install .
+RUN git clone https://github.com/fbcotter/pytorch_wavelets && cd pytorch_wavelets && pip install .
+
+# fetch yolor code
+RUN git clone https://github.com/WongKinYiu/yolor.git
 
 RUN python3 -m pip install "learning_loop_node==0.1.10" autopep8 debugpy gunicorn pyyaml
 
-WORKDIR /yolor
-
-RUN wget https://raw.githubusercontent.com/WongKinYiu/yolor/main/train.py
-
 WORKDIR /app
+
+RUN ln -s /data /app/data
 
 EXPOSE 80
 

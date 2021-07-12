@@ -6,7 +6,10 @@ services:
     environment:
       - USERNAME=${USERNAME}
       - PASSWORD=${PASSWORD}
+      - SERVER_BASE_URL=https://learning-loop.ai
+      - WEBSOCKET_BASE_URL=wss://learning-loop.ai
     volumes:
       - ./trainer:/app
+      - ./data:/data
     build: .
     command: /app/start.sh debug
