@@ -13,3 +13,12 @@ services:
       - ./data:/data
     build: .
     command: /app/start.sh debug
+
+  detector:
+    image: "zauberzeug/yolor_detector_node:${TAG-latest}"
+    ipc: host
+    volumes:
+      - ./detector:/app
+      - ./data:/data
+    build: .
+    command: /app/start.sh debug
