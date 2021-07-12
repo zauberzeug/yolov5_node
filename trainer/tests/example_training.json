@@ -2,6 +2,7 @@
   "id": "dacf3669-d6b3-43b2-b9c1-38d331dfd1f3",
   "context": { "project": "demo", "organization": "zauberzeug" },
   "project_folder": "./",
+  "training_folder": "/tmp/test_training",
   "images_folder": "example_images",
   "data": {
     "image_data": [

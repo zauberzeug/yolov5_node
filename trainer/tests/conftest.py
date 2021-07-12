@@ -1,5 +1,9 @@
 import pytest
 import os
+import icecream
+
+icecream.install()
+
 
 @pytest.fixture(scope="function")
 def use_test_dir(request):

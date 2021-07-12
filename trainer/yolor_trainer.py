@@ -2,6 +2,8 @@ from typing import List, Optional
 from learning_loop_node.trainer.trainer import Trainer
 from learning_loop_node.trainer.capability import Capability
 from learning_loop_node.trainer.model import BasicModel
+import yolor
+
 
 class YolorTrainer(Trainer):
 
@@ -9,8 +11,7 @@ class YolorTrainer(Trainer):
         super().__init__(capability=Capability.Box, model_format='yolor')
 
     async def start_training(self) -> None:
-
-        # tbd.
+        yolor.start(self.training)
 
     def is_training_alive(self) -> bool:
         return True  # tbd.

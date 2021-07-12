@@ -1,18 +1,33 @@
 from learning_loop_node.trainer.training import Training
 from imantics import Dataset, Category, Image, Annotation, BBox
 import json
+import yaml
+from pathlib import Path
+import os
 
 
-def create_dataset(training: Training):
-    dataset = Dataset('COCO')
+class BugfixedDataset(Dataset):
+
+    def __init__(self, name):
+        super().__init__(name)
+
+        self.annotations = {}
+        self.categories = {}
+        self.images = {}
+
+
+def create_dataset(training: Training, set: str):
+    global id
+    dataset = BugfixedDataset(f'COCO for {set}')
     categories = {}
-    assert len(training.data.box_categories) == 2
     for c in training.data.box_categories:
         categories[c['id']] = Category(c['name'], id=c['id'], color=c['color'])
 
-    assert len(training.data.image_data) == 4
     for i, image in enumerate(training.data.image_data):
-        location = f'{training.images_folder}/{image["id"]}.jpg'
+        if image['set'] != set:
+            continue
+
+        location = os.path.abspath(f'{training.images_folder}/{image["id"]}.jpg')
         coco_image = Image.from_path(location)
         coco_image.id = i
         dataset.add(coco_image)
@@ -26,8 +41,30 @@ def create_dataset(training: Training):
     return dataset
 
 
-def export_as_coco(training: Training, path: str):
-    dataset = create_dataset(training)
+def create_yaml(training: Training):
+    path = training.training_folder
+    data = {
+        'train': path + '/train.json',
+        'test': path + '/test.json',
+        'val': path + '/test.json',
+        'nc': len(training.data.box_categories),
+        'names': [c['name'] for c in training.data.box_categories],
+    }
 
-    with open(path, 'w') as f:
-        json.dump(dataset.coco(), f)
+    return yaml.dump(data)
+
+
+def export_as_coco(training: Training):
+    path = training.training_folder
+    Path(path).mkdir(parents=True, exist_ok=True)
+
+    print(create_dataset(training, set='train').yolo(), flush=True)
+
+    with open(f'{path}/train.json', 'w') as f:
+        json.dump(create_dataset(training, set='train').coco(), f)
+
+    with open(f'{path}/test.json', 'w') as f:
+        json.dump(create_dataset(training, set='test').coco(), f)
+
+    with open(f'{path}/coco.yaml', 'w')as f:
+        f.write(create_yaml(training))
