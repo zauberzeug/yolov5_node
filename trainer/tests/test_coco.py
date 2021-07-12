@@ -1,4 +1,4 @@
-from coco import create_dataset, create_yaml
+from coco import create_dataset
 from learning_loop_node.trainer.training import Training
 from icecream import ic
 
@@ -16,17 +16,3 @@ def test_creating_coco_from_training_object(use_test_dir):
     assert len(test['categories']) == 2
     assert len(test['images']) == 1
     assert len(test['annotations']) == 3
-
-
-def test_creating_yaml(use_test_dir):
-    training = Training.parse_file('example_training.json')
-    yaml = create_yaml(training)
-
-    assert yaml == '''names:
-- purple
-- green
-nc: 2
-test: /tmp/test_training/test.json
-train: /tmp/test_training/train.json
-val: /tmp/test_training/test.json
-'''

@@ -1,8 +1,7 @@
 from learning_loop_node.trainer.training import Training
 from imantics import Dataset, Category, Image, Annotation, BBox
-import json
-import yaml
 from pathlib import Path
+import json
 import os
 
 
@@ -41,30 +40,12 @@ def create_dataset(training: Training, set: str):
     return dataset
 
 
-def create_yaml(training: Training):
-    path = training.training_folder
-    data = {
-        'train': path + '/train.json',
-        'test': path + '/test.json',
-        'val': path + '/test.json',
-        'nc': len(training.data.box_categories),
-        'names': [c['name'] for c in training.data.box_categories],
-    }
-
-    return yaml.dump(data)
-
-
 def export_as_coco(training: Training):
     path = training.training_folder
     Path(path).mkdir(parents=True, exist_ok=True)
-
-    print(create_dataset(training, set='train').yolo(), flush=True)
 
     with open(f'{path}/train.json', 'w') as f:
         json.dump(create_dataset(training, set='train').coco(), f)
 
     with open(f'{path}/test.json', 'w') as f:
         json.dump(create_dataset(training, set='test').coco(), f)
-
-    with open(f'{path}/coco.yaml', 'w')as f:
-        f.write(create_yaml(training))
