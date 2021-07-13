@@ -34,17 +34,29 @@ fi
 
 compose_args=""
 
+if [ -f "/etc/nv_tegra_release" ]; then
+    export BASE_IMAGE="BASE_IMAGE=nvcr.io/nvidia/l4t-pytorch:r32.5.0-pth1.7-py3"
+elif (nvidia-smi > /dev/null 2>&1); then
+    export BASE_IMAGE="nvcr.io/nvidia/pytorch:20.11-py3"
+else 
+    echo no suitable gpu architecture found
+    exit 1
+fi
+
+echo $jetson $nvidia
+
 cmd=$1
 cmd_args=${@:2}
+set -x
 case $cmd in
     b | build)
-        docker-compose $compose_args build $cmd_args
+        $env_vars docker-compose $compose_args $cmd_args
         ;;
     u | up)
         docker-compose $compose_args up -d $cmd_args
         ;;
     U | buildup | upbuild | upb | bup | ub)
-        docker-compose $compose_args up -d --build $cmd_args
+        $env_vars docker-compose $compose_args up -d$cmd_args
         ;;
     d | down)
         docker-compose $compose_args down -d $cmd_args
