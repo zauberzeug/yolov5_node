@@ -48,7 +48,7 @@ def create_yaml(training: Training):
         yaml.dump(data, f)
 
 
-def export(training: Training):
+def create_file_structure(training: Training):
     path = training.training_folder
     Path(path).mkdir(parents=True, exist_ok=True)
 
