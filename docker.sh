@@ -32,76 +32,57 @@ then
     exit
 fi
 
-compose_args=""
+# sourcing .env file to get configuration (see README.md)
+. .env || echo "you should provide an .env file with USERNAME and PASSWORD for the Learning Loop"
 
-if [ -f "/etc/nv_tegra_release" ]; then
-    export BASE_IMAGE="BASE_IMAGE=nvcr.io/nvidia/l4t-pytorch:r32.5.0-pth1.7-py3"
-elif (nvidia-smi > /dev/null 2>&1); then
-    export BASE_IMAGE="nvcr.io/nvidia/pytorch:20.11-py3"
-else 
-    echo no suitable gpu architecture found
-    exit 1
-fi
+name="yolor_trainer"
 
-echo $jetson $nvidia
+compose_args="-it --rm" 
+compose_args+=" -v $(pwd)/app:/app"
+compose_args+=" -v $HOME/data:/data"
+compose_args+=" -v $(pwd)/../learning_loop_node/learning_loop_node:/usr/local/lib/python3.8/dist-packages/learning_loop_node"
+compose_args+=" -e HOST=$HOST"
+compose_args+=" -e USERNAME=$USERNAME -e PASSWORD=$PASSWORD"
+compose_args+=" --name $name"
+compose_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all"
+compose_args+=" -p 8003:80"
+
+image="zauberzeug/yolor-trainer-node:latest"
 
 cmd=$1
 cmd_args=${@:2}
-set -x
 case $cmd in
     b | build)
-        $env_vars docker-compose $compose_args $cmd_args
+        docker kill $name
+        docker rm $name # remove existing container
+        docker build . -t $image
         ;;
-    u | up)
-        docker-compose $compose_args up -d $cmd_args
+    d | debug)
+        nvidia-docker run $args $image /app/start.sh debug
         ;;
-    U | buildup | upbuild | upb | bup | ub)
-        $env_vars docker-compose $compose_args up -d$cmd_args
+    r | run)
+        nvidia-docker run $args $image
         ;;
-    d | down)
-        docker-compose $compose_args down -d $cmd_args
-        ;;
-    s | start)
-        docker-compose $compose_args start $cmd_args
-        ;;
-    r | restart)
-        docker-compose $compose_args restart $cmd_args
-        ;;
-    h | stop)
-        docker-compose $compose_args stop $cmd_args
+    s | stop)
+        docker stop $name $cmd_args
         ;;
     k | kill)
-        docker-compose $compose_args kill $cmd_args
+        docker kill $name $cmd_args
         ;;
-    rm)
-        docker-compose $compose_args rm $cmd_args
-        ;;
-    ps)
-        docker-compose $compose_args ps $cmd_args
-        ;;
-    stat | stats)
-        docker stats $cmd_args
+    d | rm)
+        docker kill $name
+        docker rm $name $cmd_args
         ;;
     l | log | logs)
-        docker-compose $compose_args logs -f --tail 100 $cmd_args
+        docker logs -f --tail 100 $cmd_args $name
         ;;
     e | exec)
-        docker-compose $compose_args exec $cmd_args
+        docker exec $name $cmd_args 
         ;;
     a | attach)
-        docker-compose $compose_args exec $cmd_args /bin/bash
-        ;;
-    prune)
-        docker system prune
-        ;;
-    stopall)
-        docker stop $(docker ps -aq)
-        ;;
-    killall)
-        docker kill $(docker ps -aq)
+        docker exec -it $cmd_args darknet_trainer /bin/bash
         ;;
     *)
         echo "Unsupported command \"$cmd\""
         exit 1
 esac
-
