@@ -38,14 +38,15 @@ fi
 name="yolor_trainer"
 
 compose_args="-it --rm" 
-compose_args+=" -v $(pwd)/app:/app"
+compose_args+=" -v $(pwd)/trainer:/app"
 compose_args+=" -v $HOME/data:/data"
 compose_args+=" -v $(pwd)/../learning_loop_node/learning_loop_node:/usr/local/lib/python3.8/dist-packages/learning_loop_node"
 compose_args+=" -e HOST=$HOST"
 compose_args+=" -e USERNAME=$USERNAME -e PASSWORD=$PASSWORD"
 compose_args+=" --name $name"
 compose_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all"
-compose_args+=" -p 8003:80"
+compose_args+=" --gpus all"
+compose_args+=" --ipc host"
 
 image="zauberzeug/yolor-trainer-node:latest"
 
@@ -58,10 +59,10 @@ case $cmd in
         docker build . -t $image
         ;;
     d | debug)
-        nvidia-docker run $args $image /app/start.sh debug
+        nvidia-docker run $compose_args $image /app/start.sh debug
         ;;
     r | run)
-        nvidia-docker run $args $image
+        nvidia-docker run -it $compose_args $image $cmd_args
         ;;
     s | stop)
         docker stop $name $cmd_args

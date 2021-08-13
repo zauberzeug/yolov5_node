@@ -1,5 +1,4 @@
-ARG BASE_IMAGE
-FROM nvcr.io/nvidia/pytorch:20.11-py3
+FROM nvcr.io/nvidia/pytorch:21.07-py3
 
 RUN curl -sSL https://gist.githubusercontent.com/b01/0a16b6645ab7921b0910603dfb85e4fb/raw/5186ea07a06eac28937fd914a9c8f9ce077a978e/download-vs-code-server.sh | sed "s/server-linux-x64/server-linux-$(dpkg --print-architecture)/" | sed "s/amd64/x64/" | sh
 
@@ -31,12 +30,13 @@ RUN git clone https://github.com/fbcotter/pytorch_wavelets && cd pytorch_wavelet
 # fetch yolor code
 RUN git clone https://github.com/WongKinYiu/yolor.git
 
-RUN python3 -m pip install "learning_loop_node==0.3.2" autopep8 debugpy gunicorn pyyaml
+RUN python3 -m pip install autopep8 debugpy gunicorn pyyaml uvloop
+RUN python3 -m pip install "learning_loop_node==0.3.3"
 
 WORKDIR /app
 
-RUN ln -s /data /app/data
+ADD ./trainer/ /app/
 
 EXPOSE 80
 
-CMD ./app/start.sh
+CMD /app/start.sh
