@@ -4,7 +4,9 @@
       "path": "."
     }
   ],
-  "settings": {},
+  "settings": {
+    "python.pythonPath": "/opt/conda/bin/python3"
+  },
   "extensions": {
     "recommendations": [
       "ms-python.vscode-pylance",

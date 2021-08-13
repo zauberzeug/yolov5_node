@@ -3,6 +3,7 @@ from learning_loop_node.trainer.trainer import Trainer
 from learning_loop_node.trainer.capability import Capability
 from learning_loop_node.trainer.model import BasicModel
 
+
 class YolorTrainer(Trainer):
 
     def __init__(self) -> None:
@@ -16,7 +17,7 @@ class YolorTrainer(Trainer):
         self.executor.start(cmd)
 
     def is_training_alive(self) -> bool:
-        return True
+        return self.executor.is_process_running()
 
     def get_model_files(self, model_id) -> List[str]:
         return []  # tbd.
@@ -29,5 +30,4 @@ class YolorTrainer(Trainer):
         # tbd.
 
     def stop_training(self) -> None:
-        pass
-        # tbd.
+        self.executor.stop()

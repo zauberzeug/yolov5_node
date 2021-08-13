@@ -1,5 +1,5 @@
 from learning_loop_node.trainer.training import Training
-from training_data import create_yaml
+from yolor_format import create_yaml
 
 
 def test_creating_yaml(use_test_dir):

@@ -3,8 +3,10 @@ import os
 import shutil
 import icecream
 import subprocess
+import logging
 
 icecream.install()
+logging.basicConfig(level=logging.INFO)
 
 
 @pytest.fixture(scope="function", autouse=True)
