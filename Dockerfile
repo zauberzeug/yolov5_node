@@ -39,4 +39,5 @@ ADD ./trainer/ /app/
 
 EXPOSE 80
 
+ENV PYTHONPATH="$PYTHONPATH:/"
 CMD /app/start.sh
