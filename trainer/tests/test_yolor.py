@@ -30,3 +30,4 @@ def test_onnx_export():
     yolor_weights = '/tmp/test_training/model.pt'
     onnx_model = onnx.export(yolor_weights)
     assert os.path.isfile(onnx_model)
+    logging.info('created ' + onnx_model)

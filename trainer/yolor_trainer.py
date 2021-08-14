@@ -2,6 +2,8 @@ from typing import List, Optional
 from learning_loop_node.trainer.trainer import Trainer
 from learning_loop_node.trainer.capability import Capability
 from learning_loop_node.trainer.model import BasicModel
+from learning_loop_node.detector.about import About
+import yolor_format
 
 
 class YolorTrainer(Trainer):
@@ -10,10 +12,14 @@ class YolorTrainer(Trainer):
         super().__init__(capability=Capability.Box, model_format='yolor')
 
     async def start_training(self) -> None:
+        about = About(resolution=800)
+        yolor_format.create_file_structure(self.training)
+
         batch_size = 4  # batch size 1 takes already 6 GB on 1280x1280
         epochs = 10
         # from https://github.com/WongKinYiu/yolor#training
-        cmd = f'python /yolor/train.py --batch-size {batch_size} --img 800 800 --data dataset.yaml --cfg config.cfg --weights weights.pt --device 0 --name yolor --hyp /yolor/data/hyp.scratch.1280.yaml --epochs {epochs}'
+        cmd = f'python /yolor/train.py --batch-size {batch_size} --img {about.resolution} {about.resolution} --data dataset.yaml --cfg model.cfg --weights model.pt --device 0 --name yolor --hyp /yolor/data/hyp.scratch.1280.yaml --epochs {epochs}'
+
         self.executor.start(cmd)
 
     def is_training_alive(self) -> bool:

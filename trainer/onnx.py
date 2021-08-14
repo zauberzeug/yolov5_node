@@ -4,7 +4,8 @@ from yolor.models.models import Darknet
 
 
 def export(pytorch_model: str):
-    model = Darknet(pytorch_model.replace('.pt', '.cfg'), 800).cuda()
+    resolution = 1280
+    model = Darknet(pytorch_model.replace('.pt', '.cfg'), resolution).cuda()
     device = torch.device('cuda:0')
     model.load_state_dict(torch.load(pytorch_model, map_location=device)['model'])
     model.half()  # FP16
@@ -12,7 +13,7 @@ def export(pytorch_model: str):
     # set the model to inference mode
     model.to(device).eval()
 
-    dummy_input = torch.randn(1, 3, 1280, 1280, device=device).half()
+    dummy_input = torch.randn(1, 3, resolution, resolution, device=device).half()
     target_filename = pytorch_model.replace('.pt', '.onnx')
 
     torch.onnx.export(
