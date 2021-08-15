@@ -32,6 +32,7 @@ RUN git clone https://github.com/WongKinYiu/yolor.git
 
 RUN python3 -m pip install autopep8 debugpy gunicorn pyyaml uvloop
 RUN python3 -m pip install "learning_loop_node==0.3.3"
+RUN python3 -m pip install utils
 
 WORKDIR /app
 
@@ -39,5 +40,5 @@ ADD ./trainer/ /app/
 
 EXPOSE 80
 
-ENV PYTHONPATH="$PYTHONPATH:/"
+ENV PYTHONPATH="$PYTHONPATH:/yolor"
 CMD /app/start.sh

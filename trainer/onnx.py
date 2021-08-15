@@ -1,19 +1,18 @@
 import torch
 import logging
-from yolor.models.models import Darknet
+from models.models import Darknet  # NOTE import from /yolor in PYTHONPATH
 
 
-def export(pytorch_model: str):
-    resolution = 1280
+def export(pytorch_model: str, resolution: int = 1280):
     model = Darknet(pytorch_model.replace('.pt', '.cfg'), resolution).cuda()
     device = torch.device('cuda:0')
     model.load_state_dict(torch.load(pytorch_model, map_location=device)['model'])
-    model.half()  # FP16
+    # model.half()  # FP16
 
     # set the model to inference mode
     model.to(device).eval()
 
-    dummy_input = torch.randn(1, 3, resolution, resolution, device=device).half()
+    dummy_input = torch.randn(1, 3, resolution, resolution, device=device)  # .half()
     target_filename = pytorch_model.replace('.pt', '.onnx')
 
     torch.onnx.export(
