@@ -52,7 +52,7 @@ WORKDIR /
 
 # --plugins do not build (see https://github.com/NVIDIA-AI-IOT/torch2trt/issues/558)
 # cloning fork from https://github.com/NVIDIA-AI-IOT/torch2trt which supports TensorRT 8.0.1 (which comes with JetPack 4.6)
-RUN git clone https://github.com/gcunhase/torch2trt.git && cd torch2trt && python3 -m pip install .
+RUN git clone https://github.com/gcunhase/torch2trt.git && cd torch2trt && python setup.py install
 
 ADD ./trainer/ /app/
 RUN cd /yolor && git apply /app/yolor.patch
