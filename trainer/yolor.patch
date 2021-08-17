@@ -1,24 +1,24 @@
 diff --git a/detect.py b/detect.py
-index f2d9f36..c67b4f2 100644
+index f2d9f36..21a4f84 100644
 --- a/detect.py
 +++ b/detect.py
-@@ -7,6 +7,11 @@ import torch
+@@ -7,6 +7,10 @@ import torch
  import torch.backends.cudnn as cudnn
  from numpy import random
  
-+import sys
 +import logging
 +
-+from torch2trt import torch2trt, tensorrt_converter, get_arg, trt, add_missing_trt_tensors, torch_dtype_to_trt
++from torch2trt import torch2trt, tensorrt_converter, get_arg, trt, add_missing_trt_tensors
 +
  from models.experimental import attempt_load
  from utils.datasets import LoadStreams, LoadImages
  from utils.general import check_img_size, non_max_suppression, apply_classifier, scale_coords, xyxy2xywh, \
-@@ -14,6 +19,18 @@ from utils.general import check_img_size, non_max_suppression, apply_classifier,
+@@ -14,6 +18,20 @@ from utils.general import check_img_size, non_max_suppression, apply_classifier,
  from utils.plots import plot_one_box
  from utils.torch_utils import select_device, load_classifier, time_synchronized
  
 +# REGISTER NEW CONVERTERS
++
 +@tensorrt_converter('torch.nn.functional.silu')
 +def convert_silu(ctx):
 +    input = get_arg(ctx, 'input', pos=0, default=None)
@@ -30,10 +30,11 @@ index f2d9f36..c67b4f2 100644
 +    
 +    output._trt = layer.get_output(0)
 +
++# missing: @tensorrt_converter('torch.nn.parameter.Parameter')
  
  def detect(save_img=False):
      source, weights, view_img, save_txt, imgsz = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size
-@@ -32,6 +49,18 @@ def detect(save_img=False):
+@@ -32,6 +50,14 @@ def detect(save_img=False):
      # Load model
      model = attempt_load(weights, map_location=device)  # load FP32 model
      imgsz = check_img_size(imgsz, s=model.stride.max())  # check img_size
@@ -43,16 +44,12 @@ index f2d9f36..c67b4f2 100644
 +        model_trt = torch2trt(model, [x], fp16_mode=True)
 +    except:
 +        logging.exception('could not create tensorRT model')
-+        # import pdb
-+        # t, v, tb = sys.exc_info()
-+        # sys.last_type, sys.last_value, sys.last_traceback = t, v, tb
-+        # pdb.pm()
 +        exit()
 +
      if half:
          model.half()  # to FP16
  
-@@ -59,6 +88,7 @@ def detect(save_img=False):
+@@ -59,6 +85,7 @@ def detect(save_img=False):
      t0 = time.time()
      img = torch.zeros((1, 3, imgsz, imgsz), device=device)  # init img
      _ = model(img.half() if half else img) if device.type != 'cpu' else None  # run once
@@ -60,7 +57,7 @@ index f2d9f36..c67b4f2 100644
      for path, img, im0s, vid_cap in dataset:
          img = torch.from_numpy(img).to(device)
          img = img.half() if half else img.float()  # uint8 to fp16/32
-@@ -67,12 +97,17 @@ def detect(save_img=False):
+@@ -67,12 +94,17 @@ def detect(save_img=False):
              img = img.unsqueeze(0)
  
          # Inference
@@ -119,15 +116,3 @@ index 0a1e7e3..d991fcf 100644
          y1 = self.cv3(self.m(self.cv1(x)))
          y2 = self.cv2(x)
          return self.cv4(self.act(self.bn(torch.cat((y1, y2), dim=1))))
-diff --git a/models/yolo.py b/models/yolo.py
-index 256da5d..e4ac6b5 100644
---- a/models/yolo.py
-+++ b/models/yolo.py
-@@ -90,6 +90,7 @@ class IDetect(nn.Module):
-         # x = x.copy()  # for profiling
-         z = []  # inference output
-         self.training |= self.export
-+        print(f'doing training: {self.training}')
-         for i in range(self.nl):
-             x[i] = self.im[i](self.m[i](self.ia[i](x[i])))  # conv
-             bs, _, ny, nx = x[i].shape  # x(bs,255,20,20) to x(bs,3,20,20,85)
