@@ -45,8 +45,8 @@ RUN git clone https://github.com/fbcotter/pytorch_wavelets && cd pytorch_wavelet
 RUN git clone https://github.com/WongKinYiu/yolor.git && cd /yolor && git checkout paper
 
 RUN python3 -m pip install autopep8 debugpy gunicorn pyyaml uvloop
-RUN python3 -m pip install "learning_loop_node==0.3.3"
-RUN python3 -m pip install utils tqdm pycocotools
+RUN python3 -m pip install "learning_loop_node==0.6.0"
+#RUN python3 -m pip install utils tqdm pycocotools
 
 WORKDIR /
 
