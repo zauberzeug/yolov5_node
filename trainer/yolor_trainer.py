@@ -16,7 +16,7 @@ class YolorTrainer(Trainer):
         batch_size = 4  # batch size 1 takes already 6 GB on 1280x1280
         epochs = 10
         # from https://github.com/WongKinYiu/yolor#training
-        cmd = f'python /yolor/train.py --batch-size {batch_size} --img {resolution} {resolution} --data dataset.yaml --cfg model.cfg --weights model.pt --device 0 --name yolor --hyp /yolor/data/hyp.scratch.1280.yaml --epochs {epochs}'
+        cmd = f'python /yolor/train.py --batch-size {batch_size} --img {resolution} {resolution} --data dataset.yaml --cfg model.yaml --weights model.pt --device 0 --name yolor --hyp /yolor/data/hyp.finetune.1280.yaml --epochs {epochs}'
 
         self.executor.start(cmd)
 
