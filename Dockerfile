@@ -26,12 +26,12 @@ RUN $VSCODE_SERVER --install-extension ms-python.vscode-pylance \
 
 RUN apt update && \
     apt purge -y hwloc-nox libhwloc-dev libhwloc-plugins && \
-    apt install -y zip htop screen libgl1-mesa-glx libmpich-dev && \
+    apt install -y zip htop screen libgl1-mesa-glx libmpich-dev jpeginfo && \
     rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m pip install --upgrade pip
 
-RUN python3 -m pip install seaborn thop
+RUN python3 -m pip install seaborn thop pywavelets
 
 WORKDIR /
 
