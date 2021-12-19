@@ -52,7 +52,7 @@ image="zauberzeug/yolor-trainer-node:latest"
 
 build_args="-t $image"
 [ -f /etc/nv_tegra_release ] && build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/l4t-pytorch:r32.6.1-pth1.9-py3"
-( nvidia-smi > /dev/null 2>&1 ) && build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:21.07-py3"
+( nvidia-smi > /dev/null 2>&1 ) && build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:21.11-py3"
 
 cmd=$1
 cmd_args=${@:2}

@@ -24,7 +24,10 @@ RUN $VSCODE_SERVER --install-extension ms-python.vscode-pylance \
     $VSCODE_SERVER --install-extension esbenp.prettier-vscode \
     $VSCODE_SERVER --install-extension littlefoxteam.vscode-python-test-adapter
 
-RUN apt update && apt install -y zip htop screen libgl1-mesa-glx && rm -rf /var/lib/apt/lists/*
+RUN apt update && \
+    apt purge -y hwloc-nox libhwloc-dev libhwloc-plugins && \
+    apt install -y zip htop screen libgl1-mesa-glx libmpich-dev && \
+    rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m pip install --upgrade pip
 
@@ -42,7 +45,7 @@ RUN git clone https://github.com/JunnYu/mish-cuda && cd mish-cuda && python3 set
 RUN git clone https://github.com/fbcotter/pytorch_wavelets && cd pytorch_wavelets && pip3 install .
 
 # fetch yolor code
-RUN git clone https://github.com/WongKinYiu/yolor.git && cd /yolor && git checkout paper
+RUN git clone -b paper https://github.com/WongKinYiu/yolor.git
 
 RUN python3 -m pip install autopep8 debugpy gunicorn pyyaml uvloop
 RUN python3 -m pip install "learning_loop_node==0.6.0"
@@ -50,12 +53,8 @@ RUN python3 -m pip install "learning_loop_node==0.6.0"
 
 WORKDIR /
 
-# --plugins do not build (see https://github.com/NVIDIA-AI-IOT/torch2trt/issues/558)
-# cloning fork from https://github.com/NVIDIA-AI-IOT/torch2trt which supports TensorRT 8.0.1 (which comes with JetPack 4.6)
-RUN git clone https://github.com/gcunhase/torch2trt.git && cd torch2trt && python setup.py install
-
 ADD ./trainer/ /app/
-RUN cd /yolor && git apply /app/yolor.patch
+#RUN cd /yolor && git apply /app/yolor.patch
 
 WORKDIR /app
 
