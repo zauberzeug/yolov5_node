@@ -22,13 +22,15 @@ model.eval()  # set model to "inference mode"
 model.model[-1].export = True  # set Detect() layer export=True
 
 # we need to trace because "script" is not working (see https://nvidia.github.io/Torch-TensorRT/tutorials/creating_torchscript_module_in_python.html)
-example_data = torch.ones((1, 3, imgsz, imgsz), device=device)
+example_data = torch.randn((1, 3, imgsz, imgsz), device=device)
 model = torch.jit.trace(model, example_data)
 
-inputs = [torch_tensorrt.Input(
-    shape=[1, 3, imgsz, imgsz],
-    dtype=torch.half  # Datatype of input tensor. Allowed options torch.(float|half|int8|int32|bool)
-)]
+inputs = [
+    torch_tensorrt.Input(
+        shape=[1, 3, imgsz, imgsz],
+        dtype=torch.half,  # Datatype of input tensor. Allowed options torch.(float|half|int8|int32|bool)
+    ),
+]
 enabled_precisions = {torch.float, torch.half}  # Run with fp16
 ttrt_module = torch_tensorrt.compile(model, inputs=inputs, enabled_precisions=enabled_precisions)
 
