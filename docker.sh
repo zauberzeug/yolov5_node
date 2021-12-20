@@ -35,10 +35,10 @@ fi
 # sourcing .env file to get configuration (see README.md)
 . .env || echo "you should provide an .env file with USERNAME and PASSWORD for the Learning Loop"
 
-name="yolor_trainer"
+name="yolov5_node"
 
 compose_args="-it --rm" 
-compose_args+=" -v $(pwd)/trainer:/app"
+compose_args+=" -v $(pwd)/app:/app"
 compose_args+=" -v $HOME/data:/data"
 compose_args+=" -v $(pwd)/../learning_loop_node/learning_loop_node:/usr/local/lib/python3.8/dist-packages/learning_loop_node"
 compose_args+=" -e HOST=$HOST"
@@ -48,7 +48,7 @@ compose_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all"
 compose_args+=" --gpus all"
 compose_args+=" --ipc host"
 
-image="zauberzeug/yolor-trainer-node:latest"
+image="zauberzeug/yolov5-node:latest"
 
 build_args="-t $image"
 [ -f /etc/nv_tegra_release ] && build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/l4t-pytorch:r32.6.1-pth1.9-py3"

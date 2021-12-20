@@ -31,35 +31,24 @@ RUN apt update && \
 
 RUN python3 -m pip install --upgrade pip
 
-RUN python3 -m pip install seaborn thop pywavelets
+#RUN python3 -m pip install seaborn thop pywavelets
 
 WORKDIR /
 
-# install mish-cuda to use mish activation
-# https://github.com/thomasbrandon/mish-cuda
-# https://github.com/JunnYu/mish-cuda
-RUN git clone https://github.com/JunnYu/mish-cuda && cd mish-cuda && python3 setup.py build install
-
-# install pytorch_wavelets to use dwt down-sampling module
-# https://github.com/fbcotter/pytorch_wavelets
-RUN git clone https://github.com/fbcotter/pytorch_wavelets && cd pytorch_wavelets && pip3 install .
-
-# fetch yolor code
-RUN git clone -b paper https://github.com/WongKinYiu/yolor.git
+# fetch yolov5 code
+RUN git clone -b v6.0 https://github.com/ultralytics/yolov5.git
 
 RUN python3 -m pip install autopep8 debugpy gunicorn pyyaml uvloop
 RUN python3 -m pip install "learning_loop_node==0.6.0"
-#RUN python3 -m pip install utils tqdm pycocotools
 
 WORKDIR /
 
-ADD ./trainer/ /app/
-#RUN cd /yolor && git apply /app/yolor.patch
+ADD ./app /app
 
 WORKDIR /app
 
 EXPOSE 80
 
-ENV PYTHONPATH="$PYTHONPATH:/yolor"
+ENV PYTHONPATH="$PYTHONPATH:/yolov5"
 ENV PYTHONPATH="$PYTHONPATH:/"
 CMD /app/start.sh

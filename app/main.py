@@ -6,8 +6,8 @@ import icecream
 icecream.install()
 
 node = TrainerNode(
-    uuid='8d04075a-d9b8-414b-a41a-f0cb1f100068',
-    name='YoloR Trainer',
+    uuid='ad04075a-d9b8-414b-a41a-f0cb1f100069',
+    name='Yolov5 Trainer',
     trainer=YolorTrainer()
 )
 

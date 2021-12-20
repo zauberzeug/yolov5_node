@@ -1,3 +1,3 @@
-# YoloR Node
+# Yolov5 Node
 
-Learning Loop Node for YoloR (trainer and detector). Based on https://github.com/WongKinYiu/yolor
+Learning Loop Node for Yolov5 (trainer and detector). Based on https://github.com/ultralytics/yolov5
