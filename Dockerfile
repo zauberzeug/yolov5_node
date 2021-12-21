@@ -28,23 +28,27 @@ RUN apt update && \
     apt purge -y hwloc-nox libhwloc-dev libhwloc-plugins && \
     apt install -y zip htop screen libgl1-mesa-glx libmpich-dev jpeginfo && \
     rm -rf /var/lib/apt/lists/*
-
 RUN python3 -m pip install --upgrade pip
 
-#RUN python3 -m pip install seaborn thop pywavelets
+RUN python3 -m pip install seaborn thop coremltools onnx gsutil notebook wandb>=0.12.2
 
 WORKDIR /
 
-# fetch yolov5 code
-RUN git clone -b v6.0 https://github.com/ultralytics/yolov5.git
+# https://githubmemory.com/repo/ultralytics/yolov5/issues/5374
+RUN pip install --no-cache -U torch torchvision numpy Pillow
 
 RUN python3 -m pip install autopep8 debugpy gunicorn pyyaml uvloop
 RUN python3 -m pip install "learning_loop_node==0.6.0"
 
-WORKDIR /
+RUN pip install --no-cache torch==1.10.0+cu113 torchvision==0.11.1+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
+
+# fetch yolov5 code
+RUN git clone -b v6.0 https://github.com/ultralytics/yolov5.git
+WORKDIR /yolov5
+RUN python3 -m pip install --no-cache -r requirements.txt
+RUN pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof
 
 ADD ./app /app
-
 WORKDIR /app
 
 EXPOSE 80
