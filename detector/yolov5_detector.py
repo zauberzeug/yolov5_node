@@ -14,11 +14,16 @@ class Yolov5Detector(Detector):
         super().__init__('yolov5_wts')
 
     def init(self,  model_info: ModelInformation, model_root_path: str):
-        model_file = f'{model_root_path}/model.wts'
-        self._build(model_info.resolution)
+        self._create_engine(model_info.resolution, f'{model_root_path}/model.wts')
 
-    def _build(self, resolution: int):
-        os.chdir('/tensorrtx/yolov5/build')  # NOTE cmake and inital building is done in Dockerfile (to speeds things up)
+    def _create_engine(self, resolution: int, wts_file: str):
+        engine_file = os.path.dirname(wts_file) + '/model.engine'
+        if os.path.isfile(engine_file):
+            logging.info(f'{engine_file} already exists, skipping conversion')
+            return
+
+        # NOTE cmake and inital building is done in Dockerfile (to speeds things up)
+        os.chdir('/tensorrtx/yolov5/build')
         # Adapt resolution
         with open('../yololayer.h', 'r+') as f:
             content = f.read()
@@ -27,6 +32,7 @@ class Yolov5Detector(Detector):
             f.truncate()
             f.write(content)
         subprocess.run('make -j6 -Wno-deprecated-declarations', shell=True)
+        subprocess.run(f'./yolov5 -s {wts_file} {engine_file} s6', shell=True)  # TODO parameterize variant "s6"
 
     def evaluate(self, image: Any) -> Detections:
         detections = Detections()
