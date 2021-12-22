@@ -1,14 +1,8 @@
 import uvicorn
-from fastapi import APIRouter, Request, File, UploadFile
-from fastapi.encoders import jsonable_encoder
-from typing import Optional, List
-import numpy as np
-from fastapi_utils.tasks import repeat_every
-from fastapi_socketio import SocketManager
 from learning_loop_node import DetectorNode
-import asyncio
-import logging
 from yolov5_detector import Yolov5Detector
+import logging
+import os
 import icecream
 icecream.install()
 

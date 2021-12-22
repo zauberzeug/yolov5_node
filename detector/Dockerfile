@@ -30,7 +30,7 @@ RUN apt-get update && \
 RUN pip3 install --no-cache-dir async_generator aiofiles psutil pillow
 RUN pip3 install --no-cache-dir multidict attrs yarl async_timeout
 RUN pip3 install --no-cache-dir idna_ssl cchardet aiosignal
-RUN pip3 install --no-cache-dir "learning-loop-node==0.6.0"
+RUN pip3 install --no-cache-dir "learning-loop-node==0.6.1"
 
 WORKDIR /
 
@@ -38,6 +38,8 @@ RUN git clone https://github.com/wang-xinyu/tensorrtx.git
 
 ADD ./ /yolov5_node/detector/
 RUN ln -sf /yolov5_node/detector /app
+
+WORKDIR /app
 
 EXPOSE 80
 
