@@ -31,22 +31,20 @@ then
     echo "  command       Command to be executed inside a container"
     exit
 fi
+set -x
+name="yolov5_detector_node"
 
-# sourcing .env file to get configuration (see README.md)
-. .env || echo "you should provide an .env file with USERNAME and PASSWORD for the Learning Loop"
-
-name="yolov5_node"
-
-compose_args="-it --rm" 
-compose_args+=" -v $(pwd)/app:/app"
-compose_args+=" -v $HOME/data:/data"
-compose_args+=" -v $(pwd)/../learning_loop_node/learning_loop_node:/usr/local/lib/python3.8/dist-packages/learning_loop_node"
-compose_args+=" -e HOST=$HOST"
-compose_args+=" -e USERNAME=$USERNAME -e PASSWORD=$PASSWORD"
-compose_args+=" --name $name"
-compose_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all"
-compose_args+=" --gpus all"
-compose_args+=" --ipc host"
+run_args="-it --rm" 
+run_args+=" -v $(pwd)/../:/yolov5_node"
+run_args+=" -v $HOME/data:/data"
+run_args+=" -v $HOME/learning_loop_node/learning_loop_node:/usr/local/lib/python3.6/dist-packages/learning_loop_node "
+#run_args+=" -e HOST=$HOST"
+run_args+="-e ORGANIZATION=zauberzeug "
+run_args+="-e PROJECT=drawingbot "
+run_args+=" --name $name "
+run_args+="--runtime=nvidia "
+run_args+="-e NVIDIA_VISIBLE_DEVICES=all "
+run_args+="-p 8004:80 "
 
 image="zauberzeug/yolov5-detector:32.6.1"
 
@@ -56,15 +54,18 @@ cmd=$1
 cmd_args=${@:2}
 case $cmd in
     b | build)
-        docker kill $name
-        docker rm $name # remove existing container
-        docker build . $build_args
+        docker build . --target release -t $image $cmd_args
+        docker build . -t ${image}-dev $cmd_args
         ;;
     d | debug)
-        nvidia-docker run $compose_args $image /app/start.sh debug
+        docker run $run_args $image /app/start.sh debug
         ;;
     r | run)
-        nvidia-docker run -it $compose_args $image $cmd_args
+        docker run $run_args $image $cmd_args
+        ;;
+    p | push)
+        docker push ${image}-dev 
+        docker push $image
         ;;
     s | stop)
         docker stop $name $cmd_args

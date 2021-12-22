@@ -37,16 +37,16 @@ fi
 
 name="yolov5_node"
 
-compose_args="-it --rm" 
-compose_args+=" -v $(pwd)/app:/app"
-compose_args+=" -v $HOME/data:/data"
-compose_args+=" -v $(pwd)/../learning_loop_node/learning_loop_node:/usr/local/lib/python3.8/dist-packages/learning_loop_node"
-compose_args+=" -e HOST=$HOST"
-compose_args+=" -e USERNAME=$USERNAME -e PASSWORD=$PASSWORD"
-compose_args+=" --name $name"
-compose_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all"
-compose_args+=" --gpus all"
-compose_args+=" --ipc host"
+run_args="-it --rm" 
+run_args+=" -v $(pwd)/app:/app"
+run_args+=" -v $HOME/data:/data"
+run_args+=" -v $(pwd)/../learning_loop_node/learning_loop_node:/usr/local/lib/python3.8/dist-packages/learning_loop_node"
+run_args+=" -e HOST=$HOST"
+run_args+=" -e USERNAME=$USERNAME -e PASSWORD=$PASSWORD"
+run_args+=" --name $name"
+run_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all"
+run_args+=" --gpus all"
+run_args+=" --ipc host"
 
 image="zauberzeug/yolov5-node:latest"
 
@@ -63,10 +63,10 @@ case $cmd in
         docker build . $build_args
         ;;
     d | debug)
-        nvidia-docker run $compose_args $image /app/start.sh debug
+        nvidia-docker run $run_args $image /app/start.sh debug
         ;;
     r | run)
-        nvidia-docker run -it $compose_args $image $cmd_args
+        nvidia-docker run -it $run_args $image $cmd_args
         ;;
     s | stop)
         docker stop $name $cmd_args

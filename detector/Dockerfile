@@ -1,4 +1,4 @@
-FROM zauberzeug/l4t-opencv:4.5.2-on-nano-32.6.1
+FROM zauberzeug/l4t-opencv:4.5.2-on-nano-32.6.1 as release
 
 RUN apt-get update && \
         DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
@@ -10,23 +10,53 @@ RUN apt-get update && \
         cmake \
         build-essential \
         python3-markupsafe \
+        python3-dev \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
+
+ENV PYTHONPATH "${PYTHONPATH}:/usr/local/lib/python3.6/dist-packages/"
+
+RUN pip3 install --no-cache-dir wheel
+RUN pip3 install --no-cache-dir pycuda
+RUN pip3 install --no-cache-dir "uvicorn[standard]" 
+
+RUN apt-get update && \
+        DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
+        apt-get install -y --no-install-recommends \
+        libjpeg8-dev zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+RUN pip3 install --no-cache-dir async_generator aiofiles psutil pillow
+RUN pip3 install --no-cache-dir multidict attrs yarl async_timeout
+RUN pip3 install --no-cache-dir idna_ssl cchardet aiosignal
+RUN pip3 install --no-cache-dir "learning-loop-node==0.6.0"
 
 WORKDIR /
 
 RUN git clone https://github.com/wang-xinyu/tensorrtx.git
-WORKDIR /tensorrtx/yolov5/build
-RUN cmake ..
-RUN make -j6
-COPY ./yolov5s6.wts ./
-RUN ./yolov5 -s yolov5s6.wts yolov5s6.engine s6
 
-RUN pip3 install --no-cache-dir wheel
-RUN pip3 install --no-cache-dir pycuda
+ADD ./ /yolov5_node/detector/
+RUN ln -sf /yolov5_node/detector /app
 
-RUN mkdir ./images
-RUN curl -o ./images/crowd.jpg "https://www.securitymagazine.com/ext/resources/Issues/2019/March/SEC0319-Events-Feat-slide1_900px.jpg?t=1552326688&width=900"
-RUN for i in $(seq 1 10); do cp images/crowd.jpg images/$i.jpg; done
+EXPOSE 80
 
-CMD ./yolov5 -d yolov5s6.engine ./images
+ENV HOST=learning-loop.ai
+
+CMD /app/start.sh
+
+FROM release
+
+RUN python3 -m pip install --no-cache-dir retry debugpy pytest-asyncio icecream pytest autopep8
+
+RUN curl -sSL https://gist.githubusercontent.com/b01/0a16b6645ab7921b0910603dfb85e4fb/raw/5186ea07a06eac28937fd914a9c8f9ce077a978e/download-vs-code-server.sh | sed "s/server-linux-x64/server-linux-$(dpkg --print-architecture)/" | sed "s/amd64/x64/" | bash
+
+ENV VSCODE_SERVER=/root/.vscode-server/bin/*/server.sh
+
+RUN $VSCODE_SERVER --install-extension ms-python.vscode-pylance \
+    $VSCODE_SERVER --install-extension ms-python.python \
+    $VSCODE_SERVER --install-extension himanoa.python-autopep8 \
+    $VSCODE_SERVER --install-extension esbenp.prettier-vscode \
+    $VSCODE_SERVER --install-extension littlefoxteam.vscode-python-test-adapter
+
+ENV PYTHONFAULTHANDLER=1
