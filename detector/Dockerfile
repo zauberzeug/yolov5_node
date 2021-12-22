@@ -24,6 +24,8 @@ RUN apt-get update && \
         DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
         apt-get install -y --no-install-recommends \
         libjpeg8-dev zlib1g-dev \
+        ca-certificates \
+        openssh-client \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -35,6 +37,8 @@ RUN pip3 install --no-cache-dir "learning-loop-node==0.6.1"
 WORKDIR /
 
 RUN git clone https://github.com/wang-xinyu/tensorrtx.git
+WORKDIR /tensorrtx/yolov5/build
+RUN cmake .. && make -j6
 
 ADD ./ /yolov5_node/detector/
 RUN ln -sf /yolov5_node/detector /app
