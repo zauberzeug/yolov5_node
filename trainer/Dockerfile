@@ -48,7 +48,7 @@ WORKDIR /yolov5
 RUN python3 -m pip install --no-cache -r requirements.txt
 RUN pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof
 
-ADD ./app /app
+ADD ./ /app
 WORKDIR /app
 
 EXPOSE 80

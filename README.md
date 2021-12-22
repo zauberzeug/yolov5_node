@@ -1,3 +1,3 @@
-# Yolov5 Node
+# Yolov5 Nodes
 
-Learning Loop Node for Yolov5 (trainer and detector). Based on https://github.com/ultralytics/yolov5
+Learning Loop Trainer and Detector Node for Yolov5. Based on https://github.com/ultralytics/yolov5
