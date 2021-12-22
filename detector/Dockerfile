@@ -39,6 +39,7 @@ WORKDIR /
 RUN git clone https://github.com/wang-xinyu/tensorrtx.git
 WORKDIR /tensorrtx/yolov5/build
 RUN cmake .. && make -j6
+ENV PYTHONPATH=$PYTHONPATH:/tensorrtx/yolov5/
 
 ADD ./ /yolov5_node/detector/
 RUN ln -sf /yolov5_node/detector /app
@@ -48,7 +49,6 @@ WORKDIR /app
 EXPOSE 80
 
 ENV HOST=learning-loop.ai
-
 CMD /app/start.sh
 
 FROM release
