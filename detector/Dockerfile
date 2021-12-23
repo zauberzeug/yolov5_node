@@ -66,3 +66,5 @@ RUN $VSCODE_SERVER --install-extension ms-python.vscode-pylance \
     $VSCODE_SERVER --install-extension littlefoxteam.vscode-python-test-adapter
 
 ENV PYTHONFAULTHANDLER=1
+
+RUN apt-get update && apt-get install gnupg2 -y
