@@ -2,30 +2,33 @@ from typing import List, Optional
 from learning_loop_node.trainer.trainer import Trainer
 from learning_loop_node.trainer.model import BasicModel
 import yolov5_format
-import json
+import os
+import shutil
 
 
 class Yolov5Trainer(Trainer):
 
     def __init__(self) -> None:
-        super().__init__(model_format='yolov5_wts')
+        super().__init__(model_format='yolov5_pytorch')
 
     async def start_training(self) -> None:
         resolution = 832
         yolov5_format.create_file_structure(self.training)
         batch_size = 4  # batch size 1 takes already 6 GB on 1280x1280
         epochs = 10
-        cmd = f'python /yolor/train.py --batch-size {batch_size} --img {resolution} {resolution} --data dataset.yaml --cfg model.yaml --weights model.pt --device 0 --name yolor --hyp /yolor/data/hyp.finetune.1280.yaml --epochs {epochs}'
+        if not os.path.isfile('hpy.yaml'):
+            shutil.copy('/app/hyp.yaml', self.training.training_folder)
+        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights model.pt --project {self.training.training_folder} --name result --hyp hyp.yaml --epochs {epochs}'
         self.executor.start(cmd)
 
     def get_error(self) -> str:
-        return 'not yet implemented'
-
-    def get_log(self) -> str:
-        return 'not yet implemented'
-
-    def is_training_alive(self) -> bool:
-        return self.executor.is_process_running()
+        if self.executor is None:
+            return
+        try:
+            if 'CUDA Error: out of memory' in self.executor.get_log():
+                return 'graphics card is out of memory'
+        except:
+            return
 
     def get_model_files(self, model_id) -> List[str]:
         return []  # tbd.

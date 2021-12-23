@@ -25,7 +25,7 @@ async def test_training_creates_model(use_training_dir):
 
     executor = Executor(os.getcwd())
     # from https://github.com/WongKinYiu/yolor#training
-    cmd = f'WANDB_MODE=disabled python /yolov5/train.py --project training --name result --batch 4 --img 416 --data training/dataset.yaml --weights yolov5n.pt --epochs 1'
+    cmd = f'WANDB_MODE=disabled python /yolov5/train.py --project training --name result --batch 4 --img 416 --data training/dataset.yaml --weights model.pt --epochs 1'
     executor.start(cmd)
     while executor.is_process_running():
         sleep(1)
