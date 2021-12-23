@@ -2,7 +2,7 @@ import os
 from learning_loop_node.trainer.executor import Executor
 from learning_loop_node.trainer.training import Training
 import onnx
-import yolor_format
+import yolov5_format
 import logging
 from time import sleep
 import glob
@@ -10,11 +10,11 @@ import glob
 
 def test_training_creates_model(use_test_dir):
     training = Training.parse_file('example_training.json')
-    yolor_format.create_file_structure(training)
+    yolov5_format.create_file_structure(training)
 
     executor = Executor(training.training_folder)
     # from https://github.com/WongKinYiu/yolor#training
-    cmd = f'python /yolor/train.py --batch-size 4 --img 400 400 --data {training.training_folder}/dataset.yaml --cfg model.cfg --weights model.pt --device 0 --name yolor --hyp /yolor/data/hyp.scratch.1280.yaml --epochs 1'
+    cmd = f'python /yolov5/train.py --batch-size 4 --img 400 400 --data {training.training_folder}/dataset.yaml --cfg model.cfg --weights model.pt --device 0 --name yolor --hyp /yolor/data/hyp.scratch.1280.yaml --epochs 1'
     executor.start(cmd)
     while executor.is_process_running():
         sleep(1)

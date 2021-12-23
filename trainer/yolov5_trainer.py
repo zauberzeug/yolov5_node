@@ -1,17 +1,17 @@
 from typing import List, Optional
 from learning_loop_node.trainer.trainer import Trainer
 from learning_loop_node.trainer.model import BasicModel
-import yolor_format
+import yolov5_format
 
 
-class YolorTrainer(Trainer):
+class Yolov5Trainer(Trainer):
 
     def __init__(self) -> None:
-        super().__init__(model_format='yolor')
+        super().__init__(model_format='yolov5_wts')
 
     async def start_training(self) -> None:
-        resolution = 800
-        yolor_format.create_file_structure(self.training)
+        resolution = 832
+        yolov5_format.create_file_structure(self.training)
 
         batch_size = 4  # batch size 1 takes already 6 GB on 1280x1280
         epochs = 10
