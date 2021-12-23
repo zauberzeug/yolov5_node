@@ -2,6 +2,7 @@ from typing import List, Optional
 from learning_loop_node.trainer.trainer import Trainer
 from learning_loop_node.trainer.model import BasicModel
 import yolov5_format
+import json
 
 
 class Yolov5Trainer(Trainer):
@@ -12,13 +13,16 @@ class Yolov5Trainer(Trainer):
     async def start_training(self) -> None:
         resolution = 832
         yolov5_format.create_file_structure(self.training)
-
         batch_size = 4  # batch size 1 takes already 6 GB on 1280x1280
         epochs = 10
-        # from https://github.com/WongKinYiu/yolor#training
         cmd = f'python /yolor/train.py --batch-size {batch_size} --img {resolution} {resolution} --data dataset.yaml --cfg model.yaml --weights model.pt --device 0 --name yolor --hyp /yolor/data/hyp.finetune.1280.yaml --epochs {epochs}'
-
         self.executor.start(cmd)
+
+    def get_error(self) -> str:
+        return 'not yet implemented'
+
+    def get_log(self) -> str:
+        return 'not yet implemented'
 
     def is_training_alive(self) -> bool:
         return self.executor.is_process_running()

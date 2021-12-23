@@ -15,16 +15,13 @@ def clear_test_dir():
     os.mkdir('/tmp/test_training')
 
     if not os.path.isfile('/tmp/model.pt'):
-        subprocess.run('''curl -c ./cookie -s -L "https://drive.google.com/uc?export=download&id=1Tdn3yqpZ79X7R1Ql0zNlNScB1Dv9Fp76" > /dev/null
-    curl -Lb ./cookie "https://drive.google.com/uc?export=download&confirm=`awk '/download/ {print $NF}' ./cookie`&id=1Tdn3yqpZ79X7R1Ql0zNlNScB1Dv9Fp76" -o /tmp/model.pt
-    rm ./cookie
-    ''', shell=True)
+        url = 'https://github.com/ultralytics/yolov5/releases/download/v6.0/yolov5n.pt'
+        subprocess.run(f'curl {url} -o /tmp/model.pt', shell=True)
     shutil.copyfile('/tmp/model.pt', '/tmp/test_training/model.pt')
-    shutil.copyfile('/yolor/cfg/yolor_p6.cfg', '/tmp/test_training/model.cfg')
 
 
 @pytest.fixture(scope="function")
-def use_test_dir(request):
-    os.chdir(request.fspath.dirname)
+def use_training_dir(request):
+    os.chdir('/tmp/test_training/')
     yield
     os.chdir(request.config.invocation_dir)
