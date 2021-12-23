@@ -61,7 +61,7 @@ case $cmd in
         docker run $run_args $image /app/start.sh debug
         ;;
     r | run)
-        docker run $run_args $image $cmd_args
+        docker run $run_args $image-dev $cmd_args
         ;;
     p | push)
         docker push ${image}-dev 
@@ -84,7 +84,7 @@ case $cmd in
         docker exec $name $cmd_args 
         ;;
     a | attach)
-        docker exec -it $cmd_args darknet_trainer /bin/bash
+        docker exec -it $cmd_args $name /bin/bash
         ;;
     *)
         echo "Unsupported command \"$cmd\""

@@ -35,12 +35,12 @@ fi
 # sourcing .env file to get configuration (see README.md)
 . .env || echo "you should provide an .env file with USERNAME and PASSWORD for the Learning Loop"
 
-name="yolov5_node"
+name="yolov5_trainer_node"
 
 run_args="-it --rm" 
-run_args+=" -v $(pwd)/app:/app"
+run_args+=" -v $(pwd)/../:/yolov5_node/"
 run_args+=" -v $HOME/data:/data"
-run_args+=" -v $(pwd)/../learning_loop_node/learning_loop_node:/usr/local/lib/python3.8/dist-packages/learning_loop_node"
+run_args+=" -v $HOME/learning_loop_node/learning_loop_node:/usr/local/lib/python3.8/dist-packages/learning_loop_node"
 run_args+=" -e HOST=$HOST"
 run_args+=" -e USERNAME=$USERNAME -e PASSWORD=$PASSWORD"
 run_args+=" --name $name"
@@ -48,9 +48,9 @@ run_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all"
 run_args+=" --gpus all"
 run_args+=" --ipc host"
 
-image="zauberzeug/yolov5-node:latest"
+image="zauberzeug/yolov5-trainer:latest"
 
-build_args="-t $image"
+build_args=""
 [ -f /etc/nv_tegra_release ] && build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/l4t-pytorch:r32.6.1-pth1.9-py3"
 ( nvidia-smi > /dev/null 2>&1 ) && build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:21.10-py3"
 
@@ -58,15 +58,18 @@ cmd=$1
 cmd_args=${@:2}
 case $cmd in
     b | build)
-        docker kill $name
-        docker rm $name # remove existing container
-        docker build . $build_args
+        docker build . --target release -t $image $build_args $cmd_args
+        docker build . -t ${image}-dev $build_args $cmd_args
         ;;
     d | debug)
-        nvidia-docker run $run_args $image /app/start.sh debug
+        docker run $run_args $image /app/start.sh debug
+        ;;
+    p | push)
+        docker push ${image}-dev 
+        docker push $image
         ;;
     r | run)
-        nvidia-docker run -it $run_args $image $cmd_args
+        docker run -it $run_args $image-dev $cmd_args
         ;;
     s | stop)
         docker stop $name $cmd_args
@@ -85,7 +88,7 @@ case $cmd in
         docker exec $name $cmd_args 
         ;;
     a | attach)
-        docker exec -it $cmd_args darknet_trainer /bin/bash
+        docker exec -it $cmd_args $name /bin/bash
         ;;
     *)
         echo "Unsupported command \"$cmd\""

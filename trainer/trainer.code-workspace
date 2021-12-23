@@ -2,6 +2,10 @@
   "folders": [
     {
       "path": "."
+    },
+    {
+      "name": "lib",
+      "path": "/usr/local/lib/python3.8/dist-packages/learning_loop_node"
     }
   ],
   "settings": {
