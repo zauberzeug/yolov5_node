@@ -36,9 +36,3 @@ async def test_training_creates_model(use_training_dir):
     assert 'best.pt' in executor.get_log()
     best = training.training_folder + '/result/weights/best.pt'
     assert os.path.isfile(best)
-
-
-def test_onnx_export():
-    yolor_weights = '/tmp/model.pt'
-    onnx_model = onnx.export(yolor_weights)
-    assert os.path.isfile(onnx_model)
