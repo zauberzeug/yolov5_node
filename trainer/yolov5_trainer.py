@@ -14,11 +14,12 @@ class Yolov5Trainer(Trainer):
     async def start_training(self) -> None:
         resolution = 832
         yolov5_format.create_file_structure(self.training)
-        batch_size = 4  # batch size 1 takes already 6 GB on 1280x1280
+        batch_size = 32
         epochs = 10
         if not os.path.isfile('hpy.yaml'):
             shutil.copy('/app/hyp.yaml', self.training.training_folder)
-        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights model.pt --project {self.training.training_folder} --name result --hyp hyp.yaml --epochs {epochs}'
+        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --batch-size {batch_size} --img {resolution} --data dataset.yaml --save-period 2 --weights model.pt --project {self.training.training_folder} --name result --hyp hyp.yaml --epochs {epochs}'
+        ic(cmd)
         self.executor.start(cmd)
 
     def get_error(self) -> str:
