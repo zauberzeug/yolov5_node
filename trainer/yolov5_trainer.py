@@ -4,18 +4,20 @@ from learning_loop_node.trainer.model import BasicModel
 import yolov5_format
 import os
 import shutil
+import json
 
 
 class Yolov5Trainer(Trainer):
 
     def __init__(self) -> None:
         super().__init__(model_format='yolov5_pytorch')
+        self.latest_epoch = 0
 
     async def start_training(self) -> None:
         resolution = 832
         yolov5_format.create_file_structure(self.training)
         batch_size = 32
-        epochs = 10
+        epochs = 1000
         if not os.path.isfile('hpy.yaml'):
             shutil.copy('/app/hyp.yaml', self.training.training_folder)
         cmd = f'WANDB_MODE=disabled python /yolov5/train.py --batch-size {batch_size} --img {resolution} --data dataset.yaml --save-period 2 --weights model.pt --project {self.training.training_folder} --name result --hyp hyp.yaml --epochs {epochs}'
@@ -35,11 +37,18 @@ class Yolov5Trainer(Trainer):
         return []  # tbd.
 
     def get_new_model(self) -> Optional[BasicModel]:
-        return None  # BasicModel(confusion_matrix={}, meta_information={})
+        path = 'result/weights'
+        if not os.path.isdir(path):
+            return
+        weightfiles = [os.path.join(path, f) for f in os.listdir(path) if 'epoch' in f and f.endswith('.pt')]
+        if not weightfiles:
+            return
+        weightfile = sorted(weightfiles)[0]
+        with open(weightfile[:-3] + '.json') as f:
+            return BasicModel(confusion_matrix=json.load(f), meta_information={'weightfile': weightfile})
 
     def on_model_published(self, basic_model: BasicModel, uuid: str) -> None:
-        pass
-        # tbd.
+        shutil.move(basic_model.meta_information['weightfile'], f'result/weights/{uuid}.pt')
 
     def stop_training(self) -> None:
         self.executor.stop()
