@@ -44,6 +44,7 @@ class Yolov5Trainer(Trainer):
         if not weightfiles:
             return
         weightfile = sorted(weightfiles)[0]
+        # NOTE /yolov5 is patched to create confusion matrix json files
         with open(weightfile[:-3] + '.json') as f:
             return BasicModel(confusion_matrix=json.load(f), meta_information={'weightfile': weightfile})
 

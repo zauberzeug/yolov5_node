@@ -30,7 +30,7 @@ index e2cd5ec..99369b8 100644
                      torch.save(ckpt, w / f'epoch{epoch}.pt')
                  del ckpt
 diff --git a/val.py b/val.py
-index 4eec499..fefb234 100644
+index 4eec499..6e0cc51 100644
 --- a/val.py
 +++ b/val.py
 @@ -255,6 +255,11 @@ def run(data,
@@ -40,7 +40,7 @@ index 4eec499..fefb234 100644
 +    confusion_matrices = {}
 +    for i, c in enumerate(ap_class):
 +        fn = tp[i] / r[i] - tp[i] if r[i] != 0 else 0
-+        confusion_matrices[names[c]] = {'tp': tp[i], 'fp': fp[i], 'fn': fn}
++        confusion_matrices[names[c]] = {'tp': int(tp[i]), 'fp': int(fp[i]), 'fn': int(fn)}
 +    
      # Print speeds
      t = tuple(x / seen * 1E3 for x in dt)  # speeds per image
