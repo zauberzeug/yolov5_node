@@ -1,31 +1,103 @@
 diff --git a/train.py b/train.py
-index e2cd5ec..99369b8 100644
+index e2cd5ec..7631fc3 100644
 --- a/train.py
 +++ b/train.py
-@@ -6,6 +6,7 @@ Usage:
+@@ -5,7 +5,26 @@ Train a YOLOv5 model on a custom dataset
+ Usage:
      $ python path/to/train.py --data coco128.yaml --weights yolov5s.pt --img 640
  """
++from utils.torch_utils import EarlyStopping, ModelEMA, de_parallel, select_device, torch_distributed_zero_first
++from utils.plots import plot_evolve, plot_labels
++from utils.metrics import fitness
++from utils.loss import ComputeLoss
++from utils.loggers.wandb.wandb_utils import check_wandb_resume
++from utils.loggers import Loggers
++from utils.general import (LOGGER, check_dataset, check_file, check_git_status, check_img_size, check_requirements,
++                           check_suffix, check_yaml, colorstr, get_latest_run, increment_path, init_seeds,
++                           intersect_dicts, labels_to_class_weights, labels_to_image_weights, methods, one_cycle,
++                           print_args, print_mutation, strip_optimizer)
++from utils.downloads import attempt_download
++from utils.datasets import create_dataloader
++from utils.callbacks import Callbacks
++from utils.autobatch import check_train_batch_size
++from utils.autoanchor import check_anchors
++from models.yolo import Model
++from models.experimental import attempt_load
++import val  # for end-of-epoch mAP
  import argparse
 +import json
  import math
  import os
  import random
-@@ -355,7 +356,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
+@@ -31,24 +50,6 @@ if str(ROOT) not in sys.path:
+     sys.path.append(str(ROOT))  # add ROOT to PATH
+ ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
+ 
+-import val  # for end-of-epoch mAP
+-from models.experimental import attempt_load
+-from models.yolo import Model
+-from utils.autoanchor import check_anchors
+-from utils.autobatch import check_train_batch_size
+-from utils.callbacks import Callbacks
+-from utils.datasets import create_dataloader
+-from utils.downloads import attempt_download
+-from utils.general import (LOGGER, check_dataset, check_file, check_git_status, check_img_size, check_requirements,
+-                           check_suffix, check_yaml, colorstr, get_latest_run, increment_path, init_seeds,
+-                           intersect_dicts, labels_to_class_weights, labels_to_image_weights, methods, one_cycle,
+-                           print_args, print_mutation, strip_optimizer)
+-from utils.loggers import Loggers
+-from utils.loggers.wandb.wandb_utils import check_wandb_resume
+-from utils.loss import ComputeLoss
+-from utils.metrics import fitness
+-from utils.plots import plot_evolve, plot_labels
+-from utils.torch_utils import EarlyStopping, ModelEMA, de_parallel, select_device, torch_distributed_zero_first
+ 
+ LOCAL_RANK = int(os.getenv('LOCAL_RANK', -1))  # https://pytorch.org/docs/stable/elastic/run.html
+ RANK = int(os.getenv('RANK', -1))
+@@ -168,7 +169,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
+ 
+     # Scheduler
+     if opt.linear_lr:
+-        lf = lambda x: (1 - x / (epochs - 1)) * (1.0 - hyp['lrf']) + hyp['lrf']  # linear
++        def lf(x): return (1 - x / (epochs - 1)) * (1.0 - hyp['lrf']) + hyp['lrf']  # linear
+     else:
+         lf = one_cycle(1, hyp['lrf'], epochs)  # cosine 1->hyp['lrf']
+     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)  # plot_lr_scheduler(optimizer, scheduler, epochs)
+@@ -355,16 +356,16 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
              ema.update_attr(model, include=['yaml', 'nc', 'hyp', 'names', 'stride', 'class_weights'])
              final_epoch = (epoch + 1 == epochs) or stopper.possible_stop
              if not noval or final_epoch:  # Calculate mAP
 -                results, maps, _ = val.run(data_dict,
+-                                           batch_size=batch_size // WORLD_SIZE * 2,
+-                                           imgsz=imgsz,
+-                                           model=ema.ema,
+-                                           single_cls=single_cls,
+-                                           dataloader=val_loader,
+-                                           save_dir=save_dir,
+-                                           plots=False,
+-                                           callbacks=callbacks,
+-                                           compute_loss=compute_loss)
 +                results, confusion_matrices, maps, _ = val.run(data_dict,
-                                            batch_size=batch_size // WORLD_SIZE * 2,
-                                            imgsz=imgsz,
-                                            model=ema.ema,
-@@ -388,6 +389,9 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
++                                                               batch_size=batch_size // WORLD_SIZE * 2,
++                                                               imgsz=imgsz,
++                                                               model=ema.ema,
++                                                               single_cls=single_cls,
++                                                               dataloader=val_loader,
++                                                               save_dir=save_dir,
++                                                               plots=False,
++                                                               callbacks=callbacks,
++                                                               compute_loss=compute_loss)
+ 
+             # Update best mAP
+             fi = fitness(np.array(results).reshape(1, -1))  # weighted combination of [P, R, mAP@.5, mAP@.5-.95]
+@@ -388,6 +389,10 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
                  torch.save(ckpt, last)
                  if best_fitness == fi:
                      torch.save(ckpt, best)
-+                    torch.save(ckpt, w / f'epoch{epoch}.pt')
-+                    with open(w / f'epoch{epoch}.json', 'w+') as f:
-+                        json.dump(confusion_matrices, f)
++                    if confusion_matrices:
++                        torch.save(ckpt, w / f'epoch{epoch}.pt')
++                        with open(w / f'epoch{epoch}.json', 'w+') as f:
++                            json.dump(confusion_matrices, f)
                  if (epoch > 0) and (opt.save_period > 0) and (epoch % opt.save_period == 0):
                      torch.save(ckpt, w / f'epoch{epoch}.pt')
                  del ckpt

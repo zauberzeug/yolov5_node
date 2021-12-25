@@ -1,6 +1,5 @@
 from typing import List, Optional
-from learning_loop_node.trainer.trainer import Trainer
-from learning_loop_node.trainer.model import BasicModel
+from learning_loop_node.trainer import Trainer, BasicModel
 import yolov5_format
 import os
 import shutil
@@ -20,8 +19,7 @@ class Yolov5Trainer(Trainer):
         epochs = 1000
         if not os.path.isfile('hpy.yaml'):
             shutil.copy('/app/hyp.yaml', self.training.training_folder)
-        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --batch-size {batch_size} --img {resolution} --data dataset.yaml --save-period 2 --weights model.pt --project {self.training.training_folder} --name result --hyp hyp.yaml --epochs {epochs}'
-        ic(cmd)
+        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights model.pt --project {self.training.training_folder} --name result --hyp hyp.yaml --epochs {epochs}'
         self.executor.start(cmd)
 
     def get_error(self) -> str:
@@ -33,11 +31,8 @@ class Yolov5Trainer(Trainer):
         except:
             return
 
-    def get_model_files(self, model_id) -> List[str]:
-        return []  # tbd.
-
     def get_new_model(self) -> Optional[BasicModel]:
-        path = 'result/weights'
+        path = self.training.training_folder + '/result/weights'
         if not os.path.isdir(path):
             return
         weightfiles = [os.path.join(path, f) for f in os.listdir(path) if 'epoch' in f and f.endswith('.pt')]
@@ -46,10 +41,15 @@ class Yolov5Trainer(Trainer):
         weightfile = sorted(weightfiles)[0]
         # NOTE /yolov5 is patched to create confusion matrix json files
         with open(weightfile[:-3] + '.json') as f:
-            return BasicModel(confusion_matrix=json.load(f), meta_information={'weightfile': weightfile})
+            matrix = json.load(f)
+            for category_name in list(matrix.keys()):
+                matrix[self.training.data.categories[category_name]] = matrix.pop(category_name)
+
+        return BasicModel(confusion_matrix=matrix, meta_information={'weightfile': weightfile})
 
     def on_model_published(self, basic_model: BasicModel, uuid: str) -> None:
-        shutil.move(basic_model.meta_information['weightfile'], f'result/weights/{uuid}.pt')
+        target = self.training.training_folder + f'/result/weights/{uuid}.pt'
+        shutil.move(basic_model.meta_information['weightfile'], target)
 
-    def stop_training(self) -> None:
-        self.executor.stop()
+    def get_model_files(self, model_id) -> List[str]:
+        return []

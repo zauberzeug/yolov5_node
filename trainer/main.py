@@ -2,8 +2,11 @@ from learning_loop_node import TrainerNode
 from yolov5_trainer import Yolov5Trainer
 import uvicorn
 import os
+import logging
 import icecream
 icecream.install()
+
+logging.basicConfig(level=logging.INFO)
 
 node = TrainerNode(name='Yolov5 Trainer ' + os.uname()[1], trainer=Yolov5Trainer())
 

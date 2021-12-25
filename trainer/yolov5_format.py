@@ -6,7 +6,7 @@ import os
 
 
 def create_set(training: Training, set_name: str):
-    categories = [c['id'] for c in training.data.categories]
+    categories = list(training.data.categories.values())
     training_path = training.training_folder
     images_path = f'{training_path}/{set_name}'
     os.makedirs(images_path, exist_ok=True)
@@ -53,7 +53,7 @@ def create_yaml(training: Training):
         'test': path + '/test',
         'val': path + '/test',
         'nc': len(training.data.categories),
-        'names': [c['name'] for c in training.data.categories],
+        'names': list(training.data.categories.keys()),
     }
 
     with open(f'{path}/dataset.yaml', 'w') as f:
