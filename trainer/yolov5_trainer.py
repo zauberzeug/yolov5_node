@@ -1,9 +1,11 @@
 from typing import List, Optional
+from learning_loop_node import GLOBALS
 from learning_loop_node.trainer import Trainer, BasicModel
 import yolov5_format
 import os
 import shutil
 import json
+from glob import glob
 
 
 class Yolov5Trainer(Trainer):
@@ -47,9 +49,14 @@ class Yolov5Trainer(Trainer):
 
         return BasicModel(confusion_matrix=matrix, meta_information={'weightfile': weightfile})
 
-    def on_model_published(self, basic_model: BasicModel, uuid: str) -> None:
-        target = self.training.training_folder + f'/result/weights/{uuid}.pt'
+    def on_model_published(self, basic_model: BasicModel, model_id: str) -> None:
+        target = self.training.training_folder + f'/result/weights/{model_id}.pt'
         shutil.move(basic_model.meta_information['weightfile'], target)
 
     def get_model_files(self, model_id) -> List[str]:
-        return []
+        weightfile = glob(f'{GLOBALS.data_folder}/**/trainings/**/{model_id}.pt', recursive=True)[0]
+        shutil.copy(weightfile, '/tmp/model.pt')
+        training_path = '/'.join(weightfile.split('/')[:-2])
+        formats = {}
+        formats[self.model_format] = [weightfile, f'{training_path}/hyp.yaml']
+        return formats
