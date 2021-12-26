@@ -6,6 +6,7 @@ import os
 import shutil
 import json
 from glob import glob
+import subprocess
 
 
 class Yolov5Trainer(Trainer):
@@ -56,7 +57,9 @@ class Yolov5Trainer(Trainer):
     def get_model_files(self, model_id) -> List[str]:
         weightfile = glob(f'{GLOBALS.data_folder}/**/trainings/**/{model_id}.pt', recursive=True)[0]
         shutil.copy(weightfile, '/tmp/model.pt')
-        training_path = '/'.join(weightfile.split('/')[:-2])
-        formats = {}
-        formats[self.model_format] = [weightfile, f'{training_path}/hyp.yaml']
-        return formats
+        training_path = '/'.join(weightfile.split('/')[:-3])
+        subprocess.run(f'python3 /yolov5/gen_wts.py -w {weightfile} -o /tmp/model.wts', shell=True)
+        return {
+            self.model_format: ['/tmp/model.pt', f'{training_path}/hyp.yaml', f'{training_path}/model.json'],
+            'yolov5_wts': ['/tmp/model.wts', f'{training_path}/model.json']
+        }

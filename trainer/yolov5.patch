@@ -1,5 +1,5 @@
 diff --git a/train.py b/train.py
-index e2cd5ec..7631fc3 100644
+index e2cd5ec..8cb2287 100644
 --- a/train.py
 +++ b/train.py
 @@ -5,7 +5,26 @@ Train a YOLOv5 model on a custom dataset
@@ -95,9 +95,9 @@ index e2cd5ec..7631fc3 100644
                  if best_fitness == fi:
                      torch.save(ckpt, best)
 +                    if confusion_matrices:
-+                        torch.save(ckpt, w / f'epoch{epoch}.pt')
 +                        with open(w / f'epoch{epoch}.json', 'w+') as f:
 +                            json.dump(confusion_matrices, f)
++                        torch.save(ckpt, w / f'epoch{epoch}.pt')
                  if (epoch > 0) and (opt.save_period > 0) and (epoch % opt.save_period == 0):
                      torch.save(ckpt, w / f'epoch{epoch}.pt')
                  del ckpt
