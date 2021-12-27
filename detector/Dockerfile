@@ -32,7 +32,7 @@ RUN apt-get update && \
 RUN pip3 install --no-cache-dir async_generator aiofiles psutil pillow
 RUN pip3 install --no-cache-dir multidict attrs yarl async_timeout
 RUN pip3 install --no-cache-dir idna_ssl cchardet aiosignal
-RUN pip3 install --no-cache-dir "learning-loop-node==0.6.1"
+RUN pip3 install --no-cache-dir "learning-loop-node==0.6.4"
 
 WORKDIR /
 
