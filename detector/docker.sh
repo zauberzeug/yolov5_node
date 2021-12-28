@@ -39,6 +39,7 @@ run_args+=" -v $(pwd)/../:/yolov5_node"
 run_args+=" -v $HOME/data:/data"
 run_args+=" -v $HOME/learning_loop_node/learning_loop_node:/usr/local/lib/python3.6/dist-packages/learning_loop_node"
 run_args+=" -h $HOSTNAME"
+#run_args+=" -e HOST=n7.zauberzeug.com"
 run_args+=" -e ORGANIZATION=zauberzeug"
 run_args+=" -e PROJECT=drawingbot"
 run_args+=" --name $name"
@@ -58,7 +59,7 @@ case $cmd in
         docker build . -t ${image}-dev $cmd_args
         ;;
     d | debug)
-        docker run $run_args $image /app/start.sh debug
+        docker run $run_args $image-dev /app/start.sh debug
         ;;
     r | run)
         docker run $run_args $image-dev $cmd_args

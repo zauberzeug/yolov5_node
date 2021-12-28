@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, List
 from learning_loop_node import ModelInformation
 from learning_loop_node import Detector
 from learning_loop_node.detector import Detections
@@ -10,6 +10,7 @@ import yolov5_trt
 import ctypes
 import cv2
 import numpy as np
+
 
 class Yolov5Detector(Detector):
 
@@ -25,10 +26,10 @@ class Yolov5Detector(Detector):
             warmup = yolov5_trt.warmUpThread(self.yolov5)
             warmup.start()
             warmup.join()
-        
-    def evaluate(self, image: [np.uint8]) -> Detections:
+
+    def evaluate(self, image: List[np.uint8]) -> Detections:
         detections = Detections()
-        try:    
+        try:
             result, time = self.yolov5.infer([cv2.imdecode(image, cv2.IMREAD_COLOR)])
             logging.info(f'took {time} ms')
         except Exception as e:
@@ -54,4 +55,3 @@ class Yolov5Detector(Detector):
         subprocess.run('make -j6 -Wno-deprecated-declarations', shell=True)
         subprocess.run(f'./yolov5 -s {wts_file} {engine_file} s6', shell=True)  # TODO parameterize variant "s6"
         return engine_file
-
