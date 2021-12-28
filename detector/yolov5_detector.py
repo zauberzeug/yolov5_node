@@ -6,7 +6,7 @@ import logging
 import os
 import subprocess
 import re
-import yolov5_trt
+import yolov5
 import ctypes
 import cv2
 import numpy as np
@@ -21,9 +21,9 @@ class Yolov5Detector(Detector):
         self.model_info = model_info
         engine_file = self._create_engine(model_info.resolution, f'{model_root_path}/model.wts')
         ctypes.CDLL('/tensorrtx/yolov5/build/libmyplugins.so')
-        self.yolov5 = yolov5_trt.YoLov5TRT(engine_file)
+        self.yolov5 = yolov5.YoLov5TRT(engine_file)
         for i in range(3):
-            warmup = yolov5_trt.warmUpThread(self.yolov5)
+            warmup = yolov5.warmUpThread(self.yolov5)
             warmup.start()
             warmup.join()
 
