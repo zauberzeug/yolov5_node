@@ -30,10 +30,8 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-RUN pip3 install --no-cache-dir async_generator aiofiles psutil pillow
-RUN pip3 install --no-cache-dir multidict attrs yarl async_timeout
-RUN pip3 install --no-cache-dir idna_ssl cchardet aiosignal
-RUN pip3 install --no-cache-dir "learning-loop-node==0.6.5"
+RUN pip3 install --no-cache-dir async_generator aiofiles psutil pillow multidict attrs yarl async_timeout idna_ssl cchardet aiosignal
+RUN pip3 install --no-cache-dir "learning-loop-node==0.6.6"
 
 WORKDIR /
 
