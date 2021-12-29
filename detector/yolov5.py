@@ -17,7 +17,7 @@ import pycuda.driver as cuda
 import tensorrt as trt
 from collections import namedtuple
 
-CONF_THRESH = 0.5
+CONF_THRESH = 0.2
 IOU_THRESHOLD = 0.4
 
 
@@ -103,7 +103,6 @@ class YoLov5TRT(object):
         bindings = self.bindings
         # Do image preprocess
         input_image, image_raw, origin_h, origin_w = self.preprocess_image(image_raw)
-        input_image = np.ascontiguousarray(input_image)
 
         # Copy input image to host buffer
         np.copyto(host_inputs[0], input_image.ravel())
