@@ -86,10 +86,12 @@ class YoLov5TRT(object):
         self.host_outputs = host_outputs
         self.cuda_outputs = cuda_outputs
         self.bindings = bindings
-        self.batch_size = engine.max_batch_size
+        self.batch_size = 1
 
     def infer(self, image_raw):
         threading.Thread.__init__(self)
+        # Do image preprocess
+        input_image, image_raw, origin_h, origin_w = self.preprocess_image(image_raw)
         # Make self the active context, pushing it on top of the context stack.
         self.ctx.push()
         # Restore
@@ -101,8 +103,6 @@ class YoLov5TRT(object):
         host_outputs = self.host_outputs
         cuda_outputs = self.cuda_outputs
         bindings = self.bindings
-        # Do image preprocess
-        input_image, image_raw, origin_h, origin_w = self.preprocess_image(image_raw)
 
         # Copy input image to host buffer
         np.copyto(host_inputs[0], input_image.ravel())

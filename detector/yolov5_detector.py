@@ -72,5 +72,7 @@ class Yolov5Detector(Detector):
             f.truncate()
             f.write(content)
         subprocess.run('make -j6 -Wno-deprecated-declarations', shell=True)
+        logging.warning('currently we assume a Yolov5 s6 model;\
+            parameterization of the variant (s, s6, m, m6, ...) still needs to be done')
         subprocess.run(f'./yolov5 -s {wts_file} {engine_file} s6', shell=True)  # TODO parameterize variant "s6"
         return engine_file
