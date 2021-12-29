@@ -1,7 +1,7 @@
 from typing import Any, List
-from learning_loop_node import ModelInformation
-from learning_loop_node import Detector
-from learning_loop_node.detector import Detections
+from learning_loop_node import ModelInformation, Detector
+from learning_loop_node.detector import Detections, BoxDetection, PointDetection
+from learning_loop_node.data_classes import Category, CategoryType
 import logging
 import os
 import subprocess
@@ -25,7 +25,7 @@ class Yolov5Detector(Detector):
             f'{model_root_path}/model.wts'
         )
         ctypes.CDLL('/tensorrtx/yolov5/build/libmyplugins.so')
-        self.yolov5 = yolov5.YoLov5TRT(engine_file, model_info.categories)
+        self.yolov5 = yolov5.YoLov5TRT(engine_file)
         for i in range(3):
             warmup = yolov5.warmUpThread(self.yolov5)
             warmup.start()
@@ -34,11 +34,24 @@ class Yolov5Detector(Detector):
     def evaluate(self, image: List[np.uint8]) -> Detections:
         detections = Detections()
         try:
-            result, time = self.yolov5.infer([cv2.imdecode(image, cv2.IMREAD_COLOR)])
+            results, time = self.yolov5.infer([cv2.imdecode(image, cv2.IMREAD_COLOR)])
             logging.info(f'took {time} ms')
+            for detection in results:
+                x, y, w, h, category, probability = detection
+                category = self.model_info.categories[category]
+                if category.type == CategoryType.Box:
+                    detections.box_detections.append(BoxDetection(
+                        category.name, x, y, w, h, self.model_info.version, probability
+                    ))
+                elif category.type == CategoryType.Point:
+                    ic(w, h)
+                    cx, cy = (np.average([x, x + w]), np.average([y, y + h]))
+                    detections.point_detections.append(PointDetection(
+                        category.name, int(cx), int(cy), self.model_info.version, probability
+                    ))
+
         except Exception as e:
             logging.exception('inference failed')
-
         return detections
 
     def _create_engine(self, resolution: int, cat_count: int, wts_file: str) -> str:

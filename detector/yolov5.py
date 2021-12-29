@@ -15,7 +15,7 @@ import numpy as np
 import pycuda.autoinit
 import pycuda.driver as cuda
 import tensorrt as trt
-from learning_loop_node.data_classes import Category
+from collections import namedtuple
 
 CONF_THRESH = 0.5
 IOU_THRESHOLD = 0.4
@@ -40,13 +40,12 @@ class YoLov5TRT(object):
     description: A YOLOv5 class that warps TensorRT ops, preprocess and postprocess ops.
     """
 
-    def __init__(self, engine_file_path: str, categories: List[Category]):
+    def __init__(self, engine_file_path: str):
         # Create a Context on this device,
         self.ctx = cuda.Device(0).make_context()
         stream = cuda.Stream()
         TRT_LOGGER = trt.Logger(trt.Logger.INFO)
         runtime = trt.Runtime(TRT_LOGGER)
-        self.categories = categories
 
         # Deserialize the engine from file
         with open(engine_file_path, "rb") as f:
@@ -133,20 +132,21 @@ class YoLov5TRT(object):
         output = host_outputs[0]
         # Do postprocess
         for i in range(self.batch_size):
-            ic()
+            detections = []
+            Detection = namedtuple('Detection', 'x y w h category probability')
             result_boxes, result_scores, result_classid = self.post_process(
                 output[i * 6001: (i + 1) * 6001], batch_origin_h[i], batch_origin_w[i]
             )
-            ic(len(result_boxes))
             for j in range(len(result_boxes)):
-                box = result_boxes[j]
-                ic(
-                    box,
-                    batch_image_raw[i],
-                    "{}:{:.2f}".format(
-                        self.categories[int(result_classid[j])].name, result_scores[j]
-                    ),
+                x, y, br_x, br_y = result_boxes[j]
+                w = br_x - x
+                h = br_y - y
+                detections.append(Detection(
+                    int(x), int(y), int(w), int(h),
+                    int(result_classid[j]), round(float(result_scores[j]), 2))
                 )
+
+            return detections, end - start
         return batch_image_raw, end - start
 
     def destroy(self):
