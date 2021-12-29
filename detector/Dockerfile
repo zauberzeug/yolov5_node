@@ -1,4 +1,5 @@
-FROM zauberzeug/l4t-opencv:4.5.2-on-nano-32.6.1 as release
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE} as release
 
 RUN apt-get update && \
         DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
