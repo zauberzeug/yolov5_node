@@ -9,11 +9,13 @@ import random
 import sys
 import threading
 import time
+from typing import Dict, List
 import cv2
 import numpy as np
 import pycuda.autoinit
 import pycuda.driver as cuda
 import tensorrt as trt
+from learning_loop_node.data_classes import Category
 
 CONF_THRESH = 0.5
 IOU_THRESHOLD = 0.4
@@ -38,12 +40,13 @@ class YoLov5TRT(object):
     description: A YOLOv5 class that warps TensorRT ops, preprocess and postprocess ops.
     """
 
-    def __init__(self, engine_file_path):
+    def __init__(self, engine_file_path: str, categories: List[Category]):
         # Create a Context on this device,
         self.ctx = cuda.Device(0).make_context()
         stream = cuda.Stream()
         TRT_LOGGER = trt.Logger(trt.Logger.INFO)
         runtime = trt.Runtime(TRT_LOGGER)
+        self.categories = categories
 
         # Deserialize the engine from file
         with open(engine_file_path, "rb") as f:
@@ -140,8 +143,8 @@ class YoLov5TRT(object):
                 ic(
                     box,
                     batch_image_raw[i],
-                    label="{}:{:.2f}".format(
-                        categories[int(result_classid[j])], result_scores[j]
+                    "{}:{:.2f}".format(
+                        self.categories[int(result_classid[j])].name, result_scores[j]
                     ),
                 )
         return batch_image_raw, end - start
@@ -363,53 +366,3 @@ class warmUpThread(threading.Thread):
     def run(self):
         batch_image_raw, use_time = self.yolov5_wrapper.infer(self.yolov5_wrapper.get_raw_image_zeros())
         print('warm_up->{}, time->{:.2f}ms'.format(batch_image_raw[0].shape, use_time * 1000))
-
-
-if __name__ == "__main__":
-    # load custom plugin and engine
-    PLUGIN_LIBRARY = "build/libmyplugins.so"
-    engine_file_path = "build/yolov5s.engine"
-
-    if len(sys.argv) > 1:
-        engine_file_path = sys.argv[1]
-    if len(sys.argv) > 2:
-        PLUGIN_LIBRARY = sys.argv[2]
-
-    ctypes.CDLL(PLUGIN_LIBRARY)
-
-    # load coco labels
-
-    categories = ["person", "bicycle", "car", "motorcycle", "airplane", "bus", "train", "truck", "boat", "traffic light",
-                  "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow",
-                  "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", "tie", "suitcase", "frisbee",
-                  "skis", "snowboard", "sports ball", "kite", "baseball bat", "baseball glove", "skateboard", "surfboard",
-                  "tennis racket", "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple",
-                  "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair", "couch",
-                  "potted plant", "bed", "dining table", "toilet", "tv", "laptop", "mouse", "remote", "keyboard", "cell phone",
-                  "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase", "scissors", "teddy bear",
-                  "hair drier", "toothbrush"]
-
-    if os.path.exists('output/'):
-        shutil.rmtree('output/')
-    os.makedirs('output/')
-    # a YoLov5TRT instance
-    yolov5_wrapper = YoLov5TRT(engine_file_path)
-    try:
-        print('batch size is', yolov5_wrapper.batch_size)
-
-        image_dir = "samples/"
-        image_path_batches = get_img_path_batches(yolov5_wrapper.batch_size, image_dir)
-
-        for i in range(10):
-            # create a new thread to do warm_up
-            thread1 = warmUpThread(yolov5_wrapper)
-            thread1.start()
-            thread1.join()
-        for batch in image_path_batches:
-            # create a new thread to do inference
-            thread1 = inferThread(yolov5_wrapper, batch)
-            thread1.start()
-            thread1.join()
-    finally:
-        # destroy the instance
-        yolov5_wrapper.destroy()

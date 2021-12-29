@@ -19,9 +19,13 @@ class Yolov5Detector(Detector):
 
     def init(self,  model_info: ModelInformation, model_root_path: str):
         self.model_info = model_info
-        engine_file = self._create_engine(model_info.resolution, f'{model_root_path}/model.wts')
+        engine_file = self._create_engine(
+            model_info.resolution,
+            len(model_info.categories),
+            f'{model_root_path}/model.wts'
+        )
         ctypes.CDLL('/tensorrtx/yolov5/build/libmyplugins.so')
-        self.yolov5 = yolov5.YoLov5TRT(engine_file)
+        self.yolov5 = yolov5.YoLov5TRT(engine_file, model_info.categories)
         for i in range(3):
             warmup = yolov5.warmUpThread(self.yolov5)
             warmup.start()
@@ -37,7 +41,7 @@ class Yolov5Detector(Detector):
 
         return detections
 
-    def _create_engine(self, resolution: int, wts_file: str) -> str:
+    def _create_engine(self, resolution: int, cat_count: int, wts_file: str) -> str:
         engine_file = os.path.dirname(wts_file) + '/model.engine'
         if os.path.isfile(engine_file):
             logging.info(f'{engine_file} already exists, skipping conversion')
@@ -48,6 +52,7 @@ class Yolov5Detector(Detector):
         # Adapt resolution
         with open('../yololayer.h', 'r+') as f:
             content = f.read()
+            content = re.sub('(CLASS_NUM =) \d*', r'\1 ' + str(cat_count), content)
             content = re.sub('(INPUT_[HW] =) \d*', r'\1 ' + str(resolution), content)
             f.seek(0)
             f.truncate()
