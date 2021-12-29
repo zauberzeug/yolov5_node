@@ -125,7 +125,7 @@ class YoLov5TRT(object):
         detections = []
         Detection = namedtuple('Detection', 'x y w h category probability')
         result_boxes, result_scores, result_classid = self.post_process(
-            output[0:6001], self.input_h, self.input_w
+            output[0:6001], origin_h, origin_w
         )
         for j in range(len(result_boxes)):
             x, y, br_x, br_y = result_boxes[j]
