@@ -10,6 +10,7 @@ import yolov5
 import ctypes
 import cv2
 import numpy as np
+import time
 
 
 class Yolov5Detector(Detector):
@@ -34,8 +35,9 @@ class Yolov5Detector(Detector):
     def evaluate(self, image: List[np.uint8]) -> Detections:
         detections = Detections()
         try:
-            results, time = self.yolov5.infer([cv2.imdecode(image, cv2.IMREAD_COLOR)])
-            logging.info(f'took {time} ms')
+            t = time.time()
+            results, inference_ms = self.yolov5.infer(cv2.imdecode(image, cv2.IMREAD_COLOR))
+            logging.info(f'took {inference_ms} s, overall {time.time() -t} s')
             for detection in results:
                 x, y, w, h, category, probability = detection
                 category = self.model_info.categories[category]
@@ -44,7 +46,6 @@ class Yolov5Detector(Detector):
                         category.name, x, y, w, h, self.model_info.version, probability
                     ))
                 elif category.type == CategoryType.Point:
-                    ic(w, h)
                     cx, cy = (np.average([x, x + w]), np.average([y, y + h]))
                     detections.point_detections.append(PointDetection(
                         category.name, int(cx), int(cy), self.model_info.version, probability

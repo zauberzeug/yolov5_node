@@ -60,7 +60,7 @@ class YoLov5TRT(object):
 
         for binding in engine:
             print('bingding:', binding, engine.get_binding_shape(binding))
-            size = trt.volume(engine.get_binding_shape(binding)) * engine.max_batch_size
+            size = trt.volume(engine.get_binding_shape(binding))
             dtype = trt.nptype(engine.get_binding_dtype(binding))
             # Allocate host and device buffers
             host_mem = cuda.pagelocked_empty(size, dtype)
@@ -88,7 +88,7 @@ class YoLov5TRT(object):
         self.bindings = bindings
         self.batch_size = engine.max_batch_size
 
-    def infer(self, raw_image_generator):
+    def infer(self, image_raw):
         threading.Thread.__init__(self)
         # Make self the active context, pushing it on top of the context stack.
         self.ctx.push()
@@ -102,20 +102,11 @@ class YoLov5TRT(object):
         cuda_outputs = self.cuda_outputs
         bindings = self.bindings
         # Do image preprocess
-        batch_image_raw = []
-        batch_origin_h = []
-        batch_origin_w = []
-        batch_input_image = np.empty(shape=[self.batch_size, 3, self.input_h, self.input_w])
-        for i, image_raw in enumerate(raw_image_generator):
-            input_image, image_raw, origin_h, origin_w = self.preprocess_image(image_raw)
-            batch_image_raw.append(image_raw)
-            batch_origin_h.append(origin_h)
-            batch_origin_w.append(origin_w)
-            np.copyto(batch_input_image[i], input_image)
-        batch_input_image = np.ascontiguousarray(batch_input_image)
+        input_image, image_raw, origin_h, origin_w = self.preprocess_image(image_raw)
+        input_image = np.ascontiguousarray(input_image)
 
         # Copy input image to host buffer
-        np.copyto(host_inputs[0], batch_input_image.ravel())
+        np.copyto(host_inputs[0], input_image.ravel())
         start = time.time()
         # Transfer input data  to the GPU.
         cuda.memcpy_htod_async(cuda_inputs[0], host_inputs[0], stream)
@@ -131,41 +122,31 @@ class YoLov5TRT(object):
         # Here we use the first row of output in that batch_size = 1
         output = host_outputs[0]
         # Do postprocess
-        for i in range(self.batch_size):
-            detections = []
-            Detection = namedtuple('Detection', 'x y w h category probability')
-            result_boxes, result_scores, result_classid = self.post_process(
-                output[i * 6001: (i + 1) * 6001], batch_origin_h[i], batch_origin_w[i]
+        detections = []
+        Detection = namedtuple('Detection', 'x y w h category probability')
+        result_boxes, result_scores, result_classid = self.post_process(
+            output[0:6001], self.input_h, self.input_w
+        )
+        for j in range(len(result_boxes)):
+            x, y, br_x, br_y = result_boxes[j]
+            w = br_x - x
+            h = br_y - y
+            detections.append(Detection(
+                int(x), int(y), int(w), int(h),
+                int(result_classid[j]), round(float(result_scores[j]), 2))
             )
-            for j in range(len(result_boxes)):
-                x, y, br_x, br_y = result_boxes[j]
-                w = br_x - x
-                h = br_y - y
-                detections.append(Detection(
-                    int(x), int(y), int(w), int(h),
-                    int(result_classid[j]), round(float(result_scores[j]), 2))
-                )
 
-            return detections, end - start
-        return batch_image_raw, end - start
+        return detections, end - start
 
     def destroy(self):
         # Remove any context from the top of the context stack, deactivating it.
         self.ctx.pop()
 
-    def get_raw_image(self, image_path_batch):
-        """
-        description: Read an image from image path
-        """
-        for img_path in image_path_batch:
-            yield cv2.imread(img_path)
-
     def get_raw_image_zeros(self, image_path_batch=None):
         """
         description: Ready data for warmup
         """
-        for _ in range(self.batch_size):
-            yield np.zeros([self.input_h, self.input_w, 3], dtype=np.uint8)
+        return np.zeros([self.input_h, self.input_w, 3], dtype=np.uint8)
 
     def preprocess_image(self, raw_bgr_image):
         """
@@ -364,5 +345,5 @@ class warmUpThread(threading.Thread):
         self.yolov5_wrapper = yolov5_wrapper
 
     def run(self):
-        batch_image_raw, use_time = self.yolov5_wrapper.infer(self.yolov5_wrapper.get_raw_image_zeros())
-        print('warm_up->{}, time->{:.2f}ms'.format(batch_image_raw[0].shape, use_time * 1000))
+        _, use_time = self.yolov5_wrapper.infer(self.yolov5_wrapper.get_raw_image_zeros())
+        print('warm_up time->{:.2f}ms'.format(use_time * 1000))
