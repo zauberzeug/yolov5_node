@@ -1,0 +1,21 @@
+diff --git a/train.py b/train.py
+index 152a7b2..36db492 100644
+--- a/train.py
++++ b/train.py
+@@ -191,6 +191,8 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
+             ema.updates = ckpt['updates']
+ 
+         # Epochs
++        if opt.clear:
++            ckpt['epoch'] = 0
+         start_epoch = ckpt['epoch'] + 1
+         if resume:
+             assert start_epoch > 0, f'{weights} training to {epochs} epochs is finished, nothing to resume.'
+@@ -451,6 +453,7 @@ def parse_opt(known=False):
+     parser.add_argument('--data', type=str, default=ROOT / 'data/coco128.yaml', help='dataset.yaml path')
+     parser.add_argument('--hyp', type=str, default=ROOT / 'data/hyps/hyp.scratch.yaml', help='hyperparameters path')
+     parser.add_argument('--epochs', type=int, default=300)
++    parser.add_argument('--clear', action='store_true', help='clear epochs before starting training')
+     parser.add_argument('--batch-size', type=int, default=16, help='total batch size for all GPUs, -1 for autobatch')
+     parser.add_argument('--imgsz', '--img', '--img-size', type=int, default=640, help='train, val image size (pixels)')
+     parser.add_argument('--rect', action='store_true', help='rectangular training')
