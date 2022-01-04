@@ -33,15 +33,15 @@ RUN pip install --no-cache torch==1.10.0+cu113 torchvision==0.11.1+cu113 -f http
 RUN git clone https://github.com/ultralytics/yolov5.git
 WORKDIR /yolov5
 RUN git checkout db6ec66a602a0b64a7db1711acd064eda5daf2b3
-COPY yolov5.patch ./
-RUN git apply yolov5.patch && rm yolov5.patch
+COPY *.patch ./
+RUN git apply confusion-matrices.patch && git apply clear_epochs.patch && rm *.patch
 RUN python3 -m pip install --no-cache -r requirements.txt
 RUN pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof
 # wts file generator for detector format
 RUN wget https://raw.githubusercontent.com/wang-xinyu/tensorrtx/master/yolov5/gen_wts.py
 
 RUN python3 -m pip install autopep8 debugpy gunicorn pyyaml uvloop pytest-asyncio 
-RUN python3 -m pip install "learning_loop_node==0.6.1"
+RUN python3 -m pip install "learning_loop_node==0.6.6"
 
 ADD ./ /yolov5_node/trainer/
 RUN ln -sf /yolov5_node/trainer /app

@@ -22,7 +22,7 @@ class Yolov5Trainer(Trainer):
         epochs = 1000
         if not os.path.isfile('hpy.yaml'):
             shutil.copy('/app/hyp.yaml', self.training.training_folder)
-        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights model.pt --project {self.training.training_folder} --name result --hyp hyp.yaml --epochs {epochs}'
+        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights model.pt --project {self.training.training_folder} --name result --hyp hyp.yaml --epochs {epochs} --clear'
         self.executor.start(cmd)
 
     def get_error(self) -> str:
