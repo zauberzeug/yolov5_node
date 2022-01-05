@@ -8,22 +8,6 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v2
-      - name: set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: "3.7"
-      - name: set up Poetry
-        uses: abatilo/actions-poetry@v2.0.0
-        with:
-          poetry-version: "1.1.12"
-      - name: install curl ssl
-        run: |
-          sudo apt-get update
-          sudo apt-get install libcurl4-openssl-dev libssl-dev
-      - name: install dependencies
-        run: |
-          poetry config virtualenvs.create false --local
-          poetry install
       - name: test
         run: |
           cd trainer
