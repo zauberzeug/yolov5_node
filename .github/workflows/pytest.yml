@@ -11,8 +11,8 @@ jobs:
       - name: test
         run: |
           cd trainer
-          docker.sh b
-          docker.sh run
+          ./docker.sh b
+          ./docker.sh run
           docker exec yolov5_trainer_node pytest -v
         env:
           LOOP_HOST: preview.learning-loop.ai
