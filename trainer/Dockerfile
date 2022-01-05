@@ -34,7 +34,7 @@ RUN git clone https://github.com/ultralytics/yolov5.git
 WORKDIR /yolov5
 RUN git checkout db6ec66a602a0b64a7db1711acd064eda5daf2b3
 COPY *.patch ./
-RUN git apply confusion-matrices.patch && git apply clear_epochs.patch && rm *.patch
+RUN git apply confusion_matrices.patch && git apply clear_epochs.patch && rm *.patch
 RUN python3 -m pip install --no-cache -r requirements.txt
 RUN pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof
 # wts file generator for detector format
