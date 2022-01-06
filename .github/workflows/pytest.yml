@@ -33,7 +33,7 @@ jobs:
 
   slack:
     needs:
-      - [pytest]
+      - pytest
     if: always() # also execute when pytest fails
     runs-on: ubuntu-latest
     steps:
