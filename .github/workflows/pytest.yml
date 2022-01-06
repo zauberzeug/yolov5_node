@@ -28,7 +28,8 @@ jobs:
           ./docker.sh p
       - name: cleanup
         if: always() # also execute when pytest fails
-            docker stop yolov5_trainer_node_github_action | echo "Nothing to do. No container running."
+        run: |
+          docker stop yolov5_trainer_node_github_action | echo "Nothing to do. No container running."
 
   slack:
     needs:
