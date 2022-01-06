@@ -14,4 +14,6 @@ jobs:
           ls
           cd trainer
           ./docker.sh b
+          pwd
+          docker exec -T yolov5-trainer pytest -v'
           nvidia-smi
