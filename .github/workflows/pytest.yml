@@ -7,8 +7,11 @@ jobs:
     runs-on: [self-hosted, gpu]
     steps:
       - uses: actions/checkout@v2
-      - name: cml_ruh
+      - name: cml_run
         env:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          ls
+          cd trainer
+          ./docker.sh b
           nvidia-smi
