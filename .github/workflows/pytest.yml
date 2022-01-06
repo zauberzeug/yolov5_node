@@ -14,5 +14,4 @@ jobs:
           ls
           cd trainer
           ./docker.sh b
-          docker-compose -p loop exec -T mock_detector pytest -v'
           nvidia-smi
