@@ -25,7 +25,6 @@ jobs:
       - name: publish
         run: |
           cd trainer
-        # ./docker.sh p
           cd force_error
       - name: cleanup
         if: always() # also execute when pytest fails
