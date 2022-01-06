@@ -22,9 +22,6 @@ jobs:
       - name: tests
         run: |
           docker exec yolov5_trainer_node_github_action pytest -v
-      - name: publish
-        run: |
-          cd trainer
       - name: cleanup
         if: always() # also execute when pytest fails
         run: |
