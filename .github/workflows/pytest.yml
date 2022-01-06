@@ -25,6 +25,7 @@ jobs:
       - name: publish
         if: github.ref == 'refs/heads/main'
         run: |
+          cd trainer
           ./docker.sh p
       - name: cleanup
         if: always() # also execute when pytest fails
