@@ -17,5 +17,5 @@ jobs:
           pwd
           docker run -d -it --rm -v /home/zauberzeug/data:/data -e HOST= -h n6 -e USERNAME= -e PASSWORD= --name yolov5_trainer_node_github_action --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all --gpus all --ipc host zauberzeug/yolov5-trainer:latest-dev
           docker ps
-          docker exec -T yolov5-trainer pytest -v'
+          docker exec -T yolov5-trainer pytest -v
           nvidia-smi
