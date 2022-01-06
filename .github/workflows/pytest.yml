@@ -11,6 +11,7 @@ jobs:
         env:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          docker stop yolov5_trainer_node_github_action | echo "Nothing to do. No container running."
           ls
           cd trainer
           ./docker.sh b
