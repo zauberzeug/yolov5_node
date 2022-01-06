@@ -24,7 +24,8 @@ jobs:
           docker exec yolov5_trainer_node_github_action pytest -v
       - name: publish
         run: |
-          ./docker p
+          cd trainer
+          ./docker.sh p
       - name: cleanup
         if: always() # also execute when pytest fails
             docker stop yolov5_trainer_node_github_action | echo "Nothing to do. No container running."
