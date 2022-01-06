@@ -25,7 +25,6 @@ jobs:
       - name: publish
         run: |
           cd trainer
-          cd force_error
       - name: cleanup
         if: always() # also execute when pytest fails
         run: |
