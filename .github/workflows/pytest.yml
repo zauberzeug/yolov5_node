@@ -1,0 +1,54 @@
+name: Run Tests
+
+on: [push]
+
+jobs:
+  pytest:
+    runs-on: [self-hosted, gpu]
+    steps:
+      - uses: actions/checkout@v2
+      - name: checkout | cleanup
+        env:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          docker stop yolov5_trainer_node_github_action | echo "Nothing to do. No container running."
+      - name: build
+        run: |
+          cd trainer
+          ./docker.sh b
+      - name: run
+        run: |
+          docker run -d -it --rm -v /home/zauberzeug/data:/data -h n6 -e LOOP_HOST=$LOOP_HOST  -e LOOP_USERNAME=$LOOP_USERNAME -e PASSWORD=$LOOP_PASSWORD --name yolov5_trainer_node_github_action --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all --gpus all --ipc host zauberzeug/yolov5-trainer:latest-dev
+      - name: tests
+        run: |
+          docker exec yolov5_trainer_node_github_action pytest -v
+      - name: publish
+        if: github.ref == 'refs/heads/main'
+        run: |
+          cd trainer
+          ./docker.sh p
+      - name: cleanup
+        if: always() # also execute when pytest fails
+        run: |
+          docker stop yolov5_trainer_node_github_action | echo "Nothing to do. No container running."
+
+  slack:
+    needs:
+      - pytest
+    if: always() # also execute when pytest fails
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine if we need to notify
+        uses: Jimdo/should-i-notify-action@main
+        id: should_notify
+        with:
+          needs_context: ${{ toJson(needs) }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Slack workflow notification
+        if: steps.should_notify.outputs.should_send_message == 'yes'
+        uses: Gamesight/slack-workflow-status@master
+        with:
+          repo_token: ${{ secrets.GIT_HUB_TOKEN }}
+          slack_webhook_url: ${{ secrets.SLACK_DEEPLEARNING_CI_WEBHOOK }}
+          channel: "deeplearning-ci"
+          name: "yolo v5 trainer"
