@@ -19,7 +19,7 @@ ENV PYTHONPATH "${PYTHONPATH}:/usr/local/lib/python3.6/dist-packages/"
 
 RUN pip3 install --no-cache-dir wheel
 RUN pip3 install --no-cache-dir pycuda
-RUN pip3 install --no-cache-dir "uvicorn[standard]" 
+RUN pip3 install --no-cache-dir "uvicorn" 
 
 RUN apt-get update && \
         DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
