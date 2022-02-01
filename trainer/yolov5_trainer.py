@@ -1,6 +1,7 @@
 from typing import List, Optional
 from learning_loop_node import GLOBALS
 from learning_loop_node.trainer import Trainer, BasicModel
+from learning_loop_node.trainer.model import PretrainedModel
 import yolov5_format
 import os
 import shutil
@@ -24,6 +25,23 @@ class Yolov5Trainer(Trainer):
             shutil.copy('/app/hyp.yaml', self.training.training_folder)
         cmd = f'WANDB_MODE=disabled python /yolov5/train.py --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights model.pt --project {self.training.training_folder} --name result --hyp hyp.yaml --epochs {epochs} --clear'
         self.executor.start(cmd)
+
+    async def start_training_from_scratch(self, identifier: str) -> None:
+        if identifier == 'small':
+            resolution = 832
+            yolov5_format.create_file_structure(self.training)
+            batch_size = 32
+            epochs = 1000
+            if not os.path.isfile('hpy.yaml'):
+                shutil.copy('/app/hyp.yaml', self.training.training_folder)
+            cmd = f'WANDB_MODE=disabled python /yolov5/train.py --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights yolov5s.pt --project {self.training.training_folder} --name result --hyp hyp.yaml --epochs {epochs} --clear'
+            import logging
+            logging.info('going to start with command : ')
+            logging.info(cmd)
+            self.executor.start(cmd)
+        else:
+            raise ValueError(f"Pretrained model '{identifier}' is not supported.")
+    
 
     def get_error(self) -> str:
         if self.executor is None:
@@ -63,3 +81,9 @@ class Yolov5Trainer(Trainer):
             self.model_format: ['/tmp/model.pt', f'{training_path}/hyp.yaml', f'{training_path}/model.json'],
             'yolov5_wts': ['/tmp/model.wts', f'{training_path}/model.json']
         }
+
+    @property
+    def provided_pretrained_models(self) -> List[PretrainedModel]:
+        return [
+            PretrainedModel(name='small', label='Small', description='')
+        ]
