@@ -66,7 +66,6 @@ def test_new_model_discovery(use_training_dir):
     assert model.confusion_matrix['uuid_of_class_a']['tp'] == 3
     trainer.on_model_published(model, 'uuid3')
     assert os.path.isfile('result/weights/published/uuid3.pt'), 'weightfile should be renamed to learning loop id'
-    assert False
 
 def test_old_model_files_are_deleted_on_publish(use_training_dir):
     trainer = Yolov5Trainer()
@@ -81,7 +80,6 @@ def test_old_model_files_are_deleted_on_publish(use_training_dir):
     mock_epoch(2, {'class_a': {'fp': 1, 'tp': 2, 'fn': 1}})
 
     _, _, files = next(os.walk("result/weights"))
-    logging.info(files)
     assert len(files) == 4
 
     model = trainer.get_new_model()
