@@ -69,8 +69,19 @@ class Yolov5Trainer(Trainer):
         return BasicModel(confusion_matrix=matrix, meta_information={'weightfile': weightfile})
 
     def on_model_published(self, basic_model: BasicModel, model_id: str) -> None:
-        target = self.training.training_folder + f'/result/weights/{model_id}.pt'
+        def delete_old_weightfiles(model_id: str):
+            path = self.training.training_folder + '/result/weights'
+            if not os.path.isdir(path):
+                return
+            files = glob(path + '/*')
+            [os.remove(f) for f in files if os.path.isfile(f)]
+        path = self.training.training_folder + '/result/weights/published'
+        if not os.path.isdir(path):
+            os.mkdir(path)
+        target = f'{path}/{model_id}.pt'
         shutil.move(basic_model.meta_information['weightfile'], target)
+        delete_old_weightfiles(model_id)
+        
 
     def get_model_files(self, model_id) -> List[str]:
         weightfile = glob(f'{GLOBALS.data_folder}/**/trainings/**/{model_id}.pt', recursive=True)[0]
