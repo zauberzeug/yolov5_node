@@ -83,15 +83,29 @@ class Yolov5Trainer(Trainer):
         delete_old_weightfiles(model_id)
         
 
-    def get_model_files(self, model_id) -> List[str]:
+    def get_model_files(self, model_id: str) -> List[str]:
         weightfile = glob(f'{GLOBALS.data_folder}/**/trainings/**/{model_id}.pt', recursive=True)[0]
         shutil.copy(weightfile, '/tmp/model.pt')
-        training_path = '/'.join(weightfile.split('/')[:-3])
+        training_path = '/'.join(weightfile.split('/')[:-4])
         subprocess.run(f'python3 /yolov5/gen_wts.py -w {weightfile} -o /tmp/model.wts', shell=True)
         return {
             self.model_format: ['/tmp/model.pt', f'{training_path}/hyp.yaml', f'{training_path}/model.json'],
             'yolov5_wts': ['/tmp/model.wts', f'{training_path}/model.json']
         }
+    
+    def clear_training_data(self, model_id: str) -> None:
+        keep_files = ['last_training.log', 'best.pt'] # Note: Keep best.pt in case uploaded model was not best.
+        keep_dirs = ['result', 'weights']
+        weightfile = glob(f'{GLOBALS.data_folder}/**/trainings/**/{model_id}.pt', recursive=True)[0]
+        training_path = '/'.join(weightfile.split('/')[:-4])
+        for root, dirs, files in os.walk(training_path, topdown=False):
+            for file in files:
+                if file not in keep_files:
+                    os.remove(os.path.join(root, file))
+            for dir in dirs:
+                if dir not in keep_dirs:
+                    os.rmdir(os.path.join(root, dir))
+
 
     @property
     def provided_pretrained_models(self) -> List[PretrainedModel]:

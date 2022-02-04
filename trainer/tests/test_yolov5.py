@@ -12,6 +12,7 @@ from time import sleep
 import pytest
 from uuid import uuid4
 import json
+import glob
 
 
 @pytest.mark.asyncio()
@@ -90,6 +91,38 @@ def test_old_model_files_are_deleted_on_publish(use_training_dir):
 
     _, _, files = next(os.walk("result/weights"))
     assert len(files) == 0
+
+def test_clear_training_data():
+    trainer = Yolov5Trainer()
+    os.makedirs('/data/o/p/trainings/some_uuid', exist_ok=True)
+    trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
+                                images_folder='./', training_folder='/data/o/p/trainings/some_uuid')
+    os.makedirs(f'{trainer.training.training_folder}/result/weights/', exist_ok=True)
+    os.makedirs(f'{trainer.training.training_folder}/result/weights/published/', exist_ok=True)
+
+    #Create needed .pt files and some dummy data
+    with open(f'{trainer.training.training_folder}/result/weights/published/some_model_id.pt', 'wb') as f:
+        f.write(b'0')
+    with open(f'{trainer.training.training_folder}/result/weights/test.txt', 'wb') as f:
+        f.write(b'0')
+    with open(f'{trainer.training.training_folder}/result/weights/best.pt', 'wb') as f:
+        f.write(b'0')
+    with open(f'{trainer.training.training_folder}/last_training.log', 'wb') as f:
+        f.write(b'0')
+
+    data = glob.glob(trainer.training.training_folder + '/**', recursive=True)
+    assert len(data) == 8
+    files = [f for f in data if os.path.isfile(f)]
+    assert len(files) == 4
+
+    trainer.clear_training_data('some_model_id')
+    data = glob.glob(trainer.training.training_folder + '/**', recursive=True)
+    assert len(data) == 5
+    files = [f for f in data if os.path.isfile(f)]
+    assert len(files) == 2 #Note: Do not delete last_training.log und best.pt
+
+
+
 
 
 def mock_epoch(number: int, confusion_matrix: Dict):
