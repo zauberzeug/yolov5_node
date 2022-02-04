@@ -93,12 +93,10 @@ class Yolov5Trainer(Trainer):
             'yolov5_wts': ['/tmp/model.wts', f'{training_path}/model.json']
         }
     
-    def clear_training_data(self, model_id: str) -> None:
+    def clear_training_data(self, training_folder: str) -> None:
         keep_files = ['last_training.log', 'best.pt'] # Note: Keep best.pt in case uploaded model was not best.
         keep_dirs = ['result', 'weights']
-        weightfile = glob(f'{GLOBALS.data_folder}/**/trainings/**/{model_id}.pt', recursive=True)[0]
-        training_path = '/'.join(weightfile.split('/')[:-4])
-        for root, dirs, files in os.walk(training_path, topdown=False):
+        for root, dirs, files in os.walk(training_folder, topdown=False):
             for file in files:
                 if file not in keep_files:
                     os.remove(os.path.join(root, file))

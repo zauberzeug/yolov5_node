@@ -115,7 +115,7 @@ def test_clear_training_data():
     files = [f for f in data if os.path.isfile(f)]
     assert len(files) == 4
 
-    trainer.clear_training_data('some_model_id')
+    trainer.clear_training_data(trainer.training.training_folder)
     data = glob.glob(trainer.training.training_folder + '/**', recursive=True)
     assert len(data) == 5
     files = [f for f in data if os.path.isfile(f)]
