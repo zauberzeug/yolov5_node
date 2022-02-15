@@ -37,10 +37,15 @@ class Yolov5Detector(Detector):
         try:
             t = time.time()
             results, inference_ms = self.yolov5.infer(cv2.imdecode(image, cv2.IMREAD_COLOR))
+            skipped_detections = []
             logging.info(f'took {inference_ms} s, overall {time.time() -t} s')
             for detection in results:
                 x, y, w, h, category, probability = detection
                 category = self.model_info.categories[category]
+                if w <= 2 or h <= 2:  # skip very small boxes.
+                    skipped_detections.append((category.name, detection))
+                    continue
+
                 if category.type == CategoryType.Box:
                     detections.box_detections.append(BoxDetection(
                         category.name, x, y, w, h, self.model_info.version, probability
@@ -50,7 +55,9 @@ class Yolov5Detector(Detector):
                     detections.point_detections.append(PointDetection(
                         category.name, int(cx), int(cy), self.model_info.version, probability
                     ))
-
+            if skipped_detections:
+                log_msg = '\n'.join([str(d) for d in skipped_detections])
+                logging.warning(f'Removed very small detections from inference result (count={len(skipped_detections)}): \n{log_msg}')
         except Exception as e:
             logging.exception('inference failed')
         return detections
