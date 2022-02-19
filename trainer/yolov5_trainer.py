@@ -20,10 +20,11 @@ class Yolov5Trainer(Trainer):
         resolution = 832
         yolov5_format.create_file_structure(self.training)
         batch_size = 32
-        epochs = 1000
+        patience = 300
+        epochs = 2000
         if not os.path.isfile('hpy.yaml'):
             shutil.copy('/app/hyp.yaml', self.training.training_folder)
-        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights model.pt --project {self.training.training_folder} --name result --hyp hyp.yaml --epochs {epochs} --clear'
+        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --patience {patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights model.pt --project {self.training.training_folder} --name result --hyp hyp.yaml --epochs {epochs} --clear'
         self.executor.start(cmd)
 
     async def start_training_from_scratch(self, identifier: str) -> None:
@@ -41,7 +42,6 @@ class Yolov5Trainer(Trainer):
             self.executor.start(cmd)
         else:
             raise ValueError(f"Pretrained model '{identifier}' is not supported.")
-    
 
     def get_error(self) -> str:
         if self.executor is None:
@@ -81,7 +81,6 @@ class Yolov5Trainer(Trainer):
         target = f'{path}/{model_id}.pt'
         shutil.move(basic_model.meta_information['weightfile'], target)
         delete_old_weightfiles(model_id)
-        
 
     def get_model_files(self, model_id: str) -> List[str]:
         weightfile = glob(f'{GLOBALS.data_folder}/**/trainings/**/{model_id}.pt', recursive=True)[0]
@@ -92,7 +91,7 @@ class Yolov5Trainer(Trainer):
             self.model_format: ['/tmp/model.pt', f'{training_path}/hyp.yaml', f'{training_path}/model.json'],
             'yolov5_wts': ['/tmp/model.wts', f'{training_path}/model.json']
         }
-    
+
     async def clear_training_data(self, training_folder: str) -> None:
         keep_files = ['last_training.log', 'best.pt']  # Note: Keep best.pt in case uploaded model was not best.
         keep_dirs = ['result', 'weights']
@@ -103,7 +102,6 @@ class Yolov5Trainer(Trainer):
             for dir in dirs:
                 if dir not in keep_dirs:
                     os.rmdir(os.path.join(root, dir))
-
 
     @property
     def provided_pretrained_models(self) -> List[PretrainedModel]:
