@@ -68,13 +68,14 @@ def test_new_model_discovery(use_training_dir):
     trainer.on_model_published(model, 'uuid3')
     assert os.path.isfile('result/weights/published/uuid3.pt'), 'weightfile should be renamed to learning loop id'
 
+
 def test_old_model_files_are_deleted_on_publish(use_training_dir):
     trainer = Yolov5Trainer()
     trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
                                 images_folder='./', training_folder='./')
     trainer.training.data = TrainingData(image_data=[], categories={'class_a': 'uuid_of_class_a'})
     assert trainer.get_new_model() is None, 'should not find any models'
-    
+
     mock_epoch(1, {'class_a': {'fp': 0, 'tp': 1, 'fn': 0}})
     model = trainer.get_new_model()
     assert model.confusion_matrix['uuid_of_class_a']['tp'] == 1
@@ -92,7 +93,9 @@ def test_old_model_files_are_deleted_on_publish(use_training_dir):
     _, _, files = next(os.walk("result/weights"))
     assert len(files) == 0
 
-def test_clear_training_data():
+
+@pytest.mark.asyncio()
+async def test_clear_training_data():
     trainer = Yolov5Trainer()
     os.makedirs('/data/o/p/trainings/some_uuid', exist_ok=True)
     trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
@@ -100,7 +103,7 @@ def test_clear_training_data():
     os.makedirs(f'{trainer.training.training_folder}/result/weights/', exist_ok=True)
     os.makedirs(f'{trainer.training.training_folder}/result/weights/published/', exist_ok=True)
 
-    #Create needed .pt files and some dummy data
+    # Create needed .pt files and some dummy data
     with open(f'{trainer.training.training_folder}/result/weights/published/some_model_id.pt', 'wb') as f:
         f.write(b'0')
     with open(f'{trainer.training.training_folder}/result/weights/test.txt', 'wb') as f:
@@ -115,14 +118,11 @@ def test_clear_training_data():
     files = [f for f in data if os.path.isfile(f)]
     assert len(files) == 4
 
-    trainer.clear_training_data(trainer.training.training_folder)
+    await trainer.clear_training_data(trainer.training.training_folder)
     data = glob.glob(trainer.training.training_folder + '/**', recursive=True)
     assert len(data) == 5
     files = [f for f in data if os.path.isfile(f)]
-    assert len(files) == 2 #Note: Do not delete last_training.log und best.pt
-
-
-
+    assert len(files) == 2  # Note: Do not delete last_training.log und best.pt
 
 
 def mock_epoch(number: int, confusion_matrix: Dict):
