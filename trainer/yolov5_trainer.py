@@ -16,7 +16,7 @@ class Yolov5Trainer(Trainer):
         super().__init__(model_format='yolov5_pytorch')
         self.latest_epoch = 0
 
-    async def start_training(self) -> None:
+    async def start_training(self, model: str = 'model.pt') -> None:
         resolution = 832
         yolov5_format.create_file_structure(self.training)
         batch_size = 32
@@ -24,24 +24,11 @@ class Yolov5Trainer(Trainer):
         epochs = 2000
         if not os.path.isfile('hpy.yaml'):
             shutil.copy('/app/hyp.yaml', self.training.training_folder)
-        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --patience {patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights model.pt --project {self.training.training_folder} --name result --hyp hyp.yaml --epochs {epochs} --clear'
+        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --patience {patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp hyp.yaml --epochs {epochs} --clear'
         self.executor.start(cmd)
 
-    async def start_training_from_scratch(self, identifier: str) -> None:
-        if identifier == 'small':
-            resolution = 832
-            yolov5_format.create_file_structure(self.training)
-            batch_size = 32
-            epochs = 1000
-            if not os.path.isfile('hpy.yaml'):
-                shutil.copy('/app/hyp.yaml', self.training.training_folder)
-            cmd = f'WANDB_MODE=disabled python /yolov5/train.py --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights yolov5s.pt --project {self.training.training_folder} --name result --hyp hyp.yaml --epochs {epochs} --clear'
-            import logging
-            logging.info('going to start with command : ')
-            logging.info(cmd)
-            self.executor.start(cmd)
-        else:
-            raise ValueError(f"Pretrained model '{identifier}' is not supported.")
+    async def start_training_from_scratch(self, id: str) -> None:
+        await self.start_training(model=f'{id}.pt')
 
     def get_error(self) -> str:
         if self.executor is None:
@@ -106,5 +93,6 @@ class Yolov5Trainer(Trainer):
     @property
     def provided_pretrained_models(self) -> List[PretrainedModel]:
         return [
-            PretrainedModel(name='small', label='Small', description='')
+            PretrainedModel(name='yolov5s', label='YOLO v5 small', description='~5 fps on Jetson Nano'),
+            #PretrainedModel(name='yolov5m', label='YOLO v5 medium', description='~2 fps on Jetson Nano'),
         ]
