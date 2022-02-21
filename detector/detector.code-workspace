@@ -4,8 +4,12 @@
       "path": "."
     },
     {
-      "name": "lib",
-      "path" : "/usr/local/lib/python3.6/dist-packages/learning_loop_node"
+      "name": "lib installed",
+      "path": "/usr/local/lib/python3.6/dist-packages/learning_loop_node"
+    },
+    {
+      "name": "lib releative",
+      "path": "../../learning_loop_node"
     }
   ],
   "settings": {
@@ -24,7 +28,6 @@
     "[json]": {
       "editor.defaultFormatter": "vscode.json-language-features"
     }
-  
   },
   "extensions": {
     "recommendations": [
