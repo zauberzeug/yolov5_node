@@ -1,7 +1,7 @@
 from learning_loop_node.trainer.training import Training
 import yaml
 from pathlib import Path
-import shutil
+import logging
 import os
 
 
@@ -55,7 +55,7 @@ def create_yaml(training: Training):
         'nc': len(training.data.categories),
         'names': list(training.data.categories.keys()),
     }
-
+    logging.info(f'ordered names: {data["names"]}')
     with open(f'{path}/dataset.yaml', 'w') as f:
         yaml.dump(data, f)
 
