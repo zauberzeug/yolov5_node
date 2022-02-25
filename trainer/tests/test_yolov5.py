@@ -1,5 +1,4 @@
 import os
-import shutil
 from typing import Dict
 from learning_loop_node import Context
 from learning_loop_node.trainer import Executor, Training, TrainingsDownloader
@@ -13,6 +12,9 @@ import pytest
 from uuid import uuid4
 import json
 import glob
+from learning_loop_node.tests import test_helper
+from learning_loop_node.gdrive_downloader import g_download
+from learning_loop_node.loop import loop
 
 
 @pytest.mark.asyncio()
@@ -123,6 +125,66 @@ async def test_clear_training_data():
     assert len(data) == 5
     files = [f for f in data if os.path.isfile(f)]
     assert len(files) == 2  # Note: Do not delete last_training.log und best.pt
+
+
+@pytest.fixture()
+def create_project():
+    test_helper.LiveServerSession().delete(f"/api/zauberzeug/projects/pytest?keep_images=true")
+    project_configuration = {'project_name': 'pytest', 'box_categories': 2,  'point_categories': 1, 'inbox': 0, 'annotate': 0, 'review': 0, 'complete': 0, 'image_style': 'plain',
+                             'thumbs': False}
+    assert test_helper.LiveServerSession().post(f"/api/zauberzeug/projects/generator",
+                                                json=project_configuration).status_code == 200
+    yield
+    test_helper.LiveServerSession().delete(f"/api/zauberzeug/projects/pytest?keep_images=true")
+
+
+@pytest.mark.asyncio()
+async def test_detecting(create_project):
+    logging.debug('downloading model from gdrive')
+    if not os.path.exists('/tmp/model/model.pt'):
+        file_id = '1q8nT-CTHt1eZuNjPMbdaavyFnMtDRT-L'
+        destination = '/tmp/model.zip'
+        g_download(file_id, destination)
+        test_helper.unzip(destination, '/tmp/model')
+
+    logging.debug('uploading model')
+    data = test_helper.prepare_formdata(['/tmp/model/model.pt'])
+    async with loop.post(f'api/zauberzeug/projects/pytest/models/yolov5_pytorch', data) as response:
+        if response.status != 200:
+            msg = f'unexpected status code {response.status} while putting model'
+            logging.error(msg)
+            raise(Exception(msg))
+        model = await response.json()
+
+    data = test_helper.prepare_formdata(['tests/example_images/ffaa4b25-23f8-4261-823c-4e598a801498.jpg'])
+    async with loop.post(f'api/zauberzeug/projects/pytest/images', data) as response:
+        if response.status != 200:
+            msg = f'unexpected status code {response.status} while posting a new image'
+            logging.error(msg)
+            raise(Exception(msg))
+        image = await response.json()
+
+    trainer = Yolov5Trainer()
+    detections = await trainer.do_detections(Context(organization='zauberzeug', project='pytest'), model['id'], 'yolov5_pytorch')
+    assert len(detections) > 0
+
+
+@pytest.mark.asyncio()
+async def test_download_multiple_images(create_project):
+    data = test_helper.prepare_formdata(['tests/example_images/ffaa4b25-23f8-4261-823c-4e598a801498.jpg'])
+    async with loop.post(f'api/zauberzeug/projects/pytest/images', data) as response:
+        if response.status != 200:
+            msg = f'unexpected status code {response.status} while posting a new image'
+            logging.error(msg)
+            raise(Exception(msg))
+        images = await response.json()
+
+    for i in range(10):
+        async with loop.get(f'api/zauberzeug/projects/pytest/images/{images["images"][0]["id"]}/main') as response:
+            if response.status != 200:
+                msg = f'unexpected status code {response.status} while posting a new image'
+                logging.error(msg)
+                raise(Exception(msg))
 
 
 def mock_epoch(number: int, confusion_matrix: Dict):

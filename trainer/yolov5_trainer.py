@@ -1,3 +1,5 @@
+from asyncio import sleep
+import logging
 from typing import List, Optional
 from learning_loop_node import GLOBALS
 from learning_loop_node.trainer import Trainer, BasicModel
@@ -8,6 +10,10 @@ import shutil
 import json
 from glob import glob
 import subprocess
+from learning_loop_node.trainer.executor import Executor
+from learning_loop_node.model_information import ModelInformation
+from learning_loop_node.detector.box_detection import BoxDetection
+import cv2
 
 
 class Yolov5Trainer(Trainer):
@@ -82,6 +88,62 @@ class Yolov5Trainer(Trainer):
             self.model_format: ['/tmp/model.pt', f'{training_path}/hyp.yaml', modeljson_path],
             'yolov5_wts': ['/tmp/model.wts', modeljson_path]
         }
+
+    async def _detect(self, model_information: ModelInformation, images:  List[str], model_folder: str, model_id: str, model_version: str) -> List:
+        images_folder = f'/tmp/imagelinks_for_detecting'
+        shutil.rmtree(images_folder, ignore_errors=True)
+        os.makedirs(images_folder)
+        for img in images:
+            image_name = os.path.basename(img)
+            os.symlink(img, f'{images_folder}/{image_name}')
+
+        logging.info('start detections')
+        shutil.rmtree('/yolov5/runs', ignore_errors=True)
+        os.makedirs('/yolov5/runs')
+        executor = Executor(images_folder)
+        img_size = model_information.resolution
+
+        cmd = f'python /yolov5/detect.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --conf-thres 0.1 --save-txt --save-conf'
+        executor.start(cmd)
+        while executor.is_process_running():
+            await sleep(1)
+            logging.debug(executor.get_log())
+
+        logging.info('parsing detections')
+        detections = []
+        for filename in os.scandir('/yolov5/runs/detect/exp/labels'):
+            uuid = os.path.splitext(os.path.basename(filename.path))[0]
+            box_detections = self._parse_file(model_information, images_folder, filename)
+            detections.append({'image_id': uuid, 'box_detections': box_detections, 'point_detections': []})
+
+        return detections
+
+    def _parse_file(self, model_information, images_folder, filename) -> List[BoxDetection]:
+        uuid = os.path.splitext(os.path.basename(filename.path))[0]
+
+        image_path = f'{images_folder}/{uuid}.jpg'
+        img_height, img_width, _ = cv2.imread(image_path).shape
+        with open(filename.path, 'r') as f:
+            content = f.readlines()
+        box_detections = []
+
+        for line in content:
+            c, x, y, w, h, probability = line.split(' ')
+            c = int(c)
+            x = float(x)
+            y = float(y)
+            w = float(w)
+            h = float(h)
+            probability = float(probability) * 100
+
+            category = model_information.categories[c]
+            if(category.type == 'box'):
+                width = w*img_width
+                height = h*img_height
+                box_detection = BoxDetection(category_name=category.name, x=(x*img_width)-0.5*width, y=(y*img_height)-0.5*height, width=width, height=height, net=model_information.version,
+                                             confidence=probability, category_id=category.id)
+                box_detections.append(box_detection)
+        return box_detections
 
     async def clear_training_data(self, training_folder: str) -> None:
         # Note: Keep best.pt in case uploaded model was not best.
