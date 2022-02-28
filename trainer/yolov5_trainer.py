@@ -112,11 +112,13 @@ class Yolov5Trainer(Trainer):
 
         logging.info('parsing detections')
         detections = []
-        for filename in os.scandir('/yolov5/runs/detect/exp/labels'):
-            uuid = os.path.splitext(os.path.basename(filename.path))[0]
-            box_detections, point_detections = self._parse_file(model_information, images_folder, filename)
-            detections.append({'image_id': uuid, 'box_detections': box_detections,
-                              'point_detections': point_detections})
+        labels_path = '/yolov5/runs/detect/exp/labels'
+        if os.path.exists(labels_path):
+            for filename in os.scandir(labels_path):
+                uuid = os.path.splitext(os.path.basename(filename.path))[0]
+                box_detections, point_detections = self._parse_file(model_information, images_folder, filename)
+                detections.append({'image_id': uuid, 'box_detections': box_detections,
+                                   'point_detections': point_detections})
 
         return detections
 
