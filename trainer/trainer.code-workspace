@@ -6,6 +6,10 @@
     {
       "name": "node lib",
       "path": "/learning_loop_node"
+    },
+    {
+      "name": "yolov5",
+      "path": "/yolov5"
     }
   ],
   "settings": {
