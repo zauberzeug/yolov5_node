@@ -169,24 +169,6 @@ async def test_detecting(create_project):
     assert len(detections) > 0
 
 
-@pytest.mark.asyncio()
-async def test_download_multiple_images(create_project):
-    data = test_helper.prepare_formdata(['tests/example_images/ffaa4b25-23f8-4261-823c-4e598a801498.jpg'])
-    async with loop.post(f'api/zauberzeug/projects/pytest/images', data) as response:
-        if response.status != 200:
-            msg = f'unexpected status code {response.status} while posting a new image'
-            logging.error(msg)
-            raise(Exception(msg))
-        images = await response.json()
-
-    for i in range(10):
-        async with loop.get(f'api/zauberzeug/projects/pytest/images/{images["images"][0]["id"]}/main') as response:
-            if response.status != 200:
-                msg = f'unexpected status code {response.status} while posting a new image'
-                logging.error(msg)
-                raise(Exception(msg))
-
-
 def mock_epoch(number: int, confusion_matrix: Dict):
     os.makedirs('result/weights/', exist_ok=True)
     with open(f'result/weights/epoch{number}.json', 'w') as f:
