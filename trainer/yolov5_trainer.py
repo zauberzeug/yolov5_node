@@ -110,6 +110,9 @@ class Yolov5Trainer(Trainer):
             await sleep(1)
             logging.debug(executor.get_log())
 
+        if executor.return_code == 1:
+            logging.error('Error during detecting.')
+
         logging.info('parsing detections')
         detections = []
         labels_path = '/yolov5/runs/detect/exp/labels'
