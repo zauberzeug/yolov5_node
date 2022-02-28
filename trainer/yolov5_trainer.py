@@ -1,6 +1,6 @@
 from asyncio import sleep
 import logging
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from learning_loop_node import GLOBALS
 from learning_loop_node.trainer import Trainer, BasicModel
 from learning_loop_node.trainer.model import PretrainedModel
@@ -13,6 +13,7 @@ import subprocess
 from learning_loop_node.trainer.executor import Executor
 from learning_loop_node.model_information import ModelInformation
 from learning_loop_node.detector.box_detection import BoxDetection
+from learning_loop_node.detector.point_detection import PointDetection
 import cv2
 
 
@@ -113,12 +114,13 @@ class Yolov5Trainer(Trainer):
         detections = []
         for filename in os.scandir('/yolov5/runs/detect/exp/labels'):
             uuid = os.path.splitext(os.path.basename(filename.path))[0]
-            box_detections = self._parse_file(model_information, images_folder, filename)
-            detections.append({'image_id': uuid, 'box_detections': box_detections, 'point_detections': []})
+            box_detections, point_detections = self._parse_file(model_information, images_folder, filename)
+            detections.append({'image_id': uuid, 'box_detections': box_detections,
+                              'point_detections': point_detections})
 
         return detections
 
-    def _parse_file(self, model_information, images_folder, filename) -> List[BoxDetection]:
+    def _parse_file(self, model_information, images_folder, filename) -> Tuple[BoxDetection, PointDetection]:
         uuid = os.path.splitext(os.path.basename(filename.path))[0]
 
         image_path = f'{images_folder}/{uuid}.jpg'
@@ -126,6 +128,7 @@ class Yolov5Trainer(Trainer):
         with open(filename.path, 'r') as f:
             content = f.readlines()
         box_detections = []
+        point_detections = []
 
         for line in content:
             c, x, y, w, h, probability = line.split(' ')
@@ -137,13 +140,19 @@ class Yolov5Trainer(Trainer):
             probability = float(probability) * 100
 
             category = model_information.categories[c]
+            width = w*img_width
+            height = h*img_height
+            x = (x*img_width)-0.5*width
+            y = (y*img_height)-0.5*height
             if(category.type == 'box'):
-                width = w*img_width
-                height = h*img_height
-                box_detection = BoxDetection(category_name=category.name, x=(x*img_width)-0.5*width, y=(y*img_height)-0.5*height, width=width, height=height, net=model_information.version,
+                box_detection = BoxDetection(category_name=category.name, x=x, y=y, width=width, height=height, net=model_information.version,
                                              confidence=probability, category_id=category.id)
                 box_detections.append(box_detection)
-        return box_detections
+            elif(category.type == 'point'):
+                point_detection = PointDetection(category_name=category.name, x=(x+w)/2, y=(y+h)/2, net=model_information.version,
+                                                 confidence=probability, category_id=category.id)
+                point_detections.append(point_detection)
+        return box_detections, point_detections
 
     async def clear_training_data(self, training_folder: str) -> None:
         # Note: Keep best.pt in case uploaded model was not best.
