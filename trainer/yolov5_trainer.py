@@ -90,7 +90,7 @@ class Yolov5Trainer(Trainer):
             'yolov5_wts': ['/tmp/model.wts', modeljson_path]
         }
 
-    async def _detect(self, model_information: ModelInformation, images:  List[str], model_folder: str, model_id: str, model_version: str) -> List:
+    async def _detect(self, model_information: ModelInformation, images:  List[str], model_folder: str) -> List:
         images_folder = f'/tmp/imagelinks_for_detecting'
         shutil.rmtree(images_folder, ignore_errors=True)
         os.makedirs(images_folder)
