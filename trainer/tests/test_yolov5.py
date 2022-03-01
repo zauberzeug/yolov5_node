@@ -19,6 +19,7 @@ from learning_loop_node.loop import loop
 
 @pytest.mark.asyncio()
 async def test_training_creates_model(use_training_dir):
+    os.remove('/tmp/model.pt')
     training = Training(
         id=str(uuid4()),
         project_folder=os.getcwd(),
@@ -142,7 +143,7 @@ def create_project():
 async def test_detecting(create_project):
     logging.debug('downloading model from gdrive')
     if not os.path.exists('/tmp/model/model.pt'):
-        file_id = '1q8nT-CTHt1eZuNjPMbdaavyFnMtDRT-L'
+        file_id = '1sZWa053fWT9PodrujDX90psmjhFVLyBV'
         destination = '/tmp/model.zip'
         g_download(file_id, destination)
         test_helper.unzip(destination, '/tmp/model')
@@ -156,7 +157,7 @@ async def test_detecting(create_project):
             raise(Exception(msg))
         model = await response.json()
 
-    data = test_helper.prepare_formdata(['tests/example_images/ffaa4b25-23f8-4261-823c-4e598a801498.jpg'])
+    data = test_helper.prepare_formdata(['tests/example_images/8647fc30-c46c-4d13-a3fd-ead3b9a67652.jpg'])
     async with loop.post(f'api/zauberzeug/projects/pytest/images', data) as response:
         if response.status != 200:
             msg = f'unexpected status code {response.status} while posting a new image'
