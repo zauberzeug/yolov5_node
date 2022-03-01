@@ -141,6 +141,8 @@ def create_project():
 
 @pytest.mark.asyncio()
 async def test_detecting(create_project):
+    from learning_loop_node.loop import Loop
+    loop = Loop()
     logging.debug('downloading model from gdrive')
     if not os.path.exists('/tmp/model/model.pt'):
         file_id = '1sZWa053fWT9PodrujDX90psmjhFVLyBV'
