@@ -174,6 +174,6 @@ class Yolov5Trainer(Trainer):
     @property
     def provided_pretrained_models(self) -> List[PretrainedModel]:
         return [
-            PretrainedModel(name='yolov5s', label='YOLO v5 small', description='~5 fps on Jetson Nano'),
+            PretrainedModel(name='yolov5s6', label='YOLO v5 small', description='~5 fps on Jetson Nano'),
             # PretrainedModel(name='yolov5m', label='YOLO v5 medium', description='~2 fps on Jetson Nano'),
         ]
