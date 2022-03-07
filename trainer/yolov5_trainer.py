@@ -105,7 +105,7 @@ class Yolov5Trainer(Trainer):
         executor = Executor(images_folder)
         img_size = model_information.resolution
 
-        cmd = f'python /yolov5/detect.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --conf-thres 0.1 --save-txt --save-conf'
+        cmd = f'python /yolov5/detect.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --conf-thres 0.2 --save-txt --save-conf'
         executor.start(cmd)
         while executor.is_process_running():
             await sleep(1)
