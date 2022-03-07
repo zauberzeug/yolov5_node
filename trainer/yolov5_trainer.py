@@ -109,7 +109,6 @@ class Yolov5Trainer(Trainer):
         executor.start(cmd)
         while executor.is_process_running():
             await sleep(1)
-            logging.debug(executor.get_log())
 
         if executor.return_code == 1:
             logging.error('Error during detecting.')
