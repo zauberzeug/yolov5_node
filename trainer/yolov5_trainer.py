@@ -15,6 +15,7 @@ from learning_loop_node.model_information import ModelInformation
 from learning_loop_node.detector.box_detection import BoxDetection
 from learning_loop_node.detector.point_detection import PointDetection
 import cv2
+import asyncio
 
 
 class Yolov5Trainer(Trainer):
@@ -113,16 +114,21 @@ class Yolov5Trainer(Trainer):
         if executor.return_code == 1:
             logging.error('Error during detecting.')
 
-        logging.info('parsing detections')
         detections = []
+        logging.info('start parsing detections')
         labels_path = '/yolov5/runs/detect/exp/labels'
+        detections = await asyncio.get_event_loop().run_in_executor(None, lambda: self._parse(labels_path, images_folder, model_information))
+
+        return detections
+
+    def _parse(self, labels_path, images_folder, model_information):
+        detections = []
         if os.path.exists(labels_path):
             for filename in os.scandir(labels_path):
                 uuid = os.path.splitext(os.path.basename(filename.path))[0]
                 box_detections, point_detections = self._parse_file(model_information, images_folder, filename)
                 detections.append({'image_id': uuid, 'box_detections': box_detections,
                                    'point_detections': point_detections})
-
         return detections
 
     def _parse_file(self, model_information, images_folder, filename) -> Tuple[BoxDetection, PointDetection]:
