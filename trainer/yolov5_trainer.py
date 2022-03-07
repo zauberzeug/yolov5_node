@@ -159,7 +159,7 @@ class Yolov5Trainer(Trainer):
                                              confidence=probability, category_id=category.id)
                 box_detections.append(box_detection)
             elif(category.type == 'point'):
-                point_detection = PointDetection(category_name=category.name, x=(x+w)/2, y=(y+h)/2, net=model_information.version,
+                point_detection = PointDetection(category_name=category.name, x=x+width/2, y=y+height/2, net=model_information.version,
                                                  confidence=probability, category_id=category.id)
                 point_detections.append(point_detection)
         return box_detections, point_detections
