@@ -40,7 +40,7 @@ run_args+=" -v $HOME/data:/data"
 run_args+=" -h $HOSTNAME"
 #run_args+=" -e HOST=n7.zauberzeug.com"
 run_args+=" -e ORGANIZATION=zauberzeug"
-run_args+=" -e PROJECT=drawingbot"
+run_args+=" -e PROJECT=demo"
 run_args+=" --name $name"
 run_args+=" --runtime=nvidia"
 run_args+=" -e NVIDIA_VISIBLE_DEVICES=all"
@@ -70,6 +70,9 @@ case $cmd in
         ;;
     r | run)
         docker run $run_args $image-dev $cmd_args
+	;;
+    ri | run-image)
+    	docker run $run_args $image $cmd_args
         ;;
     p | push)
         docker push ${image}-dev 
