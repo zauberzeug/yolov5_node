@@ -18,12 +18,12 @@ class Yolov5Detector(Detector):
     def __init__(self) -> None:
         super().__init__('yolov5_wts')
 
-    def init(self,  model_info: ModelInformation, model_root_path: str):
+    def init(self,  model_info: ModelInformation):
         self.model_info = model_info
         engine_file = self._create_engine(
             model_info.resolution,
             len(model_info.categories),
-            f'{model_root_path}/model.wts'
+            f'{model_info.model_root_path}/model.wts'
         )
         ctypes.CDLL('/tensorrtx/yolov5/build/libmyplugins.so')
         self.yolov5 = yolov5.YoLov5TRT(engine_file)
@@ -57,7 +57,8 @@ class Yolov5Detector(Detector):
                     ))
             if skipped_detections:
                 log_msg = '\n'.join([str(d) for d in skipped_detections])
-                logging.warning(f'Removed very small detections from inference result (count={len(skipped_detections)}): \n{log_msg}')
+                logging.warning(
+                    f'Removed very small detections from inference result (count={len(skipped_detections)}): \n{log_msg}')
         except Exception as e:
             logging.exception('inference failed')
         return detections
