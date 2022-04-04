@@ -82,9 +82,7 @@ class Yolov5Trainer(Trainer):
         shutil.copy(weightfile, '/tmp/model.pt')
         training_path = '/'.join(weightfile.split('/')[:-4])
         modeljson_path = f'{training_path}/model.json'
-        if not os.path.exists(modeljson_path):
-            with open(modeljson_path, 'w') as f:
-                f.write('{}')
+
         subprocess.run(f'python3 /yolov5/gen_wts.py -w {weightfile} -o /tmp/model.wts', shell=True)
         return {
             self.model_format: ['/tmp/model.pt', f'{training_path}/hyp.yaml', modeljson_path],
