@@ -1,0 +1,66 @@
+diff --git a/train.py b/train.py
+index d8df31b..ce0ea4e 100644
+--- a/train.py
++++ b/train.py
+@@ -14,6 +14,7 @@ Usage:
+ 
+ import argparse
+ import math
++import json
+ import os
+ import random
+ import sys
+@@ -367,7 +368,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
+             ema.update_attr(model, include=['yaml', 'nc', 'hyp', 'names', 'stride', 'class_weights'])
+             final_epoch = (epoch + 1 == epochs) or stopper.possible_stop
+             if not noval or final_epoch:  # Calculate mAP
+-                results, maps, _ = val.run(data_dict,
++                results, confusion_matrices, maps, _ = val.run(data_dict,
+                                            batch_size=batch_size // WORLD_SIZE * 2,
+                                            imgsz=imgsz,
+                                            model=ema.ema,
+@@ -400,6 +401,10 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
+                 torch.save(ckpt, last)
+                 if best_fitness == fi:
+                     torch.save(ckpt, best)
++                if confusion_matrices:
++                    with open(w / f'epoch{epoch}.json', 'w+') as f:
++                        json.dump(confusion_matrices, f)
++                    torch.save(ckpt, w / f'epoch{epoch}.pt')
+                 if (epoch > 0) and (opt.save_period > 0) and (epoch % opt.save_period == 0):
+                     torch.save(ckpt, w / f'epoch{epoch}.pt')
+                 del ckpt
+diff --git a/val.py b/val.py
+index 78abbda..eeb1b3d 100644
+--- a/val.py
++++ b/val.py
+@@ -268,6 +268,11 @@ def run(data,
+         for i, c in enumerate(ap_class):
+             LOGGER.info(pf % (names[c], seen, nt[c], p[i], r[i], ap50[i], ap[i]))
+ 
++    confusion_matrices = {}
++    for i, c in enumerate(ap_class):
++        fn = tp[i] / r[i] - tp[i] if r[i] != 0 else 0
++        confusion_matrices[names[c]] = {'tp': int(tp[i]), 'fp': int(fp[i]), 'fn': int(fn)}
++
+     # Print speeds
+     t = tuple(x / seen * 1E3 for x in dt)  # speeds per image
+     if not training:
+@@ -313,7 +318,7 @@ def run(data,
+     maps = np.zeros(nc) + map
+     for i, c in enumerate(ap_class):
+         maps[c] = ap[i]
+-    return (mp, mr, map50, map, *(loss.cpu() / len(dataloader)).tolist()), maps, t
++    return (mp, mr, map50, map, *(loss.cpu() / len(dataloader)).tolist()), confusion_matrices, maps, t
+ 
+ 
+ def parse_opt():
+@@ -371,7 +376,7 @@ def main(opt):
+                 x, y = list(range(256, 1536 + 128, 128)), []  # x axis (image sizes), y axis
+                 for opt.imgsz in x:  # img-size
+                     LOGGER.info(f'\nRunning {f} --imgsz {opt.imgsz}...')
+-                    r, _, t = run(**vars(opt), plots=False)
++                    r, _, _, t = run(**vars(opt), plots=False)
+                     y.append(r + t)  # results and times
+                 np.savetxt(f, y, fmt='%10.4g')  # save
+             os.system('zip -r study.zip study_*.txt')

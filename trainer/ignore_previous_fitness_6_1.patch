@@ -1,0 +1,17 @@
+diff --git a/train.py b/train.py
+index d8df31b..0d2b27b 100644
+--- a/train.py
++++ b/train.py
+@@ -189,9 +189,9 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
+     start_epoch, best_fitness = 0, 0.0
+     if pretrained:
+         # Optimizer
+-        if ckpt['optimizer'] is not None:
+-            optimizer.load_state_dict(ckpt['optimizer'])
+-            best_fitness = ckpt['best_fitness']
++        # if ckpt['optimizer'] is not None:
++        #     optimizer.load_state_dict(ckpt['optimizer'])
++        #     best_fitness = ckpt['best_fitness']
+ 
+         # EMA
+         if ema and ckpt.get('ema'):
