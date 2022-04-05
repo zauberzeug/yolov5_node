@@ -83,10 +83,14 @@ class Yolov5Trainer(Trainer):
         training_path = '/'.join(weightfile.split('/')[:-4])
         modeljson_path = f'{training_path}/model.json'
 
-        subprocess.run(f'python3 /yolov5/gen_wts.py -w {weightfile} -o /tmp/model.wts', shell=True)
+        subprocess.run(
+            f'python3 /yolov5/export.py --device 0 --half --weights {weightfile} --include engine', shell=True)
+        engine_file = glob(
+            f'{GLOBALS.data_folder}/**/trainings/**/result/weights/published/*.engine', recursive=True)[0]
+        shutil.copy(engine_file, '/tmp/model.engine')
         return {
             self.model_format: ['/tmp/model.pt', f'{training_path}/hyp.yaml', modeljson_path],
-            'yolov5_wts': ['/tmp/model.wts', modeljson_path]
+            'yolov5_engine': ['/tmp/model.engine', modeljson_path]
         }
 
     async def _detect(self, model_information: ModelInformation, images:  List[str], model_folder: str) -> List:
