@@ -33,7 +33,7 @@ RUN pip install --no-cache torch==1.10.0+cu113 torchvision==0.11.1+cu113 -f http
 RUN git clone https://github.com/ultralytics/yolov5.git
 WORKDIR /yolov5
 # Tag 6.1        3752807c0b8af03d42de478fbcbf338ec4546a6c
-RUN git fetch --all --tags && git checkout tags/v6.1 -b master
+RUN git fetch --all --tags && git checkout tags/v6.1
 COPY *.patch ./
 RUN git apply confusion_matrices_6_1.patch && git apply clear_epochs_6_1.patch && git apply ignore_previous_fitness_6_1.patch && rm *.patch
 RUN python3 -m pip install --no-cache -r requirements.txt
