@@ -15,6 +15,7 @@ import glob
 from learning_loop_node.tests import test_helper
 from learning_loop_node.gdrive_downloader import g_download
 from learning_loop_node.loop import loop
+from learning_loop_node.data_classes.category import Category
 
 
 @pytest.mark.asyncio()
@@ -29,6 +30,11 @@ async def test_training_creates_model(use_training_dir):
         context=Context(project='demo', organization='zauberzeug'),
     )
     training.data = await TrainingsDownloader(training.context).download_training_data(training.images_folder)
+    response = test_helper.LiveServerSession().get(f"/api/zauberzeug/projects/demo/data")
+    assert response.status_code == 200
+    data = response.json()
+    training.data.categories = Category.from_list(data['categories'])
+
     yolov5_format.create_file_structure(training)
 
     executor = Executor(os.getcwd())
@@ -50,7 +56,7 @@ def test_new_model_discovery(use_training_dir):
     trainer = Yolov5Trainer()
     trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
                                 images_folder='./', training_folder='./')
-    trainer.training.data = TrainingData(image_data=[], categories={'class_a': 'uuid_of_class_a'})
+    trainer.training.data = TrainingData(image_data=[], categories=[Category(name='class_a', id='uuid_of_class_a', type='box')])
     assert trainer.get_new_model() is None, 'should not find any models'
     mock_epoch(1, {'class_a': {'fp': 0, 'tp': 1, 'fn': 0}})
     model = trainer.get_new_model()
@@ -70,31 +76,6 @@ def test_new_model_discovery(use_training_dir):
     assert model.confusion_matrix['uuid_of_class_a']['tp'] == 3
     trainer.on_model_published(model, 'uuid3')
     assert os.path.isfile('result/weights/published/uuid3.pt'), 'weightfile should be renamed to learning loop id'
-
-
-def test_old_model_files_are_deleted_on_publish(use_training_dir):
-    trainer = Yolov5Trainer()
-    trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
-                                images_folder='./', training_folder='./')
-    trainer.training.data = TrainingData(image_data=[], categories={'class_a': 'uuid_of_class_a'})
-    assert trainer.get_new_model() is None, 'should not find any models'
-
-    mock_epoch(1, {'class_a': {'fp': 0, 'tp': 1, 'fn': 0}})
-    model = trainer.get_new_model()
-    assert model.confusion_matrix['uuid_of_class_a']['tp'] == 1
-    mock_epoch(2, {'class_a': {'fp': 1, 'tp': 2, 'fn': 1}})
-
-    _, _, files = next(os.walk("result/weights"))
-    assert len(files) == 4
-
-    model = trainer.get_new_model()
-    trainer.on_model_published(model, 'uuid2')
-    _, _, files = next(os.walk("result/weights/published"))
-    assert len(files) == 1
-    assert os.path.isfile('result/weights/published/uuid2.pt'), 'weightfile should be renamed to learning loop id'
-
-    _, _, files = next(os.walk("result/weights"))
-    assert len(files) == 0
 
 
 @pytest.mark.asyncio()

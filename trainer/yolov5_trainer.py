@@ -58,8 +58,9 @@ class Yolov5Trainer(Trainer):
         # NOTE /yolov5 is patched to create confusion matrix json files
         with open(weightfile[:-3] + '.json') as f:
             matrix = json.load(f)
+            categories = yolov5_format.category_lookup_from_training(self.training)
             for category_name in list(matrix.keys()):
-                matrix[self.training.data.categories[category_name]] = matrix.pop(category_name)
+                matrix[categories[category_name]] = matrix.pop(category_name)
 
         return BasicModel(confusion_matrix=matrix, meta_information={'weightfile': weightfile})
 

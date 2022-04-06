@@ -5,8 +5,12 @@ import logging
 import os
 
 
+def category_lookup_from_training(training: Training) -> dict:
+    return {c.name: c.id for c in training.data.categories}
+
+
 def create_set(training: Training, set_name: str):
-    categories = list(training.data.categories.values())
+    categories = list(category_lookup_from_training(training).values())
     training_path = training.training_folder
     images_path = f'{training_path}/{set_name}'
     os.makedirs(images_path, exist_ok=True)
@@ -47,13 +51,14 @@ def create_set(training: Training, set_name: str):
 
 
 def create_yaml(training: Training):
+    categories = category_lookup_from_training(training)
     path = training.training_folder
     data = {
         'train': path + '/train',
         'test': path + '/test',
         'val': path + '/test',
-        'nc': len(training.data.categories),
-        'names': list(training.data.categories.keys()),
+        'nc': len(categories),
+        'names': list(categories.keys())
     }
     logging.info(f'ordered names: {data["names"]}')
     with open(f'{path}/dataset.yaml', 'w') as f:
