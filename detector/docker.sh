@@ -36,11 +36,11 @@ name="yolov5_detector_node"
 run_args="-it --rm" 
 run_args+=" -v $(pwd)/../:/yolov5_node"
 run_args+=" -v $HOME/data:/data"
-run_args+=" -v $HOME/learning_loop_node/learning_loop_node:/usr/local/lib/python3.6/dist-packages/learning_loop_node"
+#run_args+=" -v $HOME/learning_loop_node/learning_loop_node:/usr/local/lib/python3.6/dist-packages/learning_loop_node"
 run_args+=" -h $HOSTNAME"
-#run_args+=" -e HOST=n7.zauberzeug.com"
-run_args+=" -e ORGANIZATION=zauberzeug"
-run_args+=" -e PROJECT=demo"
+run_args+=" -e HOST=n7.zauberzeug.com"
+run_args+=" -e ORGANIZATION=zuckerruebe"
+run_args+=" -e PROJECT=roboter"
 run_args+=" --name $name"
 run_args+=" --runtime=nvidia"
 run_args+=" -e NVIDIA_VISIBLE_DEVICES=all"
@@ -62,6 +62,7 @@ cmd_args=${@:2}
 set -x
 case $cmd in
     b | build)
+	docker pull . ${image}-dev
         docker build . --target release -t $image $build_args $cmd_args
         docker build . -t ${image}-dev $build_args $cmd_args
         ;;

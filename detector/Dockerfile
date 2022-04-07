@@ -42,10 +42,25 @@ RUN ln -s models/coco model
 
 WORKDIR /
 
-RUN git clone https://github.com/wang-xinyu/tensorrtx.git
-WORKDIR /tensorrtx/yolov5/build
-RUN cmake .. && make -j6
-ENV PYTHONPATH=$PYTHONPATH:/tensorrtx/yolov5/
+# RUN pip3 install --no-cache torch==1.10.0+cu113 torchvision==0.11.1+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
+# fetch yolov5 code
+RUN git clone https://github.com/ultralytics/yolov5.git
+WORKDIR /yolov5
+# Tag 6.1        3752807c0b8af03d42de478fbcbf338ec4546a6c
+RUN git fetch --all --tags && git checkout tags/v6.1
+ENV PYTHONPATH=$PYTHONPATH:/yolov5/
+
+#Torch
+WORKDIR /
+RUN apt-get update && apt-get install -y libopenblas-base libopenmpi-dev libpython3-dev
+RUN wget https://nvidia.box.com/shared/static/p57jwntv436lfrd78inwl7iml6p13fzh.whl -O torch-1.8.0-cp36-cp36m-linux_aarch64.whl
+RUN pip3 install torch-1.8.0-cp36-cp36m-linux_aarch64.whl
+
+# Torchvision
+RUN git clone --branch v0.9.0 https://github.com/pytorch/vision torchvision
+RUN export BUILD_VERSION=0.9.9   
+RUN cd torchvision && python3 setup.py install --user
+
 
 ADD ./ /yolov5_node/detector/
 RUN ln -sf /yolov5_node/detector /app

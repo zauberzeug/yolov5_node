@@ -11,53 +11,64 @@ import ctypes
 import cv2
 import numpy as np
 import time
+import torch
+from yolov5TRT.detect_backend import TensorRTBackend
+from yolov5TRT.torch_utils import select_device, time_sync
+from yolov5TRT.general import check_img_size, non_max_suppression
+# from yolov5TRT.export import export_engine
 
 
 class Yolov5Detector(Detector):
 
     def __init__(self) -> None:
-        super().__init__('yolov5_wts')
+        super().__init__('yolov5_pytorch')
 
     def init(self,  model_info: ModelInformation, model_root_path: str):
-        self.model_info = model_info
-        engine_file = self._create_engine(
-            model_info.resolution,
-            len(model_info.categories),
-            f'{model_root_path}/model.wts'
-        )
-        ctypes.CDLL('/tensorrtx/yolov5/build/libmyplugins.so')
-        self.yolov5 = yolov5.YoLov5TRT(engine_file)
-        for i in range(3):
-            warmup = yolov5.warmUpThread(self.yolov5)
-            warmup.start()
-            warmup.join()
+        weightfile = f'{model_root_path}/model.pt'
+        subprocess.run(
+            f'python3 /yolov5/export.py --device 0 --half --weights {weightfile} --include engine', shell=True)
+        self.device = select_device('0')
+        logging.info(model_root_path)
+        self.model = TensorRTBackend(
+            f'{model_root_path}/model.engine', device=self.device, data=f'{model_root_path}/hyp.yaml')
+        imgz = (model_info.resolution, model_info.resolution)
+        self.imgz = check_img_size(imgz, s=self.model.stride)
+        self.half = self.model.engine and self.device.type != 'cpu'
+        self.model.warmup(imgz=(1, 3, *self.imgz), half=self.half)
 
     def evaluate(self, image: List[np.uint8]) -> Detections:
         detections = Detections()
         try:
-            t = time.time()
-            results, inference_ms = self.yolov5.infer(cv2.imdecode(image, cv2.IMREAD_COLOR))
+            start = time_sync()
+            im = torch.from_numpy(im).to(self.device)
+            results = self.model(im, augment=False, visualize=False)
             skipped_detections = []
-            logging.info(f'took {inference_ms} s, overall {time.time() -t} s')
+            end = time_sync()
+            results = non_max_suppression(
+                results, conf_thresh=0.2, iou_thresh=0.4)
+            logging.info(f'took {end-start} s, overall {time.time() -start} s')
             for detection in results:
-                x, y, w, h, category, probability = detection
-                category = self.model_info.categories[category]
-                if w <= 2 or h <= 2:  # skip very small boxes.
-                    skipped_detections.append((category.name, detection))
-                    continue
+                logging.info(detection)
+        #         x, y, w, h, category, probability = detection
+        #         category = self.model_info.categories[category]
+        #         if w <= 2 or h <= 2:  # skip very small boxes.
+        #             skipped_detections.append((category.name, detection))
+        #             continue
 
-                if category.type == CategoryType.Box:
-                    detections.box_detections.append(BoxDetection(
-                        category.name, x, y, w, h, self.model_info.version, probability
-                    ))
-                elif category.type == CategoryType.Point:
-                    cx, cy = (np.average([x, x + w]), np.average([y, y + h]))
-                    detections.point_detections.append(PointDetection(
-                        category.name, int(cx), int(cy), self.model_info.version, probability
-                    ))
-            if skipped_detections:
-                log_msg = '\n'.join([str(d) for d in skipped_detections])
-                logging.warning(f'Removed very small detections from inference result (count={len(skipped_detections)}): \n{log_msg}')
+        #         if category.type == CategoryType.Box:
+        #             detections.box_detections.append(BoxDetection(
+        #                 category.name, x, y, w, h, self.model_info.version, probability
+        #             ))
+        #         elif category.type == CategoryType.Point:
+        #             cx, cy = (np.average([x, x + w]), np.average([y, y + h]))
+        #             detections.point_detections.append(PointDetection(
+        #                 category.name, int(cx), int(
+        #                     cy), self.model_info.version, probability
+        #             ))
+        #     if skipped_detections:
+        #         log_msg = '\n'.join([str(d) for d in skipped_detections])
+        #         logging.warning(
+        #             f'Removed very small detections from inference result (count={len(skipped_detections)}): \n{log_msg}')
         except Exception as e:
             logging.exception('inference failed')
         return detections
@@ -73,13 +84,16 @@ class Yolov5Detector(Detector):
         # Adapt resolution
         with open('../yololayer.h', 'r+') as f:
             content = f.read()
-            content = re.sub('(CLASS_NUM =) \d*', r'\1 ' + str(cat_count), content)
-            content = re.sub('(INPUT_[HW] =) \d*', r'\1 ' + str(resolution), content)
+            content = re.sub('(CLASS_NUM =) \d*', r'\1 ' +
+                             str(cat_count), content)
+            content = re.sub('(INPUT_[HW] =) \d*',
+                             r'\1 ' + str(resolution), content)
             f.seek(0)
             f.truncate()
             f.write(content)
         subprocess.run('make -j6 -Wno-deprecated-declarations', shell=True)
         logging.warning('currently we assume a Yolov5 s6 model;\
             parameterization of the variant (s, s6, m, m6, ...) still needs to be done')
-        subprocess.run(f'./yolov5 -s {wts_file} {engine_file} s6', shell=True)  # TODO parameterize variant "s6"
+        # TODO parameterize variant "s6"
+        subprocess.run(f'./yolov5 -s {wts_file} {engine_file} s6', shell=True)
         return engine_file
