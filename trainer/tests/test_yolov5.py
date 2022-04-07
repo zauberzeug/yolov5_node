@@ -148,10 +148,11 @@ async def test_detecting(create_project):
         file_id = '1sZWa053fWT9PodrujDX90psmjhFVLyBV'
         destination = '/tmp/model.zip'
         g_download(file_id, destination)
+
         test_helper.unzip(destination, '/tmp/model')
 
     logging.debug('uploading model')
-    data = test_helper.prepare_formdata(['/tmp/model/model.pt'])
+    data = test_helper.prepare_formdata(['/tmp/model/model.pt', '/tmp/model/model.json'])
     async with loop.post(f'api/zauberzeug/projects/pytest/models/yolov5_pytorch', data) as response:
         if response.status != 200:
             msg = f'unexpected status code {response.status} while putting model'
