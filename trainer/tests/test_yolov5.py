@@ -78,6 +78,32 @@ def test_new_model_discovery(use_training_dir):
     assert os.path.isfile('result/weights/published/uuid3.pt'), 'weightfile should be renamed to learning loop id'
 
 
+def test_old_model_files_are_deleted_on_publish(use_training_dir):
+    trainer = Yolov5Trainer()
+    trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
+                                images_folder='./', training_folder='./')
+    trainer.training.data = TrainingData(image_data=[], categories=[
+                                         Category(name='class_a', id='uuid_of_class_a', type='box')])
+    assert trainer.get_new_model() is None, 'should not find any models'
+
+    mock_epoch(1, {'class_a': {'fp': 0, 'tp': 1, 'fn': 0}})
+    model = trainer.get_new_model()
+    assert model.confusion_matrix['uuid_of_class_a']['tp'] == 1
+    mock_epoch(2, {'class_a': {'fp': 1, 'tp': 2, 'fn': 1}})
+
+    _, _, files = next(os.walk("result/weights"))
+    assert len(files) == 4
+
+    model = trainer.get_new_model()
+    trainer.on_model_published(model, 'uuid2')
+    _, _, files = next(os.walk("result/weights/published"))
+    assert len(files) == 1
+    assert os.path.isfile('result/weights/published/uuid2.pt'), 'weightfile should be renamed to learning loop id'
+
+    _, _, files = next(os.walk("result/weights"))
+    assert len(files) == 0
+
+
 @pytest.mark.asyncio()
 async def test_clear_training_data():
     trainer = Yolov5Trainer()
