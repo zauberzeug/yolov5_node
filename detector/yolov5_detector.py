@@ -6,7 +6,7 @@ import logging
 import os
 import subprocess
 import re
-import yolov5
+# import yolov5
 import ctypes
 import cv2
 import numpy as np
@@ -15,7 +15,7 @@ import torch
 from yolov5TRT.detect_backend import TensorRTBackend
 from yolov5TRT.torch_utils import select_device, time_sync
 from yolov5TRT.general import check_img_size, non_max_suppression
-# from yolov5TRT.export import export_engine
+from yolov5TRT.export import export
 
 
 class Yolov5Detector(Detector):
@@ -25,16 +25,17 @@ class Yolov5Detector(Detector):
 
     def init(self,  model_info: ModelInformation, model_root_path: str):
         weightfile = f'{model_root_path}/model.pt'
-        subprocess.run(
-            f'python3 /yolov5/export.py --device 0 --half --weights {weightfile} --include engine', shell=True)
-        self.device = select_device('0')
-        logging.info(model_root_path)
-        self.model = TensorRTBackend(
-            f'{model_root_path}/model.engine', device=self.device, data=f'{model_root_path}/hyp.yaml')
-        imgz = (model_info.resolution, model_info.resolution)
-        self.imgz = check_img_size(imgz, s=self.model.stride)
-        self.half = self.model.engine and self.device.type != 'cpu'
-        self.model.warmup(imgz=(1, 3, *self.imgz), half=self.half)
+        pass
+        # subprocess.run(
+        #     f'python3 /yolov5/export.py --device 0 --half --weights {weightfile} --include engine', shell=True)
+        # self.device = select_device('0')
+        # logging.info(model_root_path)
+        # self.model = TensorRTBackend(
+        #     f'{model_root_path}/model.engine', device=self.device, data=f'{model_root_path}/hyp.yaml')
+        # imgz = (model_info.resolution, model_info.resolution)
+        # self.imgz = check_img_size(imgz, s=self.model.stride)
+        # self.half = self.model.engine and self.device.type != 'cpu'
+        # self.model.warmup(imgz=(1, 3, *self.imgz), half=self.half)
 
     def evaluate(self, image: List[np.uint8]) -> Detections:
         detections = Detections()
