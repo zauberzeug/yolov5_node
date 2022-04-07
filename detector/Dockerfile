@@ -58,7 +58,7 @@ RUN pip3 install torch-1.8.0-cp36-cp36m-linux_aarch64.whl
 
 # Torchvision
 RUN git clone --branch v0.9.0 https://github.com/pytorch/vision torchvision
-RUN export BUILD_VERSION=0.9.9   
+RUN export BUILD_VERSION=0.9.0   
 RUN cd torchvision && python3 setup.py install --user
 
 
