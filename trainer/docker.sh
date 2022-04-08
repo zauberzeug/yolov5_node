@@ -73,6 +73,9 @@ case $cmd in
     r | run)
         docker run -it $run_args $image-dev $cmd_args
         ;;
+    ri | run-image)
+        docker run -it $run_args $image $cmd_args
+        ;;
     s | stop)
         docker stop $name $cmd_args
         ;;
