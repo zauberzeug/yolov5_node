@@ -23,7 +23,7 @@ jobs:
         run: |
           docker exec yolov5_trainer_node_github_action pytest -v
       - name: publish
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/release'
         run: |
           cd trainer
           ./docker.sh p
