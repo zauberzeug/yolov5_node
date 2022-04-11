@@ -16,7 +16,13 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-ENV PYTHONPATH "${PYTHONPATH}:/usr/local/lib/python3.6/dist-packages/"
+
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get install -y python3.8 python3.8-dev python3.8-venv curl python3-tk
+ENV PYTHONPATH "${PYTHONPATH}:/usr/local/lib/python3.8/dist-packages/"
+
+RUN rm /usr/bin/python3 && ln -s /usr/bin/python3.8 /usr/bin/python3
+RUN python3 --version
+RUN python3 -m pip install --upgrade pip setuptools
 
 RUN pip3 install --no-cache-dir wheel
 RUN pip3 install --no-cache-dir pycuda
@@ -49,18 +55,57 @@ WORKDIR /yolov5
 # Tag 6.1        3752807c0b8af03d42de478fbcbf338ec4546a6c
 RUN git fetch --all --tags && git checkout tags/v6.1
 ENV PYTHONPATH=$PYTHONPATH:/yolov5/
+COPY ./requirements.txt /yolov5/requirements.txt
+RUN apt-get update && apt-get install -y libpcap-dev libpq-dev 
+RUN pip3 install scikit-learn
+# RUN pip3 install git+https://github.com/scikit-learn/scikit-learn.git
+RUN cat requirements.txt
+RUN pip3 --version
+RUN python3 -m pip install -r requirements.txt
 
 #Torch
+RUN pip3 install setuptools==59.5.0 opencv-python
 WORKDIR /
-RUN apt-get update && apt-get install -y libopenblas-base libopenmpi-dev libpython3-dev
-RUN wget https://nvidia.box.com/shared/static/p57jwntv436lfrd78inwl7iml6p13fzh.whl -O torch-1.8.0-cp36-cp36m-linux_aarch64.whl
-RUN pip3 install torch-1.8.0-cp36-cp36m-linux_aarch64.whl
+RUN git clone --recursive --branch v1.10.0 https://github.com/pytorch/pytorch
+WORKDIR /pytorch
+RUN python3 setup.py install
+
+# WORKDIR /
+# RUN apt-get update && apt-get install -y libopenblas-base libopenmpi-dev libpython3-dev
+# RUN wget https://nvidia.box.com/shared/static/p57jwntv436lfrd78inwl7iml6p13fzh.whl -O torch-1.8.0-cp36-cp36m-linux_aarch64.whl
+# RUN pip3 install torch-1.8.0-cp36-cp36m-linux_aarch64.whl
 
 # Torchvision
-RUN git clone --branch v0.9.0 https://github.com/pytorch/vision torchvision
-RUN export BUILD_VERSION=0.9.0   
+RUN git clone --branch v0.11.1 https://github.com/pytorch/vision torchvision
+RUN export BUILD_VERSION=0.11.1   
 RUN cd torchvision && python3 setup.py install --user
 
+# TensorRT
+RUN git clone -b master https://github.com/nvidia/TensorRT TensorRT
+RUN cd TensorRT
+RUN git submodule update --init --recursive
+RUN export TRT_OSSPATH=/TensorRT
+
+RUN export EXT_PATH=~/external
+RUN mkdir -p $EXT_PATH && cd $EXT_PATH
+RUN git clone https://github.com/pybind/pybind11.git
+
+RUN wget https://www.python.org/ftp/python/3.8.0/Python-3.8.0.tgz
+RUN tar -xvf Python-3.8.0.tgz
+RUN mkdir -p $EXT_PATH/python3.8.0/include
+RUN cp -r Python-3.8.0/Include/* $EXT_PATH/python3.8.0/include/
+
+RUN cp -r /usr/include/python3.8/pyconfig.h $EXT_PATH/python3.8.0/include/
+RUN ln -sv /usr/include/python3.8/* /usr/include/
+RUN cd $TRT_OSSPATH/python
+RUN PYTHON_MAJOR_VERSION=3 PYTHON_MINOR_VERSION=8 TARGET_ARCHITECTURE=aarch64 ./build.sh
+RUN python3 -m pip install build/dist/tensorrt-*.whl
+
+
+# RUN git clone --recursive --branch v1.8.0 http://github.com/pytorch/pytorch
+# RUN cd pytorch
+# RUN python3 -m pip install -r requirements.txt
+# RUN python3 setup.py install
 
 ADD ./ /yolov5_node/detector/
 RUN ln -sf /yolov5_node/detector /app
