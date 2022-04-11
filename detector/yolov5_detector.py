@@ -6,16 +6,9 @@ import logging
 import os
 import subprocess
 import re
-# import yolov5
-import ctypes
-import cv2
 import numpy as np
 import time
 import torch
-from yolov5TRT.detect_backend import TensorRTBackend
-from yolov5TRT.torch_utils import select_device, time_sync
-from yolov5TRT.general import check_img_size, non_max_suppression
-from yolov5TRT.export import export
 
 
 class Yolov5Detector(Detector):
@@ -25,10 +18,14 @@ class Yolov5Detector(Detector):
 
     def init(self,  model_info: ModelInformation, model_root_path: str):
         weightfile = f'{model_root_path}/model.pt'
+        subprocess.run(
+            f'python3 /yolov5/export.py --device 0 --half --weights {weightfile} --include engine', shell=True)
+        # self.device = select_device('0')
+        # engine_file = export(weightfile, device=self.device, half=True)
+        # logging.info(engine_file)
         pass
         # subprocess.run(
         #     f'python3 /yolov5/export.py --device 0 --half --weights {weightfile} --include engine', shell=True)
-        # self.device = select_device('0')
         # logging.info(model_root_path)
         # self.model = TensorRTBackend(
         #     f'{model_root_path}/model.engine', device=self.device, data=f'{model_root_path}/hyp.yaml')
