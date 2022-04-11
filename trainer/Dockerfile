@@ -40,7 +40,7 @@ RUN python3 -m pip install --no-cache -r requirements.txt
 RUN pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof
 
 RUN python3 -m pip install autopep8 debugpy gunicorn pyyaml uvloop pytest-asyncio 
-RUN python3 -m pip install "learning_loop_node==0.7.12"
+RUN python3 -m pip install "learning_loop_node==v0.7.13rc1"
 
 ADD ./ /yolov5_node/trainer/
 RUN ln -sf /yolov5_node/trainer /app

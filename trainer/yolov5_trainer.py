@@ -58,8 +58,9 @@ class Yolov5Trainer(Trainer):
         # NOTE /yolov5 is patched to create confusion matrix json files
         with open(weightfile[:-3] + '.json') as f:
             matrix = json.load(f)
+            categories = yolov5_format.category_lookup_from_training(self.training)
             for category_name in list(matrix.keys()):
-                matrix[self.training.data.categories[category_name]] = matrix.pop(category_name)
+                matrix[categories[category_name]] = matrix.pop(category_name)
 
         return BasicModel(confusion_matrix=matrix, meta_information={'weightfile': weightfile})
 
@@ -81,9 +82,8 @@ class Yolov5Trainer(Trainer):
         weightfile = glob(f'{GLOBALS.data_folder}/**/trainings/**/{model_id}.pt', recursive=True)[0]
         shutil.copy(weightfile, '/tmp/model.pt')
         training_path = '/'.join(weightfile.split('/')[:-4])
-        modeljson_path = f'{training_path}/model.json'
         return {
-            self.model_format: ['/tmp/model.pt', f'{training_path}/hyp.yaml', modeljson_path]
+            self.model_format: ['/tmp/model.pt', f'{training_path}/hyp.yaml'],
         }
 
     async def _detect(self, model_information: ModelInformation, images:  List[str], model_folder: str) -> List:
@@ -161,7 +161,7 @@ class Yolov5Trainer(Trainer):
 
     async def clear_training_data(self, training_folder: str) -> None:
         # Note: Keep best.pt in case uploaded model was not best.
-        keep_files = ['last_training.log', 'model.json', 'hyp.yaml', 'dataset.yaml', 'best.pt']
+        keep_files = ['last_training.log', 'hyp.yaml', 'dataset.yaml', 'best.pt']
         keep_dirs = ['result', 'weights']
         for root, dirs, files in os.walk(training_folder, topdown=False):
             for file in files:

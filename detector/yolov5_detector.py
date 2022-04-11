@@ -21,16 +21,17 @@ class Yolov5Detector(Detector):
     def __init__(self) -> None:
         super().__init__('yolov5_pytorch')
 
-    def init(self,  model_info: ModelInformation, model_root_path: str):
-        weightfile = f'{model_root_path}/model.pt'
-        if not os.path.exists(f'{model_root_path}/model.engine'):
-            shutil.copy('/data/model.engine', f'{model_root_path}/model.engine')
+    def init(self,  model_info: ModelInformation):
+        self.model_info = model_info
+        weightfile = f'{self.model_info.model_root_path}/model.pt'
+        if not os.path.exists(f'{self.model_info.model_root_path}/model.engine'):
+            shutil.copy('/data/model.engine', f'{self.model_inf.model_root_path}/model.engine')
             # subprocess.run(
             #     f'python3 /yolov5/export.py --device 0 --half --weights {weightfile} --include engine', shell=True)
         self.device = select_device('0')
 
         self.model = DetectMultiBackend(
-            f'{model_root_path}/model.engine', device=self.device)
+            f'{self.model_inf.model_root_path}/model.engine', device=self.device)
         logging.info(model_info.resolution)
         imgz = (model_info.resolution, model_info.resolution)
         self.imgz = check_img_size(imgz, s=self.model.stride)
