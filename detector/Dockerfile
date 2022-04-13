@@ -82,8 +82,7 @@ RUN cd torchvision && python3 setup.py install --user
 
 # TensorRT
 RUN git clone -b master https://github.com/nvidia/TensorRT TensorRT
-RUN cd TensorRT
-RUN git submodule update --init --recursive
+RUN cd TensorRT && git submodule update --init --recursive
 RUN export TRT_OSSPATH=/TensorRT
 
 RUN export EXT_PATH=~/external
