@@ -16,6 +16,8 @@ from models.common import DetectMultiBackend
 from utils.general import check_img_size, non_max_suppression, scale_coords, xyxy2xywh
 import cv2
 from utils.augmentations import letterbox
+import os
+import yaml
 
 
 class Yolov5Detector(Detector):
@@ -26,11 +28,13 @@ class Yolov5Detector(Detector):
     def init(self,  model_info: ModelInformation):
         self.model_info = model_info
         weightfile = f'{self.model_info.model_root_path}/model.pt'
-        data = f'{self.model_info.model_root_path}/dataset.yaml'
+        # get yaml file. Older models may not sent dataset.yaml
+        data = f'{self.model_info.model_root_path}/dataset.yaml' if os.path.exists(
+            f'{self.model_info.model_root_path}/dataset.yaml') else self._create_dataset_yaml()
         if not os.path.exists(f'{self.model_info.model_root_path}/model.engine'):
-            shutil.copy('/data/model.engine', f'{self.model_info.model_root_path}/model.engine')
-            # subprocess.run(
-            #     f'python3 /yolov5/export.py --device 0 --half --weights {weightfile} --data {data} --imgsz {self.model_info.resolution} --include engine', shell=True)
+            # shutil.copy('/data/model.engine', f'{self.model_info.model_root_path}/model.engine')
+            subprocess.run(
+                f'python3 /yolov5/export.py --device 0 --half --weights {weightfile} --data {data} --imgsz {self.model_info.resolution} --include engine', shell=True)
         self.device = select_device('0')
 
         self.model = DetectMultiBackend(
@@ -50,23 +54,20 @@ class Yolov5Detector(Detector):
             im /= 255
             if len(im.shape) == 3:
                 im = im[None]  # expand for batch dim
-            logging.info(im.size())
             results = self.model(im, augment=False, visualize=False)
             skipped_detections = []
             end = time_sync()
             results = non_max_suppression(results, conf_thres=0.2, iou_thres=0.4)[0]  # We have only one image
             if len(results):
-                logging.info(im.shape[2:])
-                logging.info(im0.shape)
-                logging.info(results)
-                logging.info(results[:, :4])
-
                 results[:, :4] = scale_coords(im.shape[2:], results[:, :4], im0.shape).round()
                 for *xyxy, probability, cls in reversed(results):
                     xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4))).view(-1).tolist()
-                    x, y, w, h = xywh[0], xywh[1], xywh[2], xywh[3]
+                    x, y, w, h = xywh
+                    x = x - 0.5*w
+                    y = y - 0.5*h
                     c = int(cls)
                     category = self.model_info.categories[c]
+
                     probability = probability.item()
                     if w <= 2 or h <= 2:  # skip very small boxes.
                         detection = (category.name, x, y, w, h, probability)
@@ -80,7 +81,6 @@ class Yolov5Detector(Detector):
                         detections.point_detections.append(PointDetection(
                             category.name, int(cx), int(cy), self.model_info.version, probability))
 
-            # detections, skipped_detections = self._process_detections(results, im0, im)
             logging.info(f'took {end-start} s, overall {time.time() -start} s')
             if skipped_detections:
                 log_msg = '\n'.join([str(d) for d in skipped_detections])
@@ -88,64 +88,23 @@ class Yolov5Detector(Detector):
                     f'Removed very small detections from inference result (count={len(skipped_detections)}): \n{log_msg}')
         except Exception as e:
             logging.exception('inference failed')
+        logging.info(detections)
         return detections
-
-    def _create_engine(self, resolution: int, cat_count: int, wts_file: str) -> str:
-        engine_file = os.path.dirname(wts_file) + '/model.engine'
-        if os.path.isfile(engine_file):
-            logging.info(f'{engine_file} already exists, skipping conversion')
-            return engine_file
-
-        # NOTE cmake and inital building is done in Dockerfile (to speeds things up)
-        os.chdir('/tensorrtx/yolov5/build')
-        # Adapt resolution
-        with open('../yololayer.h', 'r+') as f:
-            content = f.read()
-            content = re.sub('(CLASS_NUM =) \d*', r'\1 ' +
-                             str(cat_count), content)
-            content = re.sub('(INPUT_[HW] =) \d*',
-                             r'\1 ' + str(resolution), content)
-            f.seek(0)
-            f.truncate()
-            f.write(content)
-        subprocess.run('make -j6 -Wno-deprecated-declarations', shell=True)
-        logging.warning('currently we assume a Yolov5 s6 model;\
-            parameterization of the variant (s, s6, m, m6, ...) still needs to be done')
-        # TODO parameterize variant "s6"
-        subprocess.run(f'./yolov5 -s {wts_file} {engine_file} s6', shell=True)
-        return engine_file
 
     def _preprocess_image(self, image: List[np.uint8]) -> Tuple[np.ndarray, np.ndarray]:
         img0 = cv2.imdecode(image, cv2.IMREAD_COLOR)
-        logging.info(self.imgz)
         img = letterbox(img0, self.imgz, stride=self.model.stride, scaleFill=True, auto=False)[0]
-        logging.info(img.shape)
         img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
         img = np.ascontiguousarray(img)
         return img, img0
 
-    def _process_detections(self, results: torch.Tensor, orig_img: Tuple[int, int], det_img_size: Tuple[int, int]):
-        skipped_detections = []
-        detections = Detections()
-        gn = torch.tensor(orig_img.shape)[[1, 0, 1, 0]]  # Use to get normalized values [0,1]
-        if len(results):
-            results[:, :4] = scale_coords(det_img_size.shape[2:], results[:, :4], orig_img.shape).round()
-            for *xyxy, probability, cls in reversed(results):
-                logging.info(probability)
-                logging.info(cls)
-                xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4))).view(-1).tolist()
-                x, y, w, h = xywh[0], xywh[1], xywh[2], xywh[3]
-                c = int(cls)
-                category = self.model_info.categories[c]
-                if w <= 2 or h <= 2:  # skip very small boxes.
-                    detection = (category.name, x, y, w, h, probability)
-                    skipped_detections.append((category.name, detection))
-                    continue
-                logging.info('#############HERE')
-                if category.type == CategoryType.Box:
-                    detections.box_detections.append(BoxDetection(
-                        category.name, x, y, w, h, self.model_info.version, probability))
-                elif category.type == CategoryType.Point:
-                    cx, cy = (np.average([x, x + w]), np.average([y, y + h]))
-                    detections.point_detections.append(PointDetection(
-                        category.name, int(cx), int(cy), self.model_info.version, probability))
+    def _create_dataset_yaml(self) -> str:
+        data = {
+            'nc': len(self.model_info.categories),
+            'names': [category.name for category in self.model_info.categories]
+        }
+        logging.info(data)
+        with open(f'{self.model_info.model_root_path}/dataset.yaml', 'w') as f:
+            yaml.dump(data, f)
+
+        return f'{self.model_info.model_root_path}/dataset.yaml'
