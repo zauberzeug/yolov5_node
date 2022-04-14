@@ -83,7 +83,7 @@ class Yolov5Trainer(Trainer):
         shutil.copy(weightfile, '/tmp/model.pt')
         training_path = '/'.join(weightfile.split('/')[:-4])
         return {
-            self.model_format: ['/tmp/model.pt', f'{training_path}/hyp.yaml'],
+            self.model_format: ['/tmp/model.pt', f'{training_path}/hyp.yaml', f'{training_path}/dataset.yaml'],
         }
 
     async def _detect(self, model_information: ModelInformation, images:  List[str], model_folder: str) -> List:
