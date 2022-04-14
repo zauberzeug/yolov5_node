@@ -32,7 +32,6 @@ class Yolov5Detector(Detector):
         data = f'{self.model_info.model_root_path}/dataset.yaml' if os.path.exists(
             f'{self.model_info.model_root_path}/dataset.yaml') else self._create_dataset_yaml()
         if not os.path.exists(f'{self.model_info.model_root_path}/model.engine'):
-            # shutil.copy('/data/model.engine', f'{self.model_info.model_root_path}/model.engine')
             subprocess.run(
                 f'python3 /yolov5/export.py --device 0 --half --weights {weightfile} --data {data} --imgsz {self.model_info.resolution} --include engine', shell=True)
         self.device = select_device('0')
