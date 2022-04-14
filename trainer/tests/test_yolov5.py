@@ -180,6 +180,15 @@ async def test_detecting(create_project):
     assert len(detections) > 0
 
 
+def test_batch_size_can_be_provided_by_env(monkeypatch):
+    assert Yolov5Trainer.get_batch_size() >= 8
+
+    monkeypatch.delenv('BATCH_SIZE')
+    assert Yolov5Trainer.get_batch_size() == 8  # default
+    monkeypatch.setenv('BATCH_SIZE', 32)
+    assert Yolov5Trainer.get_batch_size() == 32
+
+
 def mock_epoch(number: int, confusion_matrix: Dict):
     os.makedirs('result/weights/', exist_ok=True)
     with open(f'result/weights/epoch{number}.json', 'w') as f:

@@ -27,7 +27,7 @@ class Yolov5Trainer(Trainer):
     async def start_training(self, model: str = 'model.pt') -> None:
         resolution = 832
         yolov5_format.create_file_structure(self.training)
-        batch_size = 32
+        batch_size = Yolov5Trainer.get_batch_size()
         patience = 300
         epochs = 2000
         if not os.path.isfile('hpy.yaml'):
@@ -180,3 +180,7 @@ class Yolov5Trainer(Trainer):
             PretrainedModel(name='yolov5s6', label='YOLO v5 small', description='~5 fps on Jetson Nano'),
             # PretrainedModel(name='yolov5m', label='YOLO v5 medium', description='~2 fps on Jetson Nano'),
         ]
+
+    @staticmethod
+    def get_batch_size():
+        return int(os.environ.get('BATCH_SIZE', '8'))
