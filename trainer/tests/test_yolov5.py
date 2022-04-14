@@ -182,6 +182,7 @@ async def test_detecting(create_project):
 
 def test_batch_size_can_be_provided_by_env(monkeypatch):
     assert Yolov5Trainer.get_batch_size() >= 8
+
     try:
     monkeypatch.delenv('BATCH_SIZE')
     except:
