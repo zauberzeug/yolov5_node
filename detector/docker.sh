@@ -65,6 +65,10 @@ case $cmd in
         docker build . --target release -t $image $build_args $cmd_args
         docker build . -t ${image}-dev $build_args $cmd_args
         ;;
+    U | update)
+	docker pull ${image}
+        docker pull ${image}-dev
+	;;
     d | debug)
         docker run $run_args $image-dev /app/start.sh debug
         ;;
