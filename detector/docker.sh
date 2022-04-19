@@ -5,12 +5,10 @@ then
     echo "Usage:"
     echo
     echo "  `basename $0` (b | build)   [<containers>]      Build or rebuild"
-    echo "  `basename $0` (u | up)      [<containers>]      Create and start"
-    echo "  `basename $0` (U | upbuild) [<containers>]      Create and start (force build)"
+    echo "  `basename $0` (U | update)  [<containers>]      download latest images"
     echo "  `basename $0` (d | down)    [<containers>]      Stop and remove"
-    echo "  `basename $0` (s | start)   [<containers>]      Start"
-    echo "  `basename $0` (r | restart) [<containers>]      Restart"
-    echo "  `basename $0` (h | stop)    [<containers>]      Stop (halt)"
+    echo "  `basename $0` (r | run)     [<containers>]      Run"
+    echo "  `basename $0` (s | stop)    [<containers>]      Stop (halt)"
     echo "  `basename $0` (k | kill)    [<containers>]      Kill"
     echo "  `basename $0` ps            [<containers>]      List"
     echo "  `basename $0` rm            [<containers>]      Remove"
@@ -65,6 +63,10 @@ case $cmd in
         docker build . --target release -t $image $build_args $cmd_args
         docker build . -t ${image}-dev $build_args $cmd_args
         ;;
+    U | update)
+	    docker pull ${image}
+        docker pull ${image}-dev
+	;;
     d | debug)
         docker run $run_args $image-dev /app/start.sh debug
         ;;
