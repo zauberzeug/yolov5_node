@@ -25,14 +25,20 @@ class Yolov5Trainer(Trainer):
         self.latest_epoch = 0
 
     async def start_training(self, model: str = 'model.pt') -> None:
-        resolution = 832
+        resolution = self.training.data.hyperparameter.resolution
         yolov5_format.create_file_structure(self.training)
         batch_size = Yolov5Trainer.get_batch_size()
         patience = 300
         epochs = 2000
-        if not os.path.isfile('hpy.yaml'):
-            shutil.copy('/app/hyp.yaml', self.training.training_folder)
-        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --patience {patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp hyp.yaml --epochs {epochs} --clear'
+
+        hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
+        if not os.path.isfile(hyperparameter_path):
+            shutil.copy('/app/hyp.yaml', hyperparameter_path)
+        yolov5_format.update_hyp(hyperparameter_path, self.training.data.hyperparameter)
+
+        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --patience {patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {epochs} --clear'
+        with open(hyperparameter_path) as f:
+            logging.info(f'running training with command :\n {cmd} \and hyperparameter\n{f.read()}')
         self.executor.start(cmd)
 
     async def start_training_from_scratch(self, id: str) -> None:
