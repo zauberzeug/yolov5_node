@@ -54,7 +54,7 @@ L4T_REVISION=$(echo $L4T_VERSION_STRING | cut -f 2 -d ',' | grep -Po '(?<=REVISI
 [ "$L4T_REVISION" = "5.1" ] && L4T_REVISION=5.0
 L4T_VERSION="$L4T_RELEASE.$L4T_REVISION"
 
-build_args="--build-arg BASE_IMAGE=zauberzeug/l4t-opencv:4.5.2-on-nano-r$L4T_VERSION"
+build_args="--build-arg BASE_IMAGE=zauberzeug/l4t-python38-pytorch-trt:$L4T_VERSION"
 image="zauberzeug/yolov5-detector:$L4T_VERSION"
 
 cmd=$1
