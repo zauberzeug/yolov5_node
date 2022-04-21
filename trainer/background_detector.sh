@@ -30,7 +30,7 @@ fi
 # sourcing .env file to get configuration (see README.md)
 . .env || echo "you should provide an .env file with USERNAME and PASSWORD for the Learning Loop"
 
-name="yolov5_backeground_detector"
+name="yolov5_background_detector"
 
 run_args="-it --rm" 
 run_args+=" -v $HOME/data:/data"
