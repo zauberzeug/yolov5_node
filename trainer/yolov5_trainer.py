@@ -187,6 +187,10 @@ class Yolov5Trainer(Trainer):
             # PretrainedModel(name='yolov5m', label='YOLO v5 medium', description='~2 fps on Jetson Nano'),
         ]
 
+    @property
+    def model_architecture(self):
+        return 'yolov5s6'
+
     @staticmethod
     def get_batch_size():
         return int(os.environ.get('BATCH_SIZE', '8'))
