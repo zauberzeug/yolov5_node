@@ -87,9 +87,7 @@ async def main():
 
 
 if __name__ == "__main__":
-    start = input('Start detect? [y/n]')
-    if start == 'y':
-        while True:
-            loop.download_token()
-            asyncio.run(main())
-            print('Finished')
+    while True:
+        loop.download_token()
+        asyncio.run(main())
+        print('Finished')
