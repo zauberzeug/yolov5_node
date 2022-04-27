@@ -33,6 +33,7 @@ fi
 name="yolov5_background_detector"
 
 run_args="-it --rm" 
+run_args+=" -v $(pwd)/../:/yolov5_node/"
 run_args+=" -v $HOME/data:/data"
 run_args+=" -e HOST=$HOST"
 run_args+=" -h $HOSTNAME"
