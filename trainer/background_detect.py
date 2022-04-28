@@ -71,9 +71,9 @@ async def main():
             images = [img for img in glob(f'{image_folder}/**/*.*', recursive=True)
                       if os.path.splitext(os.path.basename(img))[0] in ids]
 
-            model_folder = f'{cd.data_path}/models/{context.organization}/{context.project}'
+            model_folder = '/tmp/background_detector/models'
             shutil.rmtree(model_folder, ignore_errors=True)
-            os.makedirs(model_folder, exist_ok=True)
+            os.makedirs(model_folder)
             deployment_target = await cd.get_deployment_target(context.project, context.organization)
             model_id = await cd.get_model_id_from_deployment_target(context.organization, context.project, deployment_target)
             if model_id:
