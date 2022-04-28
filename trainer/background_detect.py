@@ -12,6 +12,9 @@ from learning_loop_node.rest.downloader import DataDownloader
 from learning_loop_node.rest.downloads import download_model
 from fastapi.encoders import jsonable_encoder
 from typing import List
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 
 @dataclass
@@ -62,10 +65,11 @@ async def main():
     cd = ContinousDetector(loop)
     await cd.get_projects()
     for project in cd.projects:
-        print(f'Current project: {project.project_id}')
+        logging.info(f'Current project: {project.project_id}')
         context = Context(organization=project.organization_id, project=project.project_id)
         ids = await cd.get_image_ids_without_detections(context.project, context.organization)
         if ids:
+            logging.info(f'Downloading {len(ids)} images')
             image_folder = f'{cd.data_path}/images/{context.organization}/{context.project}'
             await DataDownloader(context).download_images(ids, image_folder)
             images = [img for img in glob(f'{image_folder}/**/*.*', recursive=True)
@@ -77,17 +81,18 @@ async def main():
             deployment_target = await cd.get_deployment_target(context.project, context.organization)
             model_id = await cd.get_model_id_from_deployment_target(context.organization, context.project, deployment_target)
             if model_id:
+                logging.info(f'Downloading model {model_id} (version {deployment_target})')
                 await download_model(model_folder, context, model_id, 'yolov5_pytorch')
                 model_info = ModelInformation.load_from_disk(model_folder)
-                print("Start detecting")
+                logging.info(f"Start detecting {len(ids)} images")
                 detections = await Yolov5Trainer()._detect(model_info, images, model_folder)
                 await Trainer('yolov5_pytorch')._upload_detections(context, jsonable_encoder(detections))
             else:
-                print(f'Could not download model for project {context.project} in format yolov5_pytorch')
+                logging.info(f'Could not download model for project {context.project} in format yolov5_pytorch')
 
 
 if __name__ == "__main__":
     while True:
         loop.download_token()
         asyncio.run(main())
-        print('Finished')
+        logging.info('Finished')
