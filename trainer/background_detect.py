@@ -4,7 +4,6 @@ import shutil
 from learning_loop_node import loop, ModelInformation
 import asyncio
 from glob import glob
-import json
 from yolov5_trainer import Yolov5Trainer
 from learning_loop_node.trainer import Trainer
 from learning_loop_node.context import Context
@@ -13,6 +12,7 @@ from learning_loop_node.rest.downloads import download_model
 from fastapi.encoders import jsonable_encoder
 from typing import List
 import logging
+from learning_loop_node import GLOBALS
 
 logging.basicConfig(level=logging.INFO)
 
@@ -35,7 +35,7 @@ class ContinousDetector:
     def __init__(self, loop):
         self.loop = loop
         self.projects = []
-        self.data_path = '/tmp'
+        self.data_path = GLOBALS.data_folder
 
     async def get_projects(self):
         async with loop.get('api/projects') as response:
@@ -86,6 +86,7 @@ async def main():
                 model_info = ModelInformation.load_from_disk(model_folder)
                 logging.info(f"Start detecting {len(ids)} images")
                 detections = await Yolov5Trainer()._detect(model_info, images, model_folder)
+                logging.info(f'Uploading {len(detections)} detections')
                 await Trainer('yolov5_pytorch')._upload_detections(context, jsonable_encoder(detections))
             else:
                 logging.info(f'Could not download model for project {context.project} in format yolov5_pytorch')
