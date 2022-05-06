@@ -15,7 +15,7 @@ def create_set(training: Training, set_name: str):
     training_path = training.training_folder
     images_path = f'{training_path}/{set_name}'
     os.makedirs(images_path, exist_ok=True)
-    size = 20
+
     for image in training.data.image_data:
         if image['set'] == set_name:
             image_name = image['id'] + '.jpg'
@@ -38,6 +38,7 @@ def create_set(training: Training, set_name: str):
                 id = str(categories.index(box['category_id']))
                 yolo_boxes.append(id + ' ' + ' '.join([str("%.6f" % c) for c in coords]) + '\n')
             for point in image['point_annotations']:
+                size = [c for c in training.data.categories if c.id == point['category_id']][0].point_size or 20
                 coords = [
                     point['x']/width,
                     point['y']/height,

@@ -19,6 +19,41 @@ from learning_loop_node.data_classes.category import Category
 
 
 @pytest.mark.asyncio()
+async def test_create_file_structure__box_size(use_training_dir):
+    categories = [
+        Category(name='point_category_1', id='uuid_of_class_1'),
+        Category(name='point_category_2', id='uuid_of_class_2', point_size=30)]
+    image_data = [{
+        'set': 'train',
+        'id': 'image_1',
+        'width': 100,
+        'height': 100,
+        'box_annotations': [],
+        'point_annotations': [{
+            'category_id': 'uuid_of_class_1',
+            'x': 50,
+            'y': 60,
+        }, {
+            'category_id': 'uuid_of_class_2',
+            'x': 60,
+            'y': 70,
+        }]
+    }]
+    trainer = Yolov5Trainer()
+    trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
+                                images_folder='./', training_folder='./')
+    trainer.training.data = TrainingData(image_data=image_data, categories=categories)
+
+    yolov5_format.create_file_structure(trainer.training)
+
+    with open('./train/image_1.txt', 'r') as f:
+        lines = f.readlines()
+
+    assert '0 0.500000 0.600000 0.200000 0.200000' in lines[0]
+    assert '1 0.600000 0.700000 0.300000 0.300000' in lines[1]
+
+
+@pytest.mark.asyncio()
 async def test_training_creates_model(use_training_dir):
     os.remove('/tmp/model.pt')
     training = Training(
@@ -56,7 +91,8 @@ def test_new_model_discovery(use_training_dir):
     trainer = Yolov5Trainer()
     trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
                                 images_folder='./', training_folder='./')
-    trainer.training.data = TrainingData(image_data=[], categories=[Category(name='class_a', id='uuid_of_class_a', type='box')])
+    trainer.training.data = TrainingData(image_data=[], categories=[
+                                         Category(name='class_a', id='uuid_of_class_a', type='box')])
     assert trainer.get_new_model() is None, 'should not find any models'
     mock_epoch(1, {'class_a': {'fp': 0, 'tp': 1, 'fn': 0}})
     model = trainer.get_new_model()
@@ -151,12 +187,12 @@ async def test_detecting(create_project):
     from learning_loop_node.loop import Loop
     loop = Loop()
     logging.debug('downloading model from gdrive')
-    if not os.path.exists('/tmp/model/model.pt'):
-        file_id = '1sZWa053fWT9PodrujDX90psmjhFVLyBV'
-        destination = '/tmp/model.zip'
-        g_download(file_id, destination)
 
-        test_helper.unzip(destination, '/tmp/model')
+    file_id = '1sZWa053fWT9PodrujDX90psmjhFVLyBV'
+    destination = '/tmp/model.zip'
+    g_download(file_id, destination)
+
+    test_helper.unzip(destination, '/tmp/model')
 
     logging.debug('uploading model')
     data = test_helper.prepare_formdata(['/tmp/model/model.pt', '/tmp/model/model.json'])
