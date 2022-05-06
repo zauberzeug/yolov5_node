@@ -19,7 +19,7 @@ from learning_loop_node.data_classes.category import Category
 
 
 @pytest.mark.asyncio()
-async def test_create_file_structure__box_size(use_training_dir):
+async def test_create_file_structure_box_size(use_training_dir):
     categories = [
         Category(name='point_category_1', id='uuid_of_class_1'),
         Category(name='point_category_2', id='uuid_of_class_2', point_size=30)]
