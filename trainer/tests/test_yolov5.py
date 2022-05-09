@@ -87,6 +87,39 @@ async def test_training_creates_model(use_training_dir):
     assert os.path.isfile(best)
 
 
+@pytest.mark.asyncio()
+async def test_parse_progress_from_log(use_training_dir):
+    trainer = Yolov5Trainer()
+    trainer.epochs = 2
+    os.remove('/tmp/model.pt')
+    trainer.training = Training(
+        id=str(uuid4()),
+        project_folder=os.getcwd(),
+        training_folder=os.getcwd() + '/training',
+        images_folder=os.getcwd() + '/images',
+        base_model='model.pt',
+        context=Context(project='demo', organization='zauberzeug'),
+    )
+    trainer.training.data = await TrainingsDownloader(trainer.training.context).download_training_data(trainer.training.images_folder)
+    response = test_helper.LiveServerSession().get(f"/api/zauberzeug/projects/demo/data")
+    assert response.status_code == 200
+    data = response.json()
+    trainer.training.data.categories = Category.from_list(data['categories'])
+
+    yolov5_format.create_file_structure(trainer.training)
+
+    trainer.executor = Executor(os.getcwd())
+    cmd = f'WANDB_MODE=disabled python /yolov5/train.py --project training --name result --batch 4 --img 416 --data training/dataset.yaml --weights model.pt --epochs {trainer.epochs}'
+    trainer.executor.start(cmd)
+    while trainer.executor.is_process_running():
+        sleep(1)
+
+    logging.info(trainer.executor.get_log())
+    assert f'{trainer.epochs} epochs completed' in trainer.executor.get_log()
+    assert trainer.progress == 1.0
+    
+    
+
 def test_new_model_discovery(use_training_dir):
     trainer = Yolov5Trainer()
     trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',

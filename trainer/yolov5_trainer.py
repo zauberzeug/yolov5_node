@@ -16,6 +16,7 @@ from learning_loop_node.detector.box_detection import BoxDetection
 from learning_loop_node.detector.point_detection import PointDetection
 import cv2
 import asyncio
+import re
 
 
 class Yolov5Trainer(Trainer):
@@ -23,20 +24,20 @@ class Yolov5Trainer(Trainer):
     def __init__(self) -> None:
         super().__init__(model_format='yolov5_pytorch')
         self.latest_epoch = 0
+        self.epochs = 2000
 
     async def start_training(self, model: str = 'model.pt') -> None:
         resolution = self.training.data.hyperparameter.resolution
         yolov5_format.create_file_structure(self.training)
         batch_size = Yolov5Trainer.get_batch_size()
         patience = 300
-        epochs = 2000
 
         hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
         if not os.path.isfile(hyperparameter_path):
             shutil.copy('/app/hyp.yaml', hyperparameter_path)
         yolov5_format.update_hyp(hyperparameter_path, self.training.data.hyperparameter)
 
-        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --patience {patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {epochs} --clear'
+        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --patience {patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs} --clear'
         with open(hyperparameter_path) as f:
             logging.info(f'running training with command :\n {cmd} \and hyperparameter\n{f.read()}')
         self.executor.start(cmd)
@@ -190,6 +191,25 @@ class Yolov5Trainer(Trainer):
     @property
     def model_architecture(self):
         return 'yolov5s6'
+    
+    @property
+    def progress(self) -> float:
+        return self.get_progress_from_log()
+
+    def get_progress_from_log(self) -> float:
+        if self.epochs == 1:
+            return 1.0 #NOTE: We would divide by 0 in this case
+        lines = list(reversed(self.executor.get_log_by_lines()))
+        for line in lines:
+            if re.search(f'/{self.epochs -1}',line):
+                found_line = line.split(' ')
+                for item in found_line:
+                    if f'/{self.epochs -1}' in item:
+                        epoch_and_total_epochs = item.split('/')
+                        epoch = epoch_and_total_epochs[0]
+                        total_epochs = epoch_and_total_epochs[1]
+                        progress = int(epoch) / int(total_epochs)
+                        return progress
 
     @staticmethod
     def get_batch_size():
