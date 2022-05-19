@@ -71,8 +71,8 @@ class Yolov5Trainer(Trainer):
 
         return BasicModel(confusion_matrix=matrix, meta_information={'weightfile': weightfile})
 
-    def on_model_published(self, basic_model: BasicModel, model_id: str) -> None:
-        def delete_old_weightfiles(model_id: str):
+    def on_model_published(self, basic_model: BasicModel) -> None:
+        def delete_old_weightfiles():
             path = self.training.training_folder + '/result/weights'
             if not os.path.isdir(path):
                 return
@@ -81,12 +81,13 @@ class Yolov5Trainer(Trainer):
         path = self.training.training_folder + '/result/weights/published'
         if not os.path.isdir(path):
             os.mkdir(path)
-        target = f'{path}/{model_id}.pt'
+        target = f'{path}/latest.pt'
         shutil.move(basic_model.meta_information['weightfile'], target)
-        delete_old_weightfiles(model_id)
+        delete_old_weightfiles()
 
-    def get_model_files(self, model_id: str) -> List[str]:
-        weightfile = glob(f'{GLOBALS.data_folder}/**/trainings/**/{model_id}.pt', recursive=True)[0]
+    def get_latest_model_files(self) -> List[str]:
+        path = self.training.training_folder + '/result/weights/published'
+        weightfile = f'{path}/latest.pt'
         shutil.copy(weightfile, '/tmp/model.pt')
         training_path = '/'.join(weightfile.split('/')[:-4])
 
@@ -191,17 +192,17 @@ class Yolov5Trainer(Trainer):
     @property
     def model_architecture(self):
         return 'yolov5s6'
-    
+
     @property
     def progress(self) -> float:
         return self.get_progress_from_log()
 
     def get_progress_from_log(self) -> float:
         if self.epochs == 1:
-            return 1.0 #NOTE: We would divide by 0 in this case
+            return 1.0  # NOTE: We would divide by 0 in this case
         lines = list(reversed(self.executor.get_log_by_lines()))
         for line in lines:
-            if re.search(f'/{self.epochs -1}',line):
+            if re.search(f'/{self.epochs -1}', line):
                 found_line = line.split(' ')
                 for item in found_line:
                     if f'/{self.epochs -1}' in item:
