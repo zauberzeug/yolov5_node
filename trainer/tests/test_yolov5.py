@@ -16,6 +16,7 @@ from learning_loop_node.tests import test_helper
 from learning_loop_node.gdrive_downloader import g_download
 from learning_loop_node.loop import loop
 from learning_loop_node.data_classes.category import Category
+import time
 
 
 @pytest.mark.asyncio()
@@ -117,8 +118,7 @@ async def test_parse_progress_from_log(use_training_dir):
     logging.info(trainer.executor.get_log())
     assert f'{trainer.epochs} epochs completed' in trainer.executor.get_log()
     assert trainer.progress == 1.0
-    
-    
+
 
 def test_new_model_discovery(use_training_dir):
     trainer = Yolov5Trainer()
@@ -127,30 +127,41 @@ def test_new_model_discovery(use_training_dir):
     trainer.training.data = TrainingData(image_data=[], categories=[
                                          Category(name='class_a', id='uuid_of_class_a', type='box')])
     assert trainer.get_new_model() is None, 'should not find any models'
+
+    model_path = 'result/weights/published/latest.pt'
     mock_epoch(1, {'class_a': {'fp': 0, 'tp': 1, 'fn': 0}})
     model = trainer.get_new_model()
     assert model.confusion_matrix['uuid_of_class_a']['tp'] == 1
-    trainer.on_model_published(model, 'uuid1')
-    assert os.path.isfile('result/weights/published/uuid1.pt'), 'weightfile should be renamed to learning loop id'
+    trainer.on_model_published(model)
+    assert os.path.isfile(model_path)
+    modification_date = os.path.getmtime(model_path)
 
     mock_epoch(2, {'class_a': {'fp': 1, 'tp': 2, 'fn': 1}})
     model = trainer.get_new_model()
     assert model.confusion_matrix['uuid_of_class_a']['tp'] == 2
-    trainer.on_model_published(model, 'uuid2')
+    trainer.on_model_published(model)
 
     assert trainer.get_new_model() is None, 'again we should not find any new models'
+
+    time.sleep(0.1)
 
     mock_epoch(3, {'class_a': {'fp': 0, 'tp': 3, 'fn': 1}})
     model = trainer.get_new_model()
     assert model.confusion_matrix['uuid_of_class_a']['tp'] == 3
-    trainer.on_model_published(model, 'uuid3')
-    assert os.path.isfile('result/weights/published/uuid3.pt'), 'weightfile should be renamed to learning loop id'
+    trainer.on_model_published(model)
+    assert os.path.isfile(model_path)
+    new_modification_date = os.path.getmtime(model_path)
+    assert new_modification_date > modification_date
+
+    # get_latest_model_file
+    files = trainer.get_latest_model_files()
+    assert files == {'yolov5_pytorch': ['/tmp/model.pt', './/hyp.yaml'], 'yolov5_wts': ['/tmp/model.wts']}
 
 
 def test_old_model_files_are_deleted_on_publish(use_training_dir):
     trainer = Yolov5Trainer()
-    trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
-                                images_folder='./', training_folder='./')
+    trainer.training = Training(id='someid', context=Context(organization='o', project='p'),
+                                project_folder='./', images_folder='./', training_folder='./')
     trainer.training.data = TrainingData(image_data=[], categories=[
                                          Category(name='class_a', id='uuid_of_class_a', type='box')])
     assert trainer.get_new_model() is None, 'should not find any models'
@@ -164,10 +175,10 @@ def test_old_model_files_are_deleted_on_publish(use_training_dir):
     assert len(files) == 4
 
     model = trainer.get_new_model()
-    trainer.on_model_published(model, 'uuid2')
+    trainer.on_model_published(model)
     _, _, files = next(os.walk("result/weights/published"))
     assert len(files) == 1
-    assert os.path.isfile('result/weights/published/uuid2.pt'), 'weightfile should be renamed to learning loop id'
+    assert os.path.isfile('result/weights/published/latest.pt')
 
     _, _, files = next(os.walk("result/weights"))
     assert len(files) == 0

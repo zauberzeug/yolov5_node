@@ -38,7 +38,7 @@ fi
 name="yolov5_trainer_node"
 
 run_args="-it --rm" 
-#run_args+=" -v $(pwd)/../:/yolov5_node/"
+run_args+=" -v $(pwd)/../:/yolov5_node/"
 run_args+=" -v $HOME/data:/data"
 run_args+=" -v $HOME/learning_loop_node/learning_loop_node:/opt/conda/lib/python3.8/site-packages/learning_loop_node"
 run_args+=" -v $HOME/learning_loop_node:/learning_loop_node"
