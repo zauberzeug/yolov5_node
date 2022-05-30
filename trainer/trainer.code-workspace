@@ -25,19 +25,15 @@
     "python.testing.nosetestsEnabled": false,
     "python.testing.pytestEnabled": false,
     "python.pythonPath": "/opt/conda/bin/python3",
-    "python.analysis.extraPaths": ["/app"]
+    "python.analysis.extraPaths": ["/app"],
+    "files.exclude": {
+      "**/.git/objects/**": true
+    }
   },
   "extensions": {
-    "recommendations": [
-      "ms-python.vscode-pylance",
-      "ms-python.python",
-      "himanoa.python-autopep8",
-      "esbenp.prettier-vscode",
-      "littlefoxteam.vscode-python-test-adapter",
-      "eamodio.gitlens",
-      "mhutchie.git-graph"
-    ]
+    "recommendations": ["ms-python.vscode-pylance", "ms-python.python", "himanoa.python-autopep8", "esbenp.prettier-vscode", "littlefoxteam.vscode-python-test-adapter", "eamodio.gitlens", "mhutchie.git-graph"]
   },
+
   "launch": {
     "version": "0.2.0",
     "configurations": [
