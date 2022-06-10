@@ -32,7 +32,7 @@ RUN apt-get update && \
     && apt-get clean
 
 RUN pip3 install --no-cache-dir async_generator aiofiles psutil pillow multidict attrs yarl async_timeout idna_ssl cchardet aiosignal
-RUN pip3 install --no-cache-dir "learning_loop_node==v0.7.15"
+RUN pip3 install --no-cache-dir "learning_loop_node==v0.7.24rc3"
 RUN pip3 install --no-cache-dir "gdown"
 
 WORKDIR /data/models
