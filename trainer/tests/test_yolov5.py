@@ -248,7 +248,7 @@ async def test_detecting(create_project):
         model = await response.json()
 
     data = test_helper.prepare_formdata(['tests/example_images/8647fc30-c46c-4d13-a3fd-ead3b9a67652.jpg'])
-    async with loop.post(f'api/zauberzeug/projects/pytest/images', data) as response:
+    async with loop.post(f'api/zauberzeug/projects/pytest/images', data=data) as response:
         if response.status != 200:
             msg = f'unexpected status code {response.status} while posting a new image'
             logging.error(msg)
