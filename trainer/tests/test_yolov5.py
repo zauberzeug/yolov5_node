@@ -240,7 +240,7 @@ async def test_detecting(create_project):
 
     logging.debug('uploading model')
     data = test_helper.prepare_formdata(['/tmp/model/model.pt', '/tmp/model/model.json'])
-    async with loop.post(f'api/zauberzeug/projects/pytest/models/yolov5_pytorch', data) as response:
+    async with loop.post(f'api/zauberzeug/projects/pytest/models/yolov5_pytorch', data=data) as response:
         if response.status != 200:
             msg = f'unexpected status code {response.status} while putting model'
             logging.error(msg)
