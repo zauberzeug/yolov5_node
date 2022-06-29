@@ -43,7 +43,7 @@ class Yolov5Trainer(Trainer):
         self.executor.start(cmd)
 
     async def start_training_from_scratch(self, id: str) -> None:
-        await self.start_training(model=f'{id}.pt')
+        await self.start_training(model=f'yolov5{id}.pt')
 
     def get_error(self) -> str:
         if self.executor is None:
