@@ -219,7 +219,7 @@ async def test_clear_training_data():
 def create_project():
     test_helper.LiveServerSession().delete(f"/api/zauberzeug/projects/pytest?keep_images=true")
     project_configuration = {'project_name': 'pytest', 'box_categories': 2,  'point_categories': 1, 'inbox': 0, 'annotate': 0, 'review': 0, 'complete': 0, 'image_style': 'plain',
-                             'thumbs': False}
+                             'thumbs': False, 'trainings': 1}
     assert test_helper.LiveServerSession().post(f"/api/zauberzeug/projects/generator",
                                                 json=project_configuration).status_code == 200
     yield
@@ -240,7 +240,7 @@ async def test_detecting(create_project):
 
     logging.debug('uploading model')
     data = test_helper.prepare_formdata(['/tmp/model/model.pt', '/tmp/model/model.json'])
-    async with loop.post(f'api/zauberzeug/projects/pytest/models/yolov5_pytorch', data=data) as response:
+    async with loop.put(f'api/zauberzeug/projects/pytest/trainings/1/models/latest/yolov5_pytorch/file', data=data) as response:
         if response.status != 200:
             msg = f'unexpected status code {response.status} while putting model'
             logging.error(msg)

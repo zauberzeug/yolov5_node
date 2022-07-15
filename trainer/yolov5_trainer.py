@@ -43,13 +43,13 @@ class Yolov5Trainer(Trainer):
         self.executor.start(cmd)
 
     async def start_training_from_scratch(self, id: str) -> None:
-        await self.start_training(model=f'{id}.pt')
+        await self.start_training(model=f'yolov5{id}.pt')
 
     def get_error(self) -> str:
         if self.executor is None:
             return
         try:
-            if 'CUDA Error: out of memory' in self.executor.get_log():
+            if 'CUDA out of memory' in self.executor.get_log():
                 return 'graphics card is out of memory'
         except:
             return
@@ -185,13 +185,13 @@ class Yolov5Trainer(Trainer):
     @property
     def provided_pretrained_models(self) -> List[PretrainedModel]:
         return [
-            PretrainedModel(name='yolov5s6', label='YOLO v5 small', description='~5 fps on Jetson Nano'),
+            PretrainedModel(name='s6', label='YOLO v5 small', description='~5 fps on Jetson Nano'),
             # PretrainedModel(name='yolov5m', label='YOLO v5 medium', description='~2 fps on Jetson Nano'),
         ]
 
     @property
     def model_architecture(self):
-        return 'yolov5s6'
+        return 'yolov5'
 
     @property
     def progress(self) -> float:
