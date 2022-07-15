@@ -49,7 +49,7 @@ class Yolov5Trainer(Trainer):
         if self.executor is None:
             return
         try:
-            if 'CUDA error: out of memory' in self.executor.get_log():
+            if 'CUDA out of memory' in self.executor.get_log():
                 return 'graphics card is out of memory'
         except:
             return
