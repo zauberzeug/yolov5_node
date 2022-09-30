@@ -1,6 +1,6 @@
 from asyncio import sleep
 import logging
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 from learning_loop_node import GLOBALS
 from learning_loop_node.trainer import Trainer, BasicModel
 from learning_loop_node.trainer.model import PretrainedModel
@@ -85,7 +85,7 @@ class Yolov5Trainer(Trainer):
         shutil.move(basic_model.meta_information['weightfile'], target)
         delete_old_weightfiles()
 
-    def get_latest_model_files(self) -> List[str]:
+    def get_latest_model_files(self) -> Union[List[str], Dict[str, List[str]]]:
         path = self.training.training_folder + '/result/weights/published'
         weightfile = f'{path}/latest.pt'
         shutil.copy(weightfile, '/tmp/model.pt')

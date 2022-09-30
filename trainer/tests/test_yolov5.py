@@ -256,7 +256,7 @@ async def test_detecting(create_project):
         image = await response.json()
 
     trainer = Yolov5Trainer()
-    detections = await trainer.do_detections(Context(organization='zauberzeug', project='pytest'), model['id'], 'yolov5_pytorch')
+    detections = await trainer.do_detections(Context(organization='zauberzeug', project='pytest'), model['id'])
     assert len(detections) > 0
 
 
