@@ -51,6 +51,8 @@ run_args+=" --name $name"
 run_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all"
 run_args+=" --gpus all"
 run_args+=" --ipc host"
+run_args+=" -p 7442:80"
+
 
 image="zauberzeug/yolov5-trainer:latest"
 
