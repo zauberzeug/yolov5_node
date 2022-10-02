@@ -45,6 +45,8 @@ RUN python3 -m pip install "learning_loop_node==v0.7.31"
 
 ADD ./ /yolov5_node/trainer/
 RUN ln -sf /yolov5_node/trainer /app
+git config --global --add safe.directory /yolov5_node
+git config --global --add safe.directory /learning_loop_node
 
 WORKDIR /app
 
