@@ -65,18 +65,16 @@ cmd=$1
 cmd_args=${@:2}
 case $cmd in
     b | build)
-        docker build . --target release -t $image $build_args $cmd_args
-        docker build . -t ${image}-dev $build_args $cmd_args
+        docker build . -t $image $build_args $cmd_args
         ;;
     d | debug)
         docker run $run_args $image /app/start.sh debug
         ;;
     p | push)
-        docker push ${image}-dev 
         docker push $image
         ;;
     r | run)
-        docker run -it $run_args $image-dev $cmd_args
+        docker run -it $run_args $image $cmd_args
         ;;
     ri | run-image)
         docker run -it $run_args $image $cmd_args
@@ -87,7 +85,7 @@ case $cmd in
     k | kill)
         docker kill $name $cmd_args
         ;;
-    d | rm)
+    rm)
         docker kill $name
         docker rm $name $cmd_args
         ;;

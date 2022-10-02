@@ -45,8 +45,7 @@ RUN python3 -m pip install "learning_loop_node==v0.7.31"
 
 ADD ./ /yolov5_node/trainer/
 RUN ln -sf /yolov5_node/trainer /app
-git config --global --add safe.directory /yolov5_node
-git config --global --add safe.directory /learning_loop_node
+RUN git config --global --add safe.directory /yolov5_node && git config --global --add safe.directory /learning_loop_node
 
 WORKDIR /app
 
@@ -56,15 +55,3 @@ ENV PYTHONPATH="$PYTHONPATH:/yolov5"
 ENV PYTHONPATH="$PYTHONPATH:/"
 ENV PYTHONPATH="$PYTHONPATH:/opt/conda/lib/python3.8/site-packages"
 CMD /app/start.sh
-
-FROM release as dev
-
-
-RUN curl -sSL https://gist.githubusercontent.com/b01/0a16b6645ab7921b0910603dfb85e4fb/raw/5186ea07a06eac28937fd914a9c8f9ce077a978e/download-vs-code-server.sh | sed "s/server-linux-x64/server-linux-$(dpkg --print-architecture)/" | sed "s/amd64/x64/" | bash
-ENV VSCODE_SERVER=/root/.vscode-server/bin/*/server.sh
-
-RUN $VSCODE_SERVER --install-extension ms-python.vscode-pylance \
-    $VSCODE_SERVER --install-extension ms-python.python \
-    $VSCODE_SERVER --install-extension himanoa.python-autopep8 \
-    $VSCODE_SERVER --install-extension esbenp.prettier-vscode \
-    $VSCODE_SERVER --install-extension littlefoxteam.vscode-python-test-adapter
