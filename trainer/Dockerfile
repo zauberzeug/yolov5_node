@@ -9,7 +9,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-setuptools \
     python3-matplotlib \
     curl \
-    python3-opencv \
     git \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
@@ -20,7 +19,8 @@ RUN apt update && \
     rm -rf /var/lib/apt/lists/*
 RUN python3 -m pip install --upgrade pip
 
-RUN python3 -m pip install seaborn thop coremltools onnx gsutil notebook wandb>=0.12.2
+RUN python3 -m pip install seaborn thop coremltools onnx gsutil notebook wandb>=0.12.2 opencv-python==4.5.5.64
+
 
 WORKDIR /
 
