@@ -219,7 +219,7 @@ async def test_clear_training_data():
 def create_project():
     test_helper.LiveServerSession().delete(f"/api/zauberzeug/projects/pytest?keep_images=true")
     project_configuration = {'project_name': 'pytest', 'box_categories': 2,  'point_categories': 1, 'inbox': 0, 'annotate': 0, 'review': 0, 'complete': 0, 'image_style': 'plain',
-                             'thumbs': False}
+                             'thumbs': False, 'trainings': 1}
     assert test_helper.LiveServerSession().post(f"/api/zauberzeug/projects/generator",
                                                 json=project_configuration).status_code == 200
     yield
@@ -240,7 +240,7 @@ async def test_detecting(create_project):
 
     logging.debug('uploading model')
     data = test_helper.prepare_formdata(['/tmp/model/model.pt', '/tmp/model/model.json'])
-    async with loop.post(f'api/zauberzeug/projects/pytest/models/yolov5_pytorch', data) as response:
+    async with loop.put(f'api/zauberzeug/projects/pytest/trainings/1/models/latest/yolov5_pytorch/file', data=data) as response:
         if response.status != 200:
             msg = f'unexpected status code {response.status} while putting model'
             logging.error(msg)
@@ -248,7 +248,7 @@ async def test_detecting(create_project):
         model = await response.json()
 
     data = test_helper.prepare_formdata(['tests/example_images/8647fc30-c46c-4d13-a3fd-ead3b9a67652.jpg'])
-    async with loop.post(f'api/zauberzeug/projects/pytest/images', data) as response:
+    async with loop.post(f'api/zauberzeug/projects/pytest/images', data=data) as response:
         if response.status != 200:
             msg = f'unexpected status code {response.status} while posting a new image'
             logging.error(msg)
@@ -256,7 +256,7 @@ async def test_detecting(create_project):
         image = await response.json()
 
     trainer = Yolov5Trainer()
-    detections = await trainer.do_detections(Context(organization='zauberzeug', project='pytest'), model['id'], 'yolov5_pytorch')
+    detections = await trainer.do_detections(Context(organization='zauberzeug', project='pytest'), model['id'])
     assert len(detections) > 0
 
 

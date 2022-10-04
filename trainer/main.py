@@ -6,7 +6,9 @@ import logging
 import icecream
 icecream.install()
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
+                    datefmt='%Y-%m-%d:%H:%M:%S',
+                    level=logging.INFO)
 
 node = TrainerNode(name='Yolov5 Trainer ' + os.uname()[1], trainer=Yolov5Trainer())
 
