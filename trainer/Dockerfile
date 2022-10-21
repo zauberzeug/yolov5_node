@@ -9,7 +9,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-setuptools \
     python3-matplotlib \
     curl \
-    python3-opencv \
     git \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
@@ -20,7 +19,8 @@ RUN apt update && \
     rm -rf /var/lib/apt/lists/*
 RUN python3 -m pip install --upgrade pip
 
-RUN python3 -m pip install seaborn thop coremltools onnx gsutil notebook wandb>=0.12.2
+RUN python3 -m pip install seaborn thop coremltools onnx gsutil notebook wandb>=0.12.2 opencv-python==4.5.5.64
+
 
 WORKDIR /
 
@@ -41,7 +41,7 @@ RUN pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof
 RUN wget https://raw.githubusercontent.com/wang-xinyu/tensorrtx/master/yolov5/gen_wts.py
 
 RUN python3 -m pip install autopep8 debugpy gunicorn pyyaml uvloop pytest-asyncio ruamel.yaml
-RUN python3 -m pip install "learning_loop_node==v0.7.31"
+RUN python3 -m pip install "learning_loop_node==v0.7.34"
 
 ADD ./ /yolov5_node/trainer/
 RUN ln -sf /yolov5_node/trainer /app
