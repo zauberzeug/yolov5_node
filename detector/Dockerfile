@@ -2,17 +2,17 @@ ARG BASE_IMAGE
 FROM ${BASE_IMAGE} as release
 
 RUN apt-get update && \
-        DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
-        apt-get install -y --no-install-recommends \
-        python3-pip \
-        python3-setuptools \
-        curl \
-        git \
-        cmake \
-        build-essential \
-        python3-markupsafe \
-        python3-dev \
-        unzip \
+    DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
+    apt-get install -y --no-install-recommends \
+    python3-pip \
+    python3-setuptools \
+    curl \
+    git \
+    cmake \
+    build-essential \
+    python3-markupsafe \
+    python3-dev \
+    unzip \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -23,11 +23,11 @@ RUN pip3 install --no-cache-dir pycuda
 RUN pip3 install --no-cache-dir "uvicorn" 
 
 RUN apt-get update && \
-        DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
-        apt-get install -y --no-install-recommends \
-        libjpeg8-dev zlib1g-dev \
-        ca-certificates \
-        openssh-client \
+    DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
+    apt-get install -y --no-install-recommends \
+    libjpeg8-dev zlib1g-dev \
+    ca-certificates \
+    openssh-client \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -55,6 +55,7 @@ WORKDIR /app
 EXPOSE 80
 
 ENV HOST=learning-loop.ai
+ENV TZ=Europe/Amsterdam
 CMD /app/start.sh
 
 FROM release
