@@ -6,7 +6,6 @@ import os
 import icecream
 icecream.install()
 
-logging.getLogger().setLevel(logging.INFO)
 
 detector = Yolov5Detector()
 node = DetectorNode(name=os.uname()[1], detector=detector)
