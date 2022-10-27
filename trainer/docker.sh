@@ -42,6 +42,7 @@ run_args+=" -v $(pwd)/../:/yolov5_node/"
 run_args+=" -v $HOME/data:/data"
 run_args+=" -v $HOME/learning_loop_node/learning_loop_node:/opt/conda/lib/python3.8/site-packages/learning_loop_node"
 run_args+=" -v $HOME/learning_loop_node:/learning_loop_node"
+run_args+=" -v $HOME/.vscode-server:/root/.vscode-server"
 run_args+=" -e HOST=$HOST"
 run_args+=" -h ${HOSTNAME}_DEV"
 run_args+=" -e USERNAME=$USERNAME -e PASSWORD=$PASSWORD"
@@ -51,6 +52,8 @@ run_args+=" --name $name"
 run_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all"
 run_args+=" --gpus all"
 run_args+=" --ipc host"
+run_args+=" -p 7442:80"
+
 
 image="zauberzeug/yolov5-trainer:latest"
 
@@ -62,18 +65,16 @@ cmd=$1
 cmd_args=${@:2}
 case $cmd in
     b | build)
-        docker build . --target release -t $image $build_args $cmd_args
-        docker build . -t ${image}-dev $build_args $cmd_args
+        docker build . -t $image $build_args $cmd_args
         ;;
     d | debug)
         docker run $run_args $image /app/start.sh debug
         ;;
     p | push)
-        docker push ${image}-dev 
         docker push $image
         ;;
     r | run)
-        docker run -it $run_args $image-dev $cmd_args
+        docker run -it $run_args $image $cmd_args
         ;;
     ri | run-image)
         docker run -it $run_args $image $cmd_args
@@ -84,7 +85,7 @@ case $cmd in
     k | kill)
         docker kill $name $cmd_args
         ;;
-    d | rm)
+    rm)
         docker kill $name
         docker rm $name $cmd_args
         ;;
