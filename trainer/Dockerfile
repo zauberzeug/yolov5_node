@@ -54,4 +54,5 @@ EXPOSE 80
 ENV PYTHONPATH="$PYTHONPATH:/yolov5"
 ENV PYTHONPATH="$PYTHONPATH:/"
 ENV PYTHONPATH="$PYTHONPATH:/opt/conda/lib/python3.8/site-packages"
+ENV TZ=Europe/Amsterdam
 CMD /app/start.sh
