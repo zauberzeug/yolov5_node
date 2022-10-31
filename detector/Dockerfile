@@ -34,6 +34,7 @@ RUN apt-get update && \
 RUN pip3 install --no-cache-dir async_generator aiofiles psutil pillow multidict attrs yarl async_timeout idna_ssl cchardet aiosignal
 RUN pip3 install --no-cache-dir "learning_loop_node==v0.7.37"
 RUN pip3 install --no-cache-dir "gdown"
+RUN pip3 install --no-cache-dir starlette==0.16.0
 
 WORKDIR /data/models
 RUN gdown --fuzzy https://drive.google.com/file/d/1KGZe7OUX9QWZm-dnkssSV9lSXxCn7nD_/view?usp=sharing  -O coco.zip && unzip coco.zip && rm coco.zip
@@ -61,7 +62,7 @@ CMD /app/start.sh
 FROM release
 
 RUN python3 -m pip install --no-cache-dir retry debugpy pytest-asyncio icecream pytest autopep8
-RUN python3 -m pip install --no-cache-dir starlette==0.16.0
+
 
 RUN curl -sSL https://gist.githubusercontent.com/b01/0a16b6645ab7921b0910603dfb85e4fb/raw/5186ea07a06eac28937fd914a9c8f9ce077a978e/download-vs-code-server.sh | sed "s/server-linux-x64/server-linux-$(dpkg --print-architecture)/" | sed "s/amd64/x64/" | bash
 
