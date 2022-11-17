@@ -160,11 +160,11 @@ class Yolov5Trainer(Trainer):
             height = h*img_height
             x = (x*img_width)-0.5*width
             y = (y*img_height)-0.5*height
-            if(category.type == 'box'):
+            if (category.type == 'box'):
                 box_detection = BoxDetection(category_name=category.name, x=x, y=y, width=width, height=height, net=model_information.version,
                                              confidence=probability, category_id=category.id)
                 box_detections.append(box_detection)
-            elif(category.type == 'point'):
+            elif (category.type == 'point'):
                 point_detection = PointDetection(category_name=category.name, x=x+width/2, y=y+height/2, net=model_information.version,
                                                  confidence=probability, category_id=category.id)
                 point_detections.append(point_detection)
