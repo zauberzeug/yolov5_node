@@ -134,7 +134,6 @@ class Yolov5Trainer(Trainer):
             await sleep(1)
 
         if executor.return_code == 1:
-            executor.get_log()
             logging.error(f'Error during detecting: {executor.get_log()}')
 
         detections = []
