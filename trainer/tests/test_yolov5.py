@@ -12,6 +12,7 @@ import pytest
 from uuid import uuid4
 import json
 import glob
+from learning_loop_node.trainer import Trainer
 from learning_loop_node.tests import test_helper
 from learning_loop_node.gdrive_downloader import g_download
 from learning_loop_node.loop import loop
@@ -65,11 +66,7 @@ async def test_training_creates_model(use_training_dir):
         base_model='model.pt',
         context=Context(project='demo', organization='zauberzeug'),
     )
-    training.data = await TrainingsDownloader(training.context).download_training_data(training.images_folder)
-    response = test_helper.LiveServerSession().get(f"/api/zauberzeug/projects/demo/data")
-    assert response.status_code == 200
-    data = response.json()
-    training.data.categories = Category.from_list(data['categories'])
+    training.data = await create_training_data(training)
 
     yolov5_format.create_file_structure(training)
 
@@ -101,12 +98,7 @@ async def test_parse_progress_from_log(use_training_dir):
         base_model='model.pt',
         context=Context(project='demo', organization='zauberzeug'),
     )
-    trainer.training.data = await TrainingsDownloader(trainer.training.context).download_training_data(trainer.training.images_folder)
-    response = test_helper.LiveServerSession().get(f"/api/zauberzeug/projects/demo/data")
-    assert response.status_code == 200
-    data = response.json()
-    trainer.training.data.categories = Category.from_list(data['categories'])
-
+    trainer.training.data = await create_training_data(trainer.training)
     yolov5_format.create_file_structure(trainer.training)
 
     trainer.executor = Executor(os.getcwd())
@@ -244,7 +236,7 @@ async def test_detecting(create_project):
         if response.status != 200:
             msg = f'unexpected status code {response.status} while putting model'
             logging.error(msg)
-            raise(Exception(msg))
+            raise (Exception(msg))
         model = await response.json()
 
     data = test_helper.prepare_formdata(['tests/example_images/8647fc30-c46c-4d13-a3fd-ead3b9a67652.jpg'])
@@ -252,11 +244,14 @@ async def test_detecting(create_project):
         if response.status != 200:
             msg = f'unexpected status code {response.status} while posting a new image'
             logging.error(msg)
-            raise(Exception(msg))
+            raise (Exception(msg))
         image = await response.json()
 
     trainer = Yolov5Trainer()
-    detections = await trainer.do_detections(Context(organization='zauberzeug', project='pytest'), model['id'])
+    context = Context(organization='zauberzeug', project='pytest')
+    trainer.training = Trainer.generate_training(context)
+    trainer.training.model_id_for_detecting = model['id']
+    detections = await trainer._do_detections()
     assert len(detections) > 0
 
 
@@ -267,6 +262,18 @@ def test_batch_size_can_be_provided_by_env(monkeypatch):
     assert Yolov5Trainer.get_batch_size() == 8  # default
     monkeypatch.setenv('BATCH_SIZE', 32)
     assert Yolov5Trainer.get_batch_size() == 32
+
+
+async def create_training_data(training: Training) -> TrainingData:
+    training_data = TrainingData()
+
+    image_data, _ = await TrainingsDownloader(training.context).download_training_data(training.images_folder)
+    response = test_helper.LiveServerSession().get(f"/api/zauberzeug/projects/demo/data")
+    assert response.status_code == 200
+    data = response.json()
+    training_data.categories = Category.from_list(data['categories'])
+    training_data.image_data = image_data
+    return training_data
 
 
 def mock_epoch(number: int, confusion_matrix: Dict):

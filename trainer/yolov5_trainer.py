@@ -37,13 +37,30 @@ class Yolov5Trainer(Trainer):
             shutil.copy('/app/hyp.yaml', hyperparameter_path)
         yolov5_format.update_hyp(hyperparameter_path, self.training.data.hyperparameter)
 
-        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --patience {patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs} --clear'
+        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --exist-ok --patience {patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs} --clear'
         with open(hyperparameter_path) as f:
             logging.info(f'running training with command :\n {cmd} \and hyperparameter\n{f.read()}')
         self.executor.start(cmd)
 
     async def start_training_from_scratch(self, id: str) -> None:
         await self.start_training(model=f'yolov5{id}.pt')
+
+    def can_resume(self) -> bool:
+        path = f'{self.training.training_folder}/result/weights/published/latest.pt'
+        return os.path.exists(path)
+
+    async def resume(self) -> None:
+        logging.error('resume called')
+        resolution = self.training.data.hyperparameter.resolution
+        batch_size = Yolov5Trainer.get_batch_size()
+        patience = 300
+
+        hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
+
+        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --exist-ok --patience {patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {self.training.training_folder}/result/weights/published/latest.pt --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs}'
+        with open(hyperparameter_path) as f:
+            logging.info(f'running training with command :\n {cmd} \and hyperparameter\n{f.read()}')
+        self.executor.start(cmd)
 
     def get_error(self) -> str:
         if self.executor is None:
@@ -117,7 +134,7 @@ class Yolov5Trainer(Trainer):
             await sleep(1)
 
         if executor.return_code == 1:
-            logging.error('Error during detecting.')
+            logging.error(f'Error during detecting: {executor.get_log()}')
 
         detections = []
         logging.info('start parsing detections')
@@ -160,11 +177,11 @@ class Yolov5Trainer(Trainer):
             height = h*img_height
             x = (x*img_width)-0.5*width
             y = (y*img_height)-0.5*height
-            if(category.type == 'box'):
+            if (category.type == 'box'):
                 box_detection = BoxDetection(category_name=category.name, x=x, y=y, width=width, height=height, net=model_information.version,
                                              confidence=probability, category_id=category.id)
                 box_detections.append(box_detection)
-            elif(category.type == 'point'):
+            elif (category.type == 'point'):
                 point_detection = PointDetection(category_name=category.name, x=x+width/2, y=y+height/2, net=model_information.version,
                                                  confidence=probability, category_id=category.id)
                 point_detections.append(point_detection)
@@ -180,7 +197,7 @@ class Yolov5Trainer(Trainer):
                     os.remove(os.path.join(root, file))
             for dir in dirs:
                 if dir not in keep_dirs:
-                    os.rmdir(os.path.join(root, dir))
+                    shutil.rmtree(os.path.join(root, dir))
 
     @property
     def provided_pretrained_models(self) -> List[PretrainedModel]:
