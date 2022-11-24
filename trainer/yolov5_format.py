@@ -4,6 +4,7 @@ from pathlib import Path
 import logging
 import os
 from learning_loop_node.trainer.hyperparameter import Hyperparameter
+import shutil
 
 
 def category_lookup_from_training(training: Training) -> dict:
@@ -14,6 +15,8 @@ def create_set(training: Training, set_name: str):
     categories = list(category_lookup_from_training(training).values())
     training_path = training.training_folder
     images_path = f'{training_path}/{set_name}'
+
+    shutil.rmtree(images_path, ignore_errors=True)
     os.makedirs(images_path, exist_ok=True)
 
     for image in training.data.image_data:
