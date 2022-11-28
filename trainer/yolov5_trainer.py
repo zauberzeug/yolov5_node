@@ -135,6 +135,7 @@ class Yolov5Trainer(Trainer):
 
         if executor.return_code == 1:
             logging.error(f'Error during detecting: {executor.get_log()}')
+            raise Exception('Error during detecting')
 
         detections = []
         logging.info('start parsing detections')
