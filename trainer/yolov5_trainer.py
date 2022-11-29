@@ -233,3 +233,22 @@ class Yolov5Trainer(Trainer):
     @staticmethod
     def get_batch_size():
         return int(os.environ.get('BATCH_SIZE', '8'))
+
+    @staticmethod
+    def infer_image(model_folder: str, image_path: str):
+        '''
+            Run this function from within the docker container.
+            Example Usage
+                python -c 'from yolov5_trainer import Yolov5Trainer; Yolov5Trainer.infer_image("/data/some_folder_with_model.pt_and_model.json","/data/img.jpg")
+
+        '''
+        
+        trainer = Yolov5Trainer()
+        model_information = ModelInformation.load_from_disk(model_folder)
+        import asyncio
+
+        detections = asyncio.get_event_loop().run_until_complete(trainer._detect(model_information, [image_path], model_folder))
+
+
+        from fastapi.encoders import jsonable_encoder
+        print(jsonable_encoder(detections))
