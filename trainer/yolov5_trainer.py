@@ -39,7 +39,7 @@ class Yolov5Trainer(Trainer):
 
         cmd = f'WANDB_MODE=disabled python /yolov5/train.py --exist-ok --patience {patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs} --clear'
         with open(hyperparameter_path) as f:
-            logging.info(f'running training with command :\n {cmd} \and hyperparameter\n{f.read()}')
+            logging.info(f'running training with command :\n {cmd} \nand hyperparameter\n{f.read()}')
         self.executor.start(cmd)
 
     async def start_training_from_scratch(self, id: str) -> None:
