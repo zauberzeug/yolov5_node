@@ -17,7 +17,7 @@ from learning_loop_node.detector.point_detection import PointDetection
 import cv2
 import asyncio
 import re
-
+import batch_size_calculation
 
 class Yolov5Trainer(Trainer):
 
@@ -29,14 +29,14 @@ class Yolov5Trainer(Trainer):
     async def start_training(self, model: str = 'model.pt') -> None:
         resolution = self.training.data.hyperparameter.resolution
         yolov5_format.create_file_structure(self.training)
-        batch_size = Yolov5Trainer.get_batch_size()
         patience = 300
 
         hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
         if not os.path.isfile(hyperparameter_path):
             shutil.copy('/app/hyp.yaml', hyperparameter_path)
         yolov5_format.update_hyp(hyperparameter_path, self.training.data.hyperparameter)
-
+        batch_size = await batch_size_calculation.calc(self.training.training_folder,model,hyperparameter_path, f'{self.training.training_folder}/dataset.yaml', resolution)
+        
         cmd = f'WANDB_MODE=disabled python /yolov5/train.py --exist-ok --patience {patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs} --clear'
         with open(hyperparameter_path) as f:
             logging.info(f'running training with command :\n {cmd} \nand hyperparameter\n{f.read()}')
@@ -54,7 +54,6 @@ class Yolov5Trainer(Trainer):
         resolution = self.training.data.hyperparameter.resolution
         batch_size = Yolov5Trainer.get_batch_size()
         patience = 300
-
         hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
 
         cmd = f'WANDB_MODE=disabled python /yolov5/train.py --exist-ok --patience {patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {self.training.training_folder}/result/weights/published/latest.pt --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs}'
@@ -252,3 +251,4 @@ class Yolov5Trainer(Trainer):
 
         from fastapi.encoders import jsonable_encoder
         print(jsonable_encoder(detections))
+    
