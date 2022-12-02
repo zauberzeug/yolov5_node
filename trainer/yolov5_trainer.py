@@ -228,10 +228,6 @@ class Yolov5Trainer(Trainer):
                         return progress
 
     @staticmethod
-    def get_batch_size():
-        return int(os.environ.get('BATCH_SIZE', '8'))
-
-    @staticmethod
     def infer_image(model_folder: str, image_path: str):
         '''
             Run this function from within the docker container.
