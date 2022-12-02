@@ -41,26 +41,37 @@ def _calc_batch_size(queue: Queue, training_path: str, model_file: str, hyp_path
     with open(dataset_path) as f:
         dataset = yaml.safe_load(f)
 
-    try:
-        weights = attempt_download(model_file)
-        logging.error(f'saved weights to {weights}')
-    except:
-        weights = f'{training_path}/{model_file}'
-
+    
+    # Try to download pretrained model. Its ok when its a 'Continued' training.
+    attempt_download(model_file)
+   
+    t = torch.cuda.get_device_properties(0).total_memory
+    r = torch.cuda.memory_reserved(0)
+    a = torch.cuda.memory_allocated(0)
+    logging.error(f'{t}, {r}, {a}')
     free_mem = trainer_utils.get_free_memory_mb()
     fraction = 0.95
     free_mem *= fraction
     logging.info(f'We use only {fraction *100}% of the free memory ({free_mem})')
 
     device = torch.device('cuda', 0)
-    
-    ckpt = torch.load(weights, map_location=device)
+    torch.cuda.empty_cache()
+    try:
+        ckpt = torch.load(model_file, map_location=device)
+    except FileNotFoundError:
+        # Continued Training
+        ckpt = torch.load(f'{training_path}/{model_file}', map_location=device)
+        
+
     model = Model(ckpt['model'].yaml, ch=3, nc=dataset.get('nc'), anchors=hyp.get('anchors')).to(device) # create
-    model = model.train()
     
     best_batch_size = None
     for batch_size in [128,64,32,16,8,4,2,1]:
-        stats = summary(model, input_size=(batch_size, 3, img_size, img_size),verbose=Verbosity.QUIET)
+        try:
+            stats = summary(model, input_size=(batch_size, 3, img_size, img_size), verbose=Verbosity.QUIET)
+        except RuntimeError as e:
+            logging.error(f'Got RuntimeError for batch_size {batch_size} and image_size {img_size}: {str(e)}') 
+            continue
         estimated_total_size = str(stats).split('Estimated Total Size (MB): ')[1]
         estimated_total_size = float(estimated_total_size.split('\n')[0])
 
