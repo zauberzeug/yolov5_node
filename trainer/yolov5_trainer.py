@@ -17,7 +17,7 @@ from learning_loop_node.detector.point_detection import PointDetection
 import cv2
 import asyncio
 import re
-
+import batch_size_calculation
 
 class Yolov5Trainer(Trainer):
 
@@ -26,41 +26,38 @@ class Yolov5Trainer(Trainer):
         self.latest_epoch = 0
         self.epochs = 2000
 
-    async def start_training(self, model: str = 'model.pt') -> None:
-        resolution = self.training.data.hyperparameter.resolution
-        yolov5_format.create_file_structure(self.training)
-        batch_size = Yolov5Trainer.get_batch_size()
-        patience = 300
+    async def start_training_from_scratch(self, id: str) -> None:
+        await self.start_training(model=f'yolov5{id}.pt')
 
+    async def start_training(self, model: str = 'model.pt') -> None:
+        yolov5_format.create_file_structure(self.training)
+        
         hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
         if not os.path.isfile(hyperparameter_path):
             shutil.copy('/app/hyp.yaml', hyperparameter_path)
         yolov5_format.update_hyp(hyperparameter_path, self.training.data.hyperparameter)
-
-        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --exist-ok --patience {patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs} --clear'
+        await self._start(model, " --clear")
+    
+    async def _start(self, model: str, additional_parameters : str = ''):
+        resolution = self.training.data.hyperparameter.resolution
+        patience = 300
+        
+        hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
+        batch_size = await batch_size_calculation.calc(self.training.training_folder,model,hyperparameter_path, f'{self.training.training_folder}/dataset.yaml', resolution)
+        
+        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --exist-ok --patience {patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs} {additional_parameters}'
+        
         with open(hyperparameter_path) as f:
-            logging.info(f'running training with command :\n {cmd} \and hyperparameter\n{f.read()}')
+            logging.info(f'running training with command :\n {cmd} \nand hyperparameter\n{f.read()}')
         self.executor.start(cmd)
-
-    async def start_training_from_scratch(self, id: str) -> None:
-        await self.start_training(model=f'yolov5{id}.pt')
 
     def can_resume(self) -> bool:
         path = f'{self.training.training_folder}/result/weights/published/latest.pt'
         return os.path.exists(path)
 
     async def resume(self) -> None:
-        logging.error('resume called')
-        resolution = self.training.data.hyperparameter.resolution
-        batch_size = Yolov5Trainer.get_batch_size()
-        patience = 300
-
-        hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
-
-        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --exist-ok --patience {patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {self.training.training_folder}/result/weights/published/latest.pt --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs}'
-        with open(hyperparameter_path) as f:
-            logging.info(f'running training with command :\n {cmd} \and hyperparameter\n{f.read()}')
-        self.executor.start(cmd)
+        logging.info('resume called')
+        await self._start(f'{self.training.training_folder}/result/weights/published/latest.pt')
 
     def get_error(self) -> str:
         if self.executor is None:
@@ -231,5 +228,21 @@ class Yolov5Trainer(Trainer):
                         return progress
 
     @staticmethod
-    def get_batch_size():
-        return int(os.environ.get('BATCH_SIZE', '8'))
+    def infer_image(model_folder: str, image_path: str):
+        '''
+            Run this function from within the docker container.
+            Example Usage
+                python -c 'from yolov5_trainer import Yolov5Trainer; Yolov5Trainer.infer_image("/data/some_folder_with_model.pt_and_model.json","/data/img.jpg")
+
+        '''
+        
+        trainer = Yolov5Trainer()
+        model_information = ModelInformation.load_from_disk(model_folder)
+        import asyncio
+
+        detections = asyncio.get_event_loop().run_until_complete(trainer._detect(model_information, [image_path], model_folder))
+
+
+        from fastapi.encoders import jsonable_encoder
+        print(jsonable_encoder(detections))
+    

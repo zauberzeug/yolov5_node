@@ -19,7 +19,7 @@ RUN apt update && \
     rm -rf /var/lib/apt/lists/*
 RUN python3 -m pip install --upgrade pip
 
-RUN python3 -m pip install seaborn thop coremltools onnx gsutil notebook wandb>=0.12.2 opencv-python==4.5.5.64
+RUN python3 -m pip install seaborn thop coremltools onnx gsutil notebook wandb>=0.12.2 opencv-python==4.5.5.64 torchinfo
 
 
 WORKDIR /
@@ -41,7 +41,7 @@ RUN pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof
 RUN wget https://raw.githubusercontent.com/wang-xinyu/tensorrtx/master/yolov5/gen_wts.py
 
 RUN python3 -m pip install autopep8 debugpy gunicorn pyyaml uvloop pytest-asyncio ruamel.yaml
-RUN python3 -m pip install "learning_loop_node==v0.7.38"
+RUN python3 -m pip install "learning_loop_node==v0.7.39"
 
 ADD ./ /yolov5_node/trainer/
 RUN ln -sf /yolov5_node/trainer /app
