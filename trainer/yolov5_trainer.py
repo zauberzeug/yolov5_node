@@ -87,9 +87,12 @@ class Yolov5Trainer(Trainer):
         if not os.path.isdir(path):
             os.mkdir(path)
         target = f'{path}/latest.pt'
-        shutil.move(basic_model.meta_information['weightfile'], target)
-        model_files.delete_older_epochs(self.training.training_folder, basic_model.meta_information['weightfile'])
+        weightfile = basic_model.meta_information['weightfile']
         
+        shutil.move(weightfile, target)
+        model_files.delete_json_for_weightfile(weightfile)
+        model_files.delete_older_epochs(self.training.training_folder, weightfile)
+
     def get_latest_model_files(self) -> Union[List[str], Dict[str, List[str]]]:
         path = self.training.training_folder + '/result/weights/published'
         weightfile = f'{path}/latest.pt'
