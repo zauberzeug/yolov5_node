@@ -18,6 +18,7 @@ import cv2
 import asyncio
 import re
 import batch_size_calculation
+import model_files
 
 class Yolov5Trainer(Trainer):
 
@@ -69,13 +70,9 @@ class Yolov5Trainer(Trainer):
             return
 
     def get_new_model(self) -> Optional[BasicModel]:
-        path = self.training.training_folder + '/result/weights'
-        if not os.path.isdir(path):
-            return
-        weightfiles = [os.path.join(path, f) for f in os.listdir(path) if 'epoch' in f and f.endswith('.pt')]
-        if not weightfiles:
-            return
-        weightfile = sorted(weightfiles)[0]
+        weightfile = model_files.get_new(self.training.training_folder)
+        if not weightfile:
+            return None
         # NOTE /yolov5 is patched to create confusion matrix json files
         with open(weightfile[:-3] + '.json') as f:
             matrix = json.load(f)
@@ -86,19 +83,13 @@ class Yolov5Trainer(Trainer):
         return BasicModel(confusion_matrix=matrix, meta_information={'weightfile': weightfile})
 
     def on_model_published(self, basic_model: BasicModel) -> None:
-        def delete_old_weightfiles():
-            path = self.training.training_folder + '/result/weights'
-            if not os.path.isdir(path):
-                return
-            files = glob(path + '/*')
-            [os.remove(f) for f in files if os.path.isfile(f)]
         path = self.training.training_folder + '/result/weights/published'
         if not os.path.isdir(path):
             os.mkdir(path)
         target = f'{path}/latest.pt'
         shutil.move(basic_model.meta_information['weightfile'], target)
-        delete_old_weightfiles()
-
+        model_files.delete_older_epochs(self.training.training_folder, basic_model.meta_information['weightfile'])
+        
     def get_latest_model_files(self) -> Union[List[str], Dict[str, List[str]]]:
         path = self.training.training_folder + '/result/weights/published'
         weightfile = f'{path}/latest.pt'
