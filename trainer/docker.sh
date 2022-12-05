@@ -63,8 +63,6 @@ build_args=""
 
 cmd=$1
 cmd_args=${@:2}
-echo $run_args
-echo $build_args
 case $cmd in
     b | build)
         docker build . -t $image $build_args $cmd_args
