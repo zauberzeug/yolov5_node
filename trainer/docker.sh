@@ -61,7 +61,6 @@ build_args=""
 [ -f /etc/nv_tegra_release ] && build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/l4t-pytorch:r32.6.1-pth1.9-py3"
 ( nvidia-smi > /dev/null 2>&1 ) && build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:21.10-py3"
 
-( nvidia-smi ) || echo "error for nvidia-smi"
 cmd=$1
 cmd_args=${@:2}
 echo $run_args
