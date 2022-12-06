@@ -18,6 +18,7 @@ from learning_loop_node.gdrive_downloader import g_download
 from learning_loop_node.loop import loop
 from learning_loop_node.data_classes.category import Category
 import time
+import model_files
 
 
 @pytest.mark.asyncio()
@@ -150,6 +151,24 @@ def test_new_model_discovery(use_training_dir):
     assert files == {'yolov5_pytorch': ['/tmp/model.pt', './/hyp.yaml'], 'yolov5_wts': ['/tmp/model.wts']}
 
 
+def test_newest_model_is_used(use_training_dir):
+    trainer = Yolov5Trainer()
+    trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
+                                images_folder='./', training_folder='./')
+    trainer.training.data = TrainingData(image_data=[], categories=[
+                                         Category(name='class_a', id='uuid_of_class_a', type='box')])
+    
+    #create some models.
+    mock_epoch(10, {})
+    mock_epoch(200, {})
+
+    new_model = trainer.get_new_model()
+    assert 'epoch10.pt' not in new_model.meta_information['weightfile']
+    assert 'epoch200.pt' in new_model.meta_information['weightfile']
+
+
+    
+
 def test_old_model_files_are_deleted_on_publish(use_training_dir):
     trainer = Yolov5Trainer()
     trainer.training = Training(id='someid', context=Context(organization='o', project='p'),
@@ -174,6 +193,27 @@ def test_old_model_files_are_deleted_on_publish(use_training_dir):
 
     _, _, files = next(os.walk("result/weights"))
     assert len(files) == 0
+
+def test_newer_model_files_are_kept_during_deleting(use_training_dir):
+    trainer = Yolov5Trainer()
+    trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
+                                images_folder='./', training_folder='./')
+    trainer.training.data = TrainingData(image_data=[], categories=[
+                                         Category(name='class_a', id='uuid_of_class_a', type='box')])
+    
+    #create some models.
+    mock_epoch(10, {})
+    mock_epoch(200, {})
+    new_model = trainer.get_new_model()
+    assert 'epoch200.pt' in new_model.meta_information['weightfile']
+    mock_epoch(201, {}) # An epoch is finished after during communication with the LearningLoop
+
+    trainer.on_model_published(new_model)
+    
+    all_model_files = model_files.get_all(trainer.training.training_folder)
+    assert len(all_model_files) == 1
+    assert 'epoch201.pt' in all_model_files[0], 'Epoch201 is not yed synced. It should not be deleted.'
+    
 
 
 @pytest.mark.asyncio()
