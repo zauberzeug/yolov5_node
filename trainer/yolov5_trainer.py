@@ -63,12 +63,14 @@ class Yolov5Trainer(Trainer):
     def get_error(self) -> str:
         if self.executor is None:
             return
-        try:
-            if 'CUDA out of memory' in self.executor.get_log():
-                return 'graphics card is out of memory'
-        except:
-            return
 
+        for line in self.executor.get_log_by_lines(since_last_start=True):
+            if 'CUDA out of memory' in line:
+                return 'graphics card is out of memory'
+            if  'CUDA error: invalid device ordinal' in line:
+                return 'graphics card not found'
+        return None
+            
     def get_new_model(self) -> Optional[BasicModel]:
         weightfile = model_files.get_new(self.training.training_folder)
         if not weightfile:
