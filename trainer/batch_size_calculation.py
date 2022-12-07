@@ -35,6 +35,8 @@ async def calc(training_path: str, model_file: str, hyp_path: str, dataset_path:
 
 def _calc_batch_size(queue: Queue, training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int) -> None:
     logging.error('calc_batch_size.....')
+    import os
+    os.chdir('/tmp')
 
     with open(hyp_path) as f:
         hyp = yaml.safe_load(f)
