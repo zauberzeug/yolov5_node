@@ -1,9 +1,18 @@
+From 16be1813e9e8b4aaae9e0c90c37fee1b1e3fd674 Mon Sep 17 00:00:00 2001
+From: Maik Switalski <maik@zauberzeug.com>
+Date: Fri, 9 Dec 2022 11:43:27 +0100
+Subject: [PATCH 3/3] ignore_previous_fitness.patch
+
+---
+ train.py | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
 diff --git a/train.py b/train.py
-index e2cd5ec..46ac289 100644
+index 40d8835..177add2 100644
 --- a/train.py
 +++ b/train.py
-@@ -180,9 +180,9 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
-     start_epoch, best_fitness = 0, 0.0
+@@ -170,9 +170,9 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
+     best_fitness, start_epoch = 0.0, 0
      if pretrained:
          # Optimizer
 -        if ckpt['optimizer'] is not None:
@@ -15,3 +24,6 @@ index e2cd5ec..46ac289 100644
  
          # EMA
          if ema and ckpt.get('ema'):
+-- 
+2.25.1
+
