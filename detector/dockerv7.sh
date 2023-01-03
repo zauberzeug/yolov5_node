@@ -36,10 +36,10 @@ run_args="-it --rm"
 run_args+=" -v $HOME/data:/data"
 # run_args+=" -v $HOME/learning_loop_node/learning_loop_node:/usr/local/lib/python3.6/dist-packages/learning_loop_node"
 run_args+=" -h $HOSTNAME"
-#run_args+=" -e HOST=preview.learning-loop.ai"
-run_args+=" -e HOST=learning-loop.ai"
+run_args+=" -e HOST=preview.learning-loop.ai"
+#run_args+=" -e HOST=learning-loop.ai"
 run_args+=" -e ORGANIZATION=zauberzeug"
-run_args+=" -e PROJECT=demo"
+run_args+=" -e PROJECT=drawingbot"
 run_args+=" --name $name"
 run_args+=" --runtime=nvidia"
 run_args+=" -e NVIDIA_VISIBLE_DEVICES=all"
@@ -55,31 +55,32 @@ L4T_VERSION="$L4T_RELEASE.$L4T_REVISION"
 
 build_args="--build-arg BASE_IMAGE=zauberzeug/l4t-opencv:4.5.2-on-nano-r$L4T_VERSION"
 image="zauberzeug/yolov5-detector:$L4T_VERSION"
+yolo_version="v7.0"
 
 cmd=$1
 cmd_args=${@:2}
 set -x
 case $cmd in
     b | build)
-        docker build . --target release -t $image $build_args $cmd_args
-        docker build . -t ${image}-dev $build_args $cmd_args
+        docker build . --target release -t ${image}-${yolo_version} $build_args $cmd_args
+        docker build . -t ${image}-${yolo_version}-dev $build_args $cmd_args
         ;;
     U | update)
-	    docker pull ${image}
-        docker pull ${image}-dev
+	    docker pull ${image}-${yolo_version}
+        docker pull ${image}-${yolo_version}-dev
 	;;
     d | debug)
-        docker run $run_args $image-dev /app/start.sh debug
+        docker run $run_args ${image}-${yolo_version}-dev /app/start.sh debug
         ;;
     r | run)
-        docker run $run_args $image-dev $cmd_args
+        docker run $run_args ${image}-${yolo_version}-dev $cmd_args
 	;;
     ri | run-image)
-    	docker run $run_args $image $cmd_args
+    	docker run $run_args ${image}-${yolo_version} $cmd_args
         ;;
     p | push)
-        docker push ${image}-dev 
-        docker push $image
+        docker push ${image}-${yolo_version}-dev 
+        docker push ${image}-${yolo_version}
         ;;
     s | stop)
         docker stop $name $cmd_args

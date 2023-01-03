@@ -44,8 +44,9 @@ class Yolov5Trainer(Trainer):
         patience = 300
         
         hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
-        batch_size = await batch_size_calculation.calc(self.training.training_folder,model,hyperparameter_path, f'{self.training.training_folder}/dataset.yaml', resolution)
-        
+        self.try_replace_optimized_hyperparameter()
+        batch_size = await batch_size_calculation.calc(self.training.training_folder, model, hyperparameter_path, f'{self.training.training_folder}/dataset.yaml', resolution)
+
         cmd = f'WANDB_MODE=disabled python /yolov5/train.py --exist-ok --patience {patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs} {additional_parameters}'
         
         with open(hyperparameter_path) as f:
@@ -59,6 +60,15 @@ class Yolov5Trainer(Trainer):
     async def resume(self) -> None:
         logging.info('resume called')
         await self._start(f'{self.training.training_folder}/result/weights/published/latest.pt')
+
+    def try_replace_optimized_hyperparameter(self):
+        optimied_hyperparameter = f'{self.training.project_folder}/yolov5s6_evolved_hyperparameter.yaml'
+        if os.path.exists(optimied_hyperparameter):
+            logging.info('Found optimized hyperparameter')
+            shutil.copy(optimied_hyperparameter,
+                        f'{self.training.training_folder}/hyp.yaml')
+        else:
+            logging.warning('NO optimized hyperparameter found (!)')
 
     def get_error(self) -> str:
         if self.executor is None:
