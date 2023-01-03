@@ -1,12 +1,8 @@
 """
-Original from https://github.com/wang-xinyu/tensorrtx/blob/5f1b048a29e2fcd9eb85b780c89b90a4f052a3b7/yolov5/yolov5_trt.py
+Original from https://github.com/wang-xinyu/tensorrtx/blob/7b79de466c7ac2fcf179e65c2fa4718107f236f9/yolov5/yolov5_det_trt.py
 MIT License
 """
-import ctypes
 import os
-import shutil
-import random
-import sys
 import threading
 import time
 from typing import Dict, List
@@ -19,6 +15,8 @@ from collections import namedtuple
 
 CONF_THRESH = 0.2
 IOU_THRESHOLD = 0.4
+LEN_ALL_RESULT = 38001
+LEN_ONE_RESULT = 38
 
 
 def get_img_path_batches(batch_size, img_dir):
@@ -90,8 +88,6 @@ class YoLov5TRT(object):
 
     def infer(self, image_raw):
         threading.Thread.__init__(self)
-        # Do image preprocess
-        input_image, image_raw, origin_h, origin_w = self.preprocess_image(image_raw)
         # Make self the active context, pushing it on top of the context stack.
         self.ctx.push()
         # Restore
@@ -103,7 +99,8 @@ class YoLov5TRT(object):
         host_outputs = self.host_outputs
         cuda_outputs = self.cuda_outputs
         bindings = self.bindings
-
+        # Do image preprocess
+        input_image, image_raw, origin_h, origin_w = self.preprocess_image(image_raw)
         # Copy input image to host buffer
         np.copyto(host_inputs[0], input_image.ravel())
         start = time.time()
@@ -123,9 +120,7 @@ class YoLov5TRT(object):
         # Do postprocess
         detections = []
         Detection = namedtuple('Detection', 'x y w h category probability')
-        result_boxes, result_scores, result_classid = self.post_process(
-            output[0:6001], origin_h, origin_w
-        )
+        result_boxes, result_scores, result_classid = self.post_process(output[0:LEN_ALL_RESULT], origin_h, origin_w)
         for j in range(len(result_boxes)):
             x, y, br_x, br_y = result_boxes[j]
             w = br_x - x
@@ -134,13 +129,13 @@ class YoLov5TRT(object):
                 int(x), int(y), int(w), int(h),
                 int(result_classid[j]), round(float(result_scores[j]), 2))
             )
-
+        
         return detections, end - start
 
     def destroy(self):
         # Remove any context from the top of the context stack, deactivating it.
         self.ctx.pop()
-
+        
     def get_raw_image_zeros(self, image_path_batch=None):
         """
         description: Ready data for warmup
@@ -182,7 +177,7 @@ class YoLov5TRT(object):
         image = cv2.resize(image, (tw, th))
         # Pad the short side with (128,128,128)
         image = cv2.copyMakeBorder(
-            image, ty1, ty2, tx1, tx2, cv2.BORDER_CONSTANT, (128, 128, 128)
+            image, ty1, ty2, tx1, tx2, cv2.BORDER_CONSTANT, None, (128, 128, 128)
         )
         image = image.astype(np.float32)
         # Normalize to [0,1]
@@ -238,7 +233,8 @@ class YoLov5TRT(object):
         # Get the num of boxes detected
         num = int(output[0])
         # Reshape to a two dimentional ndarray
-        pred = np.reshape(output[1:], (-1, 6))[:num, :]
+        pred = np.reshape(output[1:], (-1, LEN_ONE_RESULT))[:num, :]
+        pred = pred[:, :6]
         # Do nms
         boxes = self.non_max_suppression(pred, origin_h, origin_w, conf_thres=CONF_THRESH, nms_thres=IOU_THRESHOLD)
         result_boxes = boxes[:, :4] if len(boxes) else np.array([])
@@ -274,7 +270,7 @@ class YoLov5TRT(object):
         inter_rect_y2 = np.minimum(b1_y2, b2_y2)
         # Intersection area
         inter_area = np.clip(inter_rect_x2 - inter_rect_x1 + 1, 0, None) * \
-            np.clip(inter_rect_y2 - inter_rect_y1 + 1, 0, None)
+                     np.clip(inter_rect_y2 - inter_rect_y1 + 1, 0, None)
         # Union Area
         b1_area = (b1_x2 - b1_x1 + 1) * (b1_y2 - b1_y1 + 1)
         b2_area = (b2_x2 - b2_x1 + 1) * (b2_y2 - b2_y1 + 1)
@@ -320,23 +316,6 @@ class YoLov5TRT(object):
             boxes = boxes[~invalid]
         boxes = np.stack(keep_boxes, 0) if len(keep_boxes) else np.array([])
         return boxes
-
-
-class inferThread(threading.Thread):
-    def __init__(self, yolov5_wrapper, image_path_batch):
-        threading.Thread.__init__(self)
-        self.yolov5_wrapper = yolov5_wrapper
-        self.image_path_batch = image_path_batch
-
-    def run(self):
-        batch_image_raw, use_time = self.yolov5_wrapper.infer(self.yolov5_wrapper.get_raw_image(self.image_path_batch))
-        for i, img_path in enumerate(self.image_path_batch):
-            parent, filename = os.path.split(img_path)
-            save_name = os.path.join('output', filename)
-            # Save image
-            cv2.imwrite(save_name, batch_image_raw[i])
-        print('input->{}, time->{:.2f}ms, saving into output/'.format(self.image_path_batch, use_time * 1000))
-
 
 class warmUpThread(threading.Thread):
     def __init__(self, yolov5_wrapper):

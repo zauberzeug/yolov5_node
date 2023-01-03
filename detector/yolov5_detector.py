@@ -72,7 +72,7 @@ class Yolov5Detector(Detector):
         # NOTE cmake and inital building is done in Dockerfile (to speeds things up)
         os.chdir('/tensorrtx/yolov5/build')
         # Adapt resolution
-        with open('../yololayer.h', 'r+') as f:
+        with open('../plugin/yololayer.h', 'r+') as f:
             content = f.read()
             content = re.sub('(CLASS_NUM =) \d*', r'\1 ' + str(cat_count), content)
             content = re.sub('(INPUT_[HW] =) \d*', r'\1 ' + str(resolution), content)
@@ -82,5 +82,5 @@ class Yolov5Detector(Detector):
         subprocess.run('make -j6 -Wno-deprecated-declarations', shell=True)
         logging.warning('currently we assume a Yolov5 s6 model;\
             parameterization of the variant (s, s6, m, m6, ...) still needs to be done')
-        subprocess.run(f'./yolov5 -s {wts_file} {engine_file} s6', shell=True)  # TODO parameterize variant "s6"
+        subprocess.run(f'./yolov5_det -s {wts_file} {engine_file} s6', shell=True)  # TODO parameterize variant "s6"
         return engine_file
