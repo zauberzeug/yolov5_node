@@ -67,6 +67,9 @@ case $cmd in
     b | build)
         docker build . -t $image $build_args $cmd_args
         ;;
+    bnc | build-no-cache)
+        docker build --no-cache . -t $image $build_args $cmd_args
+        ;;
     d | debug)
         docker run $run_args $image /app/start.sh debug
         ;;
