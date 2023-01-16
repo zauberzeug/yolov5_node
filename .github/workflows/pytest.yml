@@ -13,9 +13,15 @@ jobs:
         run: |
           docker stop yolov5_trainer_node_github_action | echo "Nothing to do. No container running."
       - name: build
+        if: github.ref != 'refs/heads/release'
         run: |
           cd trainer
           ./docker.sh b
+      - name: buildnocache
+        if: github.ref == 'refs/heads/release'
+        run: |
+          cd trainer
+          ./docker.sh bnc
       - name: run
         run: |
           docker run -d -it --rm -v /home/zauberzeug/data:/data -h n6 -e LOOP_HOST=$LOOP_HOST  -e LOOP_USERNAME=$LOOP_USERNAME -e PASSWORD=$LOOP_PASSWORD --name yolov5_trainer_node_github_action --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all --gpus all --ipc host zauberzeug/yolov5-trainer:latest-dev
