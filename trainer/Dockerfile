@@ -41,7 +41,7 @@ RUN pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof
 RUN wget https://raw.githubusercontent.com/wang-xinyu/tensorrtx/master/yolov5/gen_wts.py
 
 RUN python3 -m pip install autopep8 debugpy gunicorn pyyaml uvloop pytest-asyncio ruamel.yaml
-RUN python3 -m pip install "learning_loop_node==v0.7.41"
+RUN python3 -m pip install "learning_loop_node==v0.7.45"
 
 ADD ./ /yolov5_node/trainer/
 RUN ln -sf /yolov5_node/trainer /app
