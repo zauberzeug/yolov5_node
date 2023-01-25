@@ -19,28 +19,35 @@ from learning_loop_node.loop import loop
 from learning_loop_node.data_classes.category import Category
 import time
 import model_files
+from pathlib import Path
 
 
 @pytest.mark.asyncio()
-async def test_create_file_structure_box_size(use_training_dir):
+async def test_create_file_structure(use_training_dir):
     categories = [
-        Category(name='point_category_1', id='uuid_of_class_1'),
-        Category(name='point_category_2', id='uuid_of_class_2', point_size=30)]
+        Category(name='classification_category_1', id='uuid_of_class_1'),
+        Category(name='classification_category_2', id='uuid_of_class_2')]
     image_data = [{
         'set': 'train',
         'id': 'image_1',
         'width': 100,
         'height': 100,
         'box_annotations': [],
-        'point_annotations': [{
+        'point_annotations': [],
+        'classification_annotation': {
             'category_id': 'uuid_of_class_1',
-            'x': 50,
-            'y': 60,
-        }, {
+        }
+    },
+        {
+        'set': 'test',
+        'id': 'image_2',
+        'width': 100,
+        'height': 100,
+        'box_annotations': [],
+        'point_annotations': [],
+        'classification_annotation': {
             'category_id': 'uuid_of_class_2',
-            'x': 60,
-            'y': 70,
-        }]
+        }
     }]
     trainer = Yolov5Trainer()
     trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
@@ -49,11 +56,8 @@ async def test_create_file_structure_box_size(use_training_dir):
 
     yolov5_format.create_file_structure(trainer.training)
 
-    with open('./train/image_1.txt', 'r') as f:
-        lines = f.readlines()
-
-    assert '0 0.500000 0.600000 0.200000 0.200000' in lines[0]
-    assert '1 0.600000 0.700000 0.300000 0.300000' in lines[1]
+    assert Path('./train/classification_category_1/image_1.jpg').is_symlink()
+    assert Path('./test/classification_category_2/image_2.jpg').is_symlink()
 
 
 @pytest.mark.asyncio()
@@ -70,17 +74,18 @@ async def test_training_creates_model(use_training_dir):
     training.data = await create_training_data(training)
 
     yolov5_format.create_file_structure(training)
-
+    logging.info(training.training_folder)  # /tmp/test_training/
+    logging.info([p for p in Path(f'{training.training_folder}/train/green classification/').iterdir()])
     executor = Executor(os.getcwd())
     # from https://github.com/WongKinYiu/yolor#training
-    cmd = f'WANDB_MODE=disabled python /yolov5/train.py --project training --name result --batch 4 --img 416 --data training/dataset.yaml --weights model.pt --epochs 1'
+    cmd = f'python /yolov5/classify/train.py --project training --name result --batch 4 --img 416 --data {training.training_folder} --model yolov5s-cls.pt --epochs 1'
     executor.start(cmd)
     while executor.is_process_running():
         sleep(1)
         logging.debug(executor.get_log())
 
     logging.info(executor.get_log())
-    assert '1 epochs completed' in executor.get_log()
+    assert 'Training complete' in executor.get_log()
     assert 'best.pt' in executor.get_log()
     best = training.training_folder + '/result/weights/best.pt'
     assert os.path.isfile(best)
@@ -103,13 +108,13 @@ async def test_parse_progress_from_log(use_training_dir):
     yolov5_format.create_file_structure(trainer.training)
 
     trainer.executor = Executor(os.getcwd())
-    cmd = f'WANDB_MODE=disabled python /yolov5/train.py --project training --name result --batch 4 --img 416 --data training/dataset.yaml --weights model.pt --epochs {trainer.epochs}'
+    cmd = f'python /yolov5/classify/train.py --project training --name result --batch 4 --img 416 --data {trainer.training.training_folder} --model yolov5s-cls.pt --epochs {trainer.epochs}'
     trainer.executor.start(cmd)
     while trainer.executor.is_process_running():
         sleep(1)
 
     logging.info(trainer.executor.get_log())
-    assert f'{trainer.epochs} epochs completed' in trainer.executor.get_log()
+    assert f'{trainer.epochs}/{trainer.epochs}' in trainer.executor.get_log()
     assert trainer.progress == 1.0
 
 
@@ -118,7 +123,7 @@ def test_new_model_discovery(use_training_dir):
     trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
                                 images_folder='./', training_folder='./')
     trainer.training.data = TrainingData(image_data=[], categories=[
-                                         Category(name='class_a', id='uuid_of_class_a', type='box')])
+                                         Category(name='class_a', id='uuid_of_class_a', type='classification')])
     assert trainer.get_new_model() is None, 'should not find any models'
 
     model_path = 'result/weights/published/latest.pt'
@@ -156,9 +161,9 @@ def test_newest_model_is_used(use_training_dir):
     trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
                                 images_folder='./', training_folder='./')
     trainer.training.data = TrainingData(image_data=[], categories=[
-                                         Category(name='class_a', id='uuid_of_class_a', type='box')])
-    
-    #create some models.
+                                         Category(name='class_a', id='uuid_of_class_a', type='classification')])
+
+    # create some models.
     mock_epoch(10, {})
     mock_epoch(200, {})
 
@@ -167,14 +172,12 @@ def test_newest_model_is_used(use_training_dir):
     assert 'epoch200.pt' in new_model.meta_information['weightfile']
 
 
-    
-
 def test_old_model_files_are_deleted_on_publish(use_training_dir):
     trainer = Yolov5Trainer()
     trainer.training = Training(id='someid', context=Context(organization='o', project='p'),
                                 project_folder='./', images_folder='./', training_folder='./')
     trainer.training.data = TrainingData(image_data=[], categories=[
-                                         Category(name='class_a', id='uuid_of_class_a', type='box')])
+                                         Category(name='class_a', id='uuid_of_class_a', type='classification')])
     assert trainer.get_new_model() is None, 'should not find any models'
 
     mock_epoch(1, {'class_a': {'fp': 0, 'tp': 1, 'fn': 0}})
@@ -194,26 +197,26 @@ def test_old_model_files_are_deleted_on_publish(use_training_dir):
     _, _, files = next(os.walk("result/weights"))
     assert len(files) == 0
 
+
 def test_newer_model_files_are_kept_during_deleting(use_training_dir):
     trainer = Yolov5Trainer()
     trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
                                 images_folder='./', training_folder='./')
     trainer.training.data = TrainingData(image_data=[], categories=[
-                                         Category(name='class_a', id='uuid_of_class_a', type='box')])
-    
-    #create some models.
+                                         Category(name='class_a', id='uuid_of_class_a', type='classification')])
+
+    # create some models.
     mock_epoch(10, {})
     mock_epoch(200, {})
     new_model = trainer.get_new_model()
     assert 'epoch200.pt' in new_model.meta_information['weightfile']
-    mock_epoch(201, {}) # An epoch is finished after during communication with the LearningLoop
+    mock_epoch(201, {})  # An epoch is finished after during communication with the LearningLoop
 
     trainer.on_model_published(new_model)
-    
+
     all_model_files = model_files.get_all(trainer.training.training_folder)
     assert len(all_model_files) == 1
     assert 'epoch201.pt' in all_model_files[0], 'Epoch201 is not yed synced. It should not be deleted.'
-    
 
 
 @pytest.mark.asyncio()
@@ -250,7 +253,7 @@ async def test_clear_training_data():
 @pytest.fixture()
 def create_project():
     test_helper.LiveServerSession().delete(f"/api/zauberzeug/projects/pytest?keep_images=true")
-    project_configuration = {'project_name': 'pytest', 'box_categories': 2,  'point_categories': 1, 'inbox': 0, 'annotate': 0, 'review': 0, 'complete': 0, 'image_style': 'plain',
+    project_configuration = {'project_name': 'pytest', 'classification_categories': 2, 'inbox': 0, 'annotate': 0, 'review': 0, 'complete': 0, 'image_style': 'plain',
                              'thumbs': False, 'trainings': 1}
     assert test_helper.LiveServerSession().post(f"/api/zauberzeug/projects/generator",
                                                 json=project_configuration).status_code == 200
@@ -258,41 +261,41 @@ def create_project():
     test_helper.LiveServerSession().delete(f"/api/zauberzeug/projects/pytest?keep_images=true")
 
 
-@pytest.mark.asyncio()
-async def test_detecting(create_project):
-    from learning_loop_node.loop import Loop
-    loop = Loop()
-    logging.debug('downloading model from gdrive')
+# @pytest.mark.asyncio()
+# async def test_detecting(create_project):
+#     from learning_loop_node.loop import Loop
+#     loop = Loop()
+#     logging.debug('downloading model from gdrive')
 
-    file_id = '1sZWa053fWT9PodrujDX90psmjhFVLyBV'
-    destination = '/tmp/model.zip'
-    g_download(file_id, destination)
+#     file_id = '1sZWa053fWT9PodrujDX90psmjhFVLyBV'
+#     destination = '/tmp/model.zip'
+#     g_download(file_id, destination)
 
-    test_helper.unzip(destination, '/tmp/model')
+#     test_helper.unzip(destination, '/tmp/model')
 
-    logging.debug('uploading model')
-    data = test_helper.prepare_formdata(['/tmp/model/model.pt', '/tmp/model/model.json'])
-    async with loop.put(f'api/zauberzeug/projects/pytest/trainings/1/models/latest/yolov5_pytorch/file', data=data) as response:
-        if response.status != 200:
-            msg = f'unexpected status code {response.status} while putting model'
-            logging.error(msg)
-            raise (Exception(msg))
-        model = await response.json()
+#     logging.debug('uploading model')
+#     data = test_helper.prepare_formdata(['/tmp/model/model.pt', '/tmp/model/model.json'])
+#     async with loop.put(f'api/zauberzeug/projects/pytest/trainings/1/models/latest/yolov5_pytorch/file', data=data) as response:
+#         if response.status != 200:
+#             msg = f'unexpected status code {response.status} while putting model'
+#             logging.error(msg)
+#             raise (Exception(msg))
+#         model = await response.json()
 
-    data = test_helper.prepare_formdata(['tests/example_images/8647fc30-c46c-4d13-a3fd-ead3b9a67652.jpg'])
-    async with loop.post(f'api/zauberzeug/projects/pytest/images', data=data) as response:
-        if response.status != 200:
-            msg = f'unexpected status code {response.status} while posting a new image'
-            logging.error(msg)
-            raise (Exception(msg))
-        image = await response.json()
+#     data = test_helper.prepare_formdata(['tests/example_images/8647fc30-c46c-4d13-a3fd-ead3b9a67652.jpg'])
+#     async with loop.post(f'api/zauberzeug/projects/pytest/images', data=data) as response:
+#         if response.status != 200:
+#             msg = f'unexpected status code {response.status} while posting a new image'
+#             logging.error(msg)
+#             raise (Exception(msg))
+#         image = await response.json()
 
-    trainer = Yolov5Trainer()
-    context = Context(organization='zauberzeug', project='pytest')
-    trainer.training = Trainer.generate_training(context)
-    trainer.training.model_id_for_detecting = model['id']
-    detections = await trainer._do_detections()
-    assert len(detections) > 0
+#     trainer = Yolov5Trainer()
+#     context = Context(organization='zauberzeug', project='pytest')
+#     trainer.training = Trainer.generate_training(context)
+#     trainer.training.model_id_for_detecting = model['id']
+#     detections = await trainer._do_detections()
+#     assert len(detections) > 0
 
 
 async def create_training_data(training: Training) -> TrainingData:
@@ -302,7 +305,8 @@ async def create_training_data(training: Training) -> TrainingData:
     response = test_helper.LiveServerSession().get(f"/api/zauberzeug/projects/demo/data")
     assert response.status_code == 200
     data = response.json()
-    training_data.categories = Category.from_list(data['categories'])
+    training_data.categories = Category.from_list(
+        [category for category in data['categories'] if category['type'] == 'classification'])
     training_data.image_data = image_data
     return training_data
 

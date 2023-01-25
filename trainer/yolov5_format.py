@@ -12,47 +12,34 @@ def category_lookup_from_training(training: Training) -> dict:
 
 
 def create_set(training: Training, set_name: str):
-    categories = list(category_lookup_from_training(training).values())
     training_path = training.training_folder
     images_path = f'{training_path}/{set_name}'
 
     shutil.rmtree(images_path, ignore_errors=True)
     os.makedirs(images_path, exist_ok=True)
+    for category in category_lookup_from_training(training).keys():
+        os.makedirs(f'{images_path}/{category}', exist_ok=True)
 
+    # classification format:
+        # dataset
+        # ├── train
+        # │   ├── class1
+        # │   │   ├── image1.jpg
+        # |── test
+        # │   ├── class1
+        # │   │   ├── image2.jpg
     for image in training.data.image_data:
         if image['set'] == set_name:
             image_name = image['id'] + '.jpg'
-            image_path = f"{images_path}/{image_name}"
-            width = float(image['width'])
-            height = float(image['height'])
-            os.symlink(f'{os.path.abspath(training.images_folder)}/{image_name}', image_path)
-
-            # box format: https://docs.ultralytics.com/tutorials/train-custom-datasets/
-            # class x_center y_center width height
-            # normalized coordinates
-            yolo_boxes = []
-            for box in image['box_annotations']:
-                coords = [
-                    (box['x'] + box['width'] / 2) / width,
-                    (box['y'] + box['height'] / 2) / height,
-                    box['width'] / width,
-                    box['height'] / height,
-                ]
-                id = str(categories.index(box['category_id']))
-                yolo_boxes.append(id + ' ' + ' '.join([str("%.6f" % c) for c in coords]) + '\n')
-            for point in image['point_annotations']:
-                size = [c for c in training.data.categories if c.id == point['category_id']][0].point_size or 20
-                coords = [
-                    point['x']/width,
-                    point['y']/height,
-                    size/width,
-                    size/height,
-                ]
-                id = str(categories.index(point['category_id']))
-                yolo_boxes.append(id + ' ' + ' '.join([str("%.6f" % c) for c in coords]) + '\n')
-
-            with open(f'{images_path}/{image["id"]}.txt', 'w') as l:
-                l.writelines(yolo_boxes)
+            classification = image['classification_annotation']
+            if classification:
+                category = classification['category_id']
+                category_name = [c for c in training.data.categories if c.id == category][0].name
+                logging.error(f'category_name: {category_name}')
+                image_path = f"{images_path}/{category_name}/{image_name}"
+                logging.info('image_path: ' + image_path)
+                logging.info(f'linking {image_name} to {image_path}')
+                os.symlink(f'{os.path.abspath(training.images_folder)}/{image_name}', image_path)
 
 
 def create_yaml(training: Training):
