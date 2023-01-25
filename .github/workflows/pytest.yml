@@ -24,7 +24,7 @@ jobs:
           ./docker.sh bnc
       - name: run
         run: |
-          docker run -d -it --rm -v /home/zauberzeug/data:/data -h n6 -e LOOP_HOST=$LOOP_HOST  -e LOOP_USERNAME=$LOOP_USERNAME -e PASSWORD=$LOOP_PASSWORD --name yolov5_trainer_node_github_action --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all --gpus all --ipc host zauberzeug/yolov5-trainer:latest-dev
+          docker run -d -it --rm -v /home/zauberzeug/data:/data -h n6 -e LOOP_HOST=$LOOP_HOST  -e LOOP_USERNAME=$LOOP_USERNAME -e PASSWORD=$LOOP_PASSWORD --name yolov5_trainer_node_github_action --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all --gpus all --ipc host zauberzeug/yolov5-trainer:latest
       - name: tests
         run: |
           docker exec yolov5_trainer_node_github_action pytest -v
