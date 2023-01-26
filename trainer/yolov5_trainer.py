@@ -26,31 +26,23 @@ class Yolov5Trainer(Trainer):
     def __init__(self) -> None:
         super().__init__(model_format='yolov5_pytorch')
         self.latest_epoch = 0
-        self.epochs = 500
+        self.epochs = 1000
 
     async def start_training_from_scratch(self, id: str) -> None:
         await self.start_training(model=f'yolov5{id}.pt')
 
     async def start_training(self, model: str = 'model.pt') -> None:
         yolov5_format.create_file_structure(self.training)
-
-        hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
-        if not os.path.isfile(hyperparameter_path):
-            shutil.copy('/app/hyp.yaml', hyperparameter_path)
-        yolov5_format.update_hyp(hyperparameter_path, self.training.data.hyperparameter)
+        if model == 'model.pt':
+            model = f'{self.training.training_folder}/model.pt'
         await self._start(model)
 
     async def _start(self, model: str, additional_parameters: str = ''):
         resolution = self.training.data.hyperparameter.resolution
 
-        hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
-        self.try_replace_optimized_hyperparameter()
         # batch_size = await batch_size_calculation.calc(self.training.training_folder, model, hyperparameter_path, f'{self.training.training_folder}/dataset.yaml', resolution)
         batch_size = 4
         cmd = f'python /yolov5/classify/train.py --exist-ok --batch-size {batch_size} --img {resolution} --data {self.training.training_folder} --model {model} --project {self.training.training_folder} --name result --epochs {self.epochs} {additional_parameters}'
-
-        with open(hyperparameter_path) as f:
-            logging.info(f'running training with command :\n {cmd} \nand hyperparameter\n{f.read()}')
         self.executor.start(cmd)
 
     def can_resume(self) -> bool:
@@ -60,15 +52,6 @@ class Yolov5Trainer(Trainer):
     async def resume(self) -> None:
         logging.info('resume called')
         await self._start(f'{self.training.training_folder}/result/weights/published/latest.pt')
-
-    def try_replace_optimized_hyperparameter(self):
-        optimied_hyperparameter = f'{self.training.project_folder}/yolov5s6_evolved_hyperparameter.yaml'
-        if os.path.exists(optimied_hyperparameter):
-            logging.info('Found optimized hyperparameter')
-            shutil.copy(optimied_hyperparameter,
-                        f'{self.training.training_folder}/hyp.yaml')
-        else:
-            logging.warning('NO optimized hyperparameter found (!)')
 
     def get_error(self) -> str:
         if self.executor is None:
@@ -87,12 +70,11 @@ class Yolov5Trainer(Trainer):
         if not weightfile:
             return None
         # NOTE /yolov5 is patched to create confusion matrix json files
-        # with open(weightfile[:-3] + '.json') as f:
-        #     matrix = json.load(f)
-        #     categories = yolov5_format.category_lookup_from_training(self.training)
-        #     for category_name in list(matrix.keys()):
-        #         matrix[categories[category_name]] = matrix.pop(category_name)
-        matrix = {}
+        with open(weightfile[:-3] + '.json') as f:
+            matrix = json.load(f)
+            categories = yolov5_format.category_lookup_from_training(self.training)
+            for category_name in list(matrix.keys()):
+                matrix[categories[category_name]] = matrix.pop(category_name)
         return BasicModel(confusion_matrix=matrix, meta_information={'weightfile': weightfile})
 
     def on_model_published(self, basic_model: BasicModel) -> None:
@@ -103,8 +85,7 @@ class Yolov5Trainer(Trainer):
         weightfile = basic_model.meta_information['weightfile']
 
         shutil.move(weightfile, target)
-        # model_files.delete_json_for_weightfile(weightfile)
-        # model_files.delete_older_epochs(self.training.training_folder, weightfile)
+        model_files.delete_json_for_weightfile(weightfile)
 
     def get_latest_model_files(self) -> Union[List[str], Dict[str, List[str]]]:
         path = self.training.training_folder + '/result/weights/published'
@@ -112,13 +93,12 @@ class Yolov5Trainer(Trainer):
         shutil.copy(weightfile, '/tmp/model.pt')
         training_path = '/'.join(weightfile.split('/')[:-4])
 
-        # subprocess.run(f'python3 /yolov5/gen_wts.py -w {weightfile} -o /tmp/model.wts', shell=True)
         return {
-            self.model_format: ['/tmp/model.pt', f'{training_path}/hyp.yaml']
+            self.model_format: ['/tmp/model.pt', f'{training_path}/result/opt.yaml']
         }
 
     async def _detect(self, model_information: ModelInformation, images:  List[str], model_folder: str) -> List:
-        pass
+        return []
         #     images_folder = f'/tmp/imagelinks_for_detecting'
         #     shutil.rmtree(images_folder, ignore_errors=True)
         #     os.makedirs(images_folder)
@@ -194,7 +174,7 @@ class Yolov5Trainer(Trainer):
 
     async def clear_training_data(self, training_folder: str) -> None:
         # Note: Keep best.pt in case uploaded model was not best.
-        keep_files = ['last_training.log', 'hyp.yaml', 'dataset.yaml', 'best.pt']
+        keep_files = ['last_training.log', 'last.pt']
         keep_dirs = ['result', 'weights']
         for root, dirs, files in os.walk(training_folder, topdown=False):
             for file in files:
@@ -224,15 +204,12 @@ class Yolov5Trainer(Trainer):
             return 1.0  # NOTE: We would divide by 0 in this case
         lines = list(reversed(self.executor.get_log_by_lines()))
         for line in lines:
-            if re.search(f'/{self.epochs -1}', line):
-                found_line = line.split(' ')
-                for item in found_line:
-                    if f'/{self.epochs -1}' in item:
-                        epoch_and_total_epochs = item.split('/')
-                        epoch = epoch_and_total_epochs[0]
-                        total_epochs = epoch_and_total_epochs[1]
-                        progress = int(epoch) / int(total_epochs)
-                        return progress
+            if re.search(f'/{self.epochs}', line):
+                found_line = line.split('/')
+                if found_line:
+                    epoch = int(found_line[0])
+                    progress = int(epoch) / int(self.epochs)
+                    return progress
 
     @staticmethod
     def infer_image(model_folder: str, image_path: str):

@@ -42,19 +42,6 @@ def create_set(training: Training, set_name: str):
                 os.symlink(f'{os.path.abspath(training.images_folder)}/{image_name}', image_path)
 
 
-def create_yaml(training: Training):
-    categories = category_lookup_from_training(training)
-    path = training.training_folder
-    data = {
-        'train': path + '/train',
-        'test': path + '/test',
-        'val': path + '/test',
-        'nc': len(categories),
-        'names': list(categories.keys())
-    }
-    logging.info(f'ordered names: {data["names"]}')
-    with open(f'{path}/dataset.yaml', 'w') as f:
-        yaml.dump(data, f)
 
 
 def create_file_structure(training: Training):
@@ -63,17 +50,5 @@ def create_file_structure(training: Training):
 
     create_set(training, 'test')
     create_set(training, 'train')
-    create_yaml(training)
 
 
-def update_hyp(yaml_path: str, hyperparameter: Hyperparameter):
-    from ruamel.yaml import YAML
-    yaml = YAML()
-
-    with open(yaml_path) as f:
-        content = yaml.load(f)
-
-    content['fliplr'] = 0.5 if hyperparameter.flip_rl else 0
-    content['flipud'] = 0.00856 if hyperparameter.flip_ud else 0
-    with open(yaml_path, 'w') as f:
-        yaml.dump(content, f)
