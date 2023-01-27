@@ -8,16 +8,12 @@ import yolov5_format
 import os
 import shutil
 import json
-from glob import glob
-import subprocess
 from learning_loop_node.trainer.executor import Executor
 from learning_loop_node.model_information import ModelInformation
-from learning_loop_node.detector.box_detection import BoxDetection
-from learning_loop_node.detector.point_detection import PointDetection
+from learning_loop_node.detector.classification_detection import ClassificationDetection
 import cv2
 import asyncio
 import re
-import batch_size_calculation
 import model_files
 
 
@@ -98,79 +94,63 @@ class Yolov5Trainer(Trainer):
         }
 
     async def _detect(self, model_information: ModelInformation, images:  List[str], model_folder: str) -> List:
-        return []
-        #     images_folder = f'/tmp/imagelinks_for_detecting'
-        #     shutil.rmtree(images_folder, ignore_errors=True)
-        #     os.makedirs(images_folder)
-        #     for img in images:
-        #         image_name = os.path.basename(img)
-        #         os.symlink(img, f'{images_folder}/{image_name}')
+        images_folder = f'/tmp/imagelinks_for_detecting'
+        shutil.rmtree(images_folder, ignore_errors=True)
+        os.makedirs(images_folder)
+        for img in images:
+            image_name = os.path.basename(img)
+            os.symlink(img, f'{images_folder}/{image_name}')
 
-        #     logging.info('start detections')
-        #     shutil.rmtree('/yolov5/runs', ignore_errors=True)
-        #     os.makedirs('/yolov5/runs')
-        #     executor = Executor(images_folder)
-        #     img_size = model_information.resolution
+        logging.info('start detections')
+        shutil.rmtree('/yolov5/runs', ignore_errors=True)
+        os.makedirs('/yolov5/runs')
+        executor = Executor(images_folder)
+        img_size = model_information.resolution
 
-        #     cmd = f'python /yolov5/detect.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --conf-thres 0.2 --save-txt --save-conf'
-        #     executor.start(cmd)
-        #     while executor.is_process_running():
-        #         await sleep(1)
+        cmd = f'python /yolov5/classify/predict.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --save-txt'
+        executor.start(cmd)
+        while executor.is_process_running():
+            await sleep(1)
 
-        #     if executor.return_code == 1:
-        #         logging.error(f'Error during detecting: {executor.get_log()}')
-        #         raise Exception('Error during detecting')
+        if executor.return_code == 1:
+            logging.error(f'Error during detecting: {executor.get_log()}')
+            raise Exception('Error during detecting')
 
-        #     detections = []
-        #     logging.info('start parsing detections')
-        #     labels_path = '/yolov5/runs/detect/exp/labels'
-        #     detections = await asyncio.get_event_loop().run_in_executor(None, self._parse, labels_path, images_folder, model_information)
+        detections = []
+        logging.info('start parsing detections')
+        labels_path = '/yolov5/runs/predict-cls/exp/labels'
+        detections = await asyncio.get_event_loop().run_in_executor(None, self._parse, labels_path, model_information)
 
-        #     return detections
+        return detections
 
-        # def _parse(self, labels_path, images_folder, model_information):
-        #     detections = []
-        #     if os.path.exists(labels_path):
-        #         for filename in os.scandir(labels_path):
-        #             uuid = os.path.splitext(os.path.basename(filename.path))[0]
-        #             box_detections, point_detections = self._parse_file(model_information, images_folder, filename)
-        #             detections.append({'image_id': uuid, 'box_detections': box_detections,
-        #                                'point_detections': point_detections})
-        #     return detections
+    def _parse(self, labels_path, model_information):
+        detections = []
+        if os.path.exists(labels_path):
+            for filename in os.scandir(labels_path):
+                logging.error(filename)
+                uuid = os.path.splitext(os.path.basename(filename.path))[0]
+                classification_detections = self._parse_file(model_information, filename)
+                detections.append({'image_id': uuid, 'classification_detections': classification_detections})
+        return detections
 
-        # def _parse_file(self, model_information, images_folder, filename) -> Tuple[BoxDetection, PointDetection]:
-        #     uuid = os.path.splitext(os.path.basename(filename.path))[0]
+    def _parse_file(self, model_information, filename) -> List[ClassificationDetection]:
+        with open(filename.path, 'r') as f:
+            content = f.readlines()
+        classification_detections = []
 
-        #     image_path = f'{images_folder}/{uuid}.jpg'
-        #     img_height, img_width, _ = cv2.imread(image_path).shape
-        #     with open(filename.path, 'r') as f:
-        #         content = f.readlines()
-        #     box_detections = []
-        #     point_detections = []
+        logging.error(content)
+        for line in content:
+            logging.error(line)
+            probability, c = line.split(' ')
+            probability = float(probability) * 100
+            c = c.strip()
+            logging.error(model_information.categories)
+            category = [category for category in model_information.categories if category.name == c][0]
+            classification_detection = ClassificationDetection(
+                category_name=category.name, model_name=model_information.version, confidence=probability, category_id=category.id)
 
-        #     for line in content:
-        #         c, x, y, w, h, probability = line.split(' ')
-        #         c = int(c)
-        #         x = float(x)
-        #         y = float(y)
-        #         w = float(w)
-        #         h = float(h)
-        #         probability = float(probability) * 100
-
-        #         category = model_information.categories[c]
-        #         width = w*img_width
-        #         height = h*img_height
-        #         x = (x*img_width)-0.5*width
-        #         y = (y*img_height)-0.5*height
-        #         if (category.type == 'box'):
-        #             box_detection = BoxDetection(category_name=category.name, x=x, y=y, width=width, height=height, net=model_information.version,
-        #                                          confidence=probability, category_id=category.id)
-        #             box_detections.append(box_detection)
-        #         elif (category.type == 'point'):
-        #             point_detection = PointDetection(category_name=category.name, x=x+width/2, y=y+height/2, net=model_information.version,
-        #                                              confidence=probability, category_id=category.id)
-        #             point_detections.append(point_detection)
-        #     return box_detections, point_detections
+            classification_detections.append(classification_detection)
+        return classification_detections
 
     async def clear_training_data(self, training_folder: str) -> None:
         # Note: Keep best.pt in case uploaded model was not best.
