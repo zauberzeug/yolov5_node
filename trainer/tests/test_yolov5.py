@@ -16,10 +16,10 @@ from learning_loop_node.trainer import Trainer
 from learning_loop_node.tests import test_helper
 from learning_loop_node.gdrive_downloader import g_download
 from learning_loop_node.loop import loop
-from learning_loop_node.data_classes.category import Category
+from learning_loop_node.data_classes.category import Category, CategoryType
 import time
-import model_files
 from pathlib import Path
+from learning_loop_node.model_information import ModelInformation
 
 
 @pytest.mark.asyncio()
@@ -62,7 +62,6 @@ async def test_create_file_structure(use_training_dir):
 
 @pytest.mark.asyncio()
 async def test_training_creates_model(use_training_dir):
-    os.remove('/tmp/model.pt')
     training = Training(
         id=str(uuid4()),
         project_folder=os.getcwd(),
@@ -95,7 +94,6 @@ async def test_training_creates_model(use_training_dir):
 async def test_parse_progress_from_log(use_training_dir):
     trainer = Yolov5Trainer()
     trainer.epochs = 2
-    os.remove('/tmp/model.pt')
     trainer.training = Training(
         id=str(uuid4()),
         project_folder=os.getcwd(),
@@ -127,14 +125,14 @@ def test_new_model_discovery(use_training_dir):
     assert trainer.get_new_model() is None, 'should not find any models'
 
     model_path = 'result/weights/published/latest.pt'
-    mock_epoch(1, {'class_a': {'fp': 0, 'tp': 1, 'fn': 0}})
+    mock_epoch({'class_a': {'fp': 0, 'tp': 1, 'fn': 0}})
     model = trainer.get_new_model()
     assert model.confusion_matrix['uuid_of_class_a']['tp'] == 1
     trainer.on_model_published(model)
     assert os.path.isfile(model_path)
     modification_date = os.path.getmtime(model_path)
 
-    mock_epoch(2, {'class_a': {'fp': 1, 'tp': 2, 'fn': 1}})
+    mock_epoch({'class_a': {'fp': 1, 'tp': 2, 'fn': 1}})
     model = trainer.get_new_model()
     assert model.confusion_matrix['uuid_of_class_a']['tp'] == 2
     trainer.on_model_published(model)
@@ -143,7 +141,7 @@ def test_new_model_discovery(use_training_dir):
 
     time.sleep(0.1)
 
-    mock_epoch(3, {'class_a': {'fp': 0, 'tp': 3, 'fn': 1}})
+    mock_epoch({'class_a': {'fp': 0, 'tp': 3, 'fn': 1}})
     model = trainer.get_new_model()
     assert model.confusion_matrix['uuid_of_class_a']['tp'] == 3
     trainer.on_model_published(model)
@@ -153,23 +151,7 @@ def test_new_model_discovery(use_training_dir):
 
     # get_latest_model_file
     files = trainer.get_latest_model_files()
-    assert files == {'yolov5_pytorch': ['/tmp/model.pt', './/hyp.yaml'], 'yolov5_wts': ['/tmp/model.wts']}
-
-
-def test_newest_model_is_used(use_training_dir):
-    trainer = Yolov5Trainer()
-    trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
-                                images_folder='./', training_folder='./')
-    trainer.training.data = TrainingData(image_data=[], categories=[
-                                         Category(name='class_a', id='uuid_of_class_a', type='classification')])
-
-    # create some models.
-    mock_epoch(10, {})
-    mock_epoch(200, {})
-
-    new_model = trainer.get_new_model()
-    assert 'epoch10.pt' not in new_model.meta_information['weightfile']
-    assert 'epoch200.pt' in new_model.meta_information['weightfile']
+    assert files == {'yolov5_pytorch': ['/tmp/model.pt', './/result/opt.yaml']}
 
 
 def test_old_model_files_are_deleted_on_publish(use_training_dir):
@@ -180,13 +162,13 @@ def test_old_model_files_are_deleted_on_publish(use_training_dir):
                                          Category(name='class_a', id='uuid_of_class_a', type='classification')])
     assert trainer.get_new_model() is None, 'should not find any models'
 
-    mock_epoch(1, {'class_a': {'fp': 0, 'tp': 1, 'fn': 0}})
+    mock_epoch({'class_a': {'fp': 0, 'tp': 1, 'fn': 0}})
     model = trainer.get_new_model()
     assert model.confusion_matrix['uuid_of_class_a']['tp'] == 1
-    mock_epoch(2, {'class_a': {'fp': 1, 'tp': 2, 'fn': 1}})
+    mock_epoch({'class_a': {'fp': 1, 'tp': 2, 'fn': 1}})
 
     _, _, files = next(os.walk("result/weights"))
-    assert len(files) == 4
+    assert len(files) == 2
 
     model = trainer.get_new_model()
     trainer.on_model_published(model)
@@ -196,27 +178,6 @@ def test_old_model_files_are_deleted_on_publish(use_training_dir):
 
     _, _, files = next(os.walk("result/weights"))
     assert len(files) == 0
-
-
-def test_newer_model_files_are_kept_during_deleting(use_training_dir):
-    trainer = Yolov5Trainer()
-    trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
-                                images_folder='./', training_folder='./')
-    trainer.training.data = TrainingData(image_data=[], categories=[
-                                         Category(name='class_a', id='uuid_of_class_a', type='classification')])
-
-    # create some models.
-    mock_epoch(10, {})
-    mock_epoch(200, {})
-    new_model = trainer.get_new_model()
-    assert 'epoch200.pt' in new_model.meta_information['weightfile']
-    mock_epoch(201, {})  # An epoch is finished after during communication with the LearningLoop
-
-    trainer.on_model_published(new_model)
-
-    all_model_files = model_files.get_all(trainer.training.training_folder)
-    assert len(all_model_files) == 1
-    assert 'epoch201.pt' in all_model_files[0], 'Epoch201 is not yed synced. It should not be deleted.'
 
 
 @pytest.mark.asyncio()
@@ -229,11 +190,11 @@ async def test_clear_training_data():
     os.makedirs(f'{trainer.training.training_folder}/result/weights/published/', exist_ok=True)
 
     # Create needed .pt files and some dummy data
-    with open(f'{trainer.training.training_folder}/result/weights/published/some_model_id.pt', 'wb') as f:
-        f.write(b'0')
-    with open(f'{trainer.training.training_folder}/result/weights/test.txt', 'wb') as f:
+    with open(f'{trainer.training.training_folder}/result/weights/published/best.pt', 'wb') as f:
         f.write(b'0')
     with open(f'{trainer.training.training_folder}/result/weights/best.pt', 'wb') as f:
+        f.write(b'0')
+    with open(f'{trainer.training.training_folder}/result/weights/last.pt', 'wb') as f:
         f.write(b'0')
     with open(f'{trainer.training.training_folder}/last_training.log', 'wb') as f:
         f.write(b'0')
@@ -247,7 +208,8 @@ async def test_clear_training_data():
     data = glob.glob(trainer.training.training_folder + '/**', recursive=True)
     assert len(data) == 5
     files = [f for f in data if os.path.isfile(f)]
-    assert len(files) == 2  # Note: Do not delete last_training.log und best.pt
+    print(files)
+    assert len(files) == 2  # Note: Do not delete last_training.log und last.pt
 
 
 @pytest.fixture()
@@ -261,41 +223,17 @@ def create_project():
     test_helper.LiveServerSession().delete(f"/api/zauberzeug/projects/pytest?keep_images=true")
 
 
-# @pytest.mark.asyncio()
-# async def test_detecting(create_project):
-#     from learning_loop_node.loop import Loop
-#     loop = Loop()
-#     logging.debug('downloading model from gdrive')
-
-#     file_id = '1sZWa053fWT9PodrujDX90psmjhFVLyBV'
-#     destination = '/tmp/model.zip'
-#     g_download(file_id, destination)
-
-#     test_helper.unzip(destination, '/tmp/model')
-
-#     logging.debug('uploading model')
-#     data = test_helper.prepare_formdata(['/tmp/model/model.pt', '/tmp/model/model.json'])
-#     async with loop.put(f'api/zauberzeug/projects/pytest/trainings/1/models/latest/yolov5_pytorch/file', data=data) as response:
-#         if response.status != 200:
-#             msg = f'unexpected status code {response.status} while putting model'
-#             logging.error(msg)
-#             raise (Exception(msg))
-#         model = await response.json()
-
-#     data = test_helper.prepare_formdata(['tests/example_images/8647fc30-c46c-4d13-a3fd-ead3b9a67652.jpg'])
-#     async with loop.post(f'api/zauberzeug/projects/pytest/images', data=data) as response:
-#         if response.status != 200:
-#             msg = f'unexpected status code {response.status} while posting a new image'
-#             logging.error(msg)
-#             raise (Exception(msg))
-#         image = await response.json()
-
-#     trainer = Yolov5Trainer()
-#     context = Context(organization='zauberzeug', project='pytest')
-#     trainer.training = Trainer.generate_training(context)
-#     trainer.training.model_id_for_detecting = model['id']
-#     detections = await trainer._do_detections()
-#     assert len(detections) > 0
+def test_parse_detections_file():
+    os.makedirs('/tmp/results', exist_ok=True)
+    with open(f'/tmp/results/detection.txt', 'w') as f:
+        f.writelines(['1.00 Thripse\n', '0.00 Kastanienminiermotte\n',
+                     '0.00 Johannisbeerblasenlaus\n', '0.00 Blattlaeuse\n', '0.00 Wolllaeuse'])
+    model_information = ModelInformation(id='someid', organization='o', project='p', version='1.1', categories=[
+                                         Category(id='some_id', name='Thripse', type=CategoryType.Classification)], resolution=320)
+    file = os.scandir('/tmp/results').__next__()
+    detections = Yolov5Trainer._parse_file(model_information=model_information, filename=file)
+    assert len(detections) > 0
+    os.remove('/tmp/results/detection.txt')
 
 
 async def create_training_data(training: Training) -> TrainingData:
@@ -311,9 +249,9 @@ async def create_training_data(training: Training) -> TrainingData:
     return training_data
 
 
-def mock_epoch(number: int, confusion_matrix: Dict):
+def mock_epoch(confusion_matrix: Dict):
     os.makedirs('result/weights/', exist_ok=True)
-    with open(f'result/weights/epoch{number}.json', 'w') as f:
+    with open(f'result/weights/best.json', 'w') as f:
         json.dump(confusion_matrix, f)
-    with open(f'result/weights/epoch{number}.pt', 'wb') as f:
+    with open(f'result/weights/best.pt', 'wb') as f:
         f.write(b'0')

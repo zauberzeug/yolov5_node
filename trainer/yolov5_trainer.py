@@ -133,23 +133,26 @@ class Yolov5Trainer(Trainer):
                 detections.append({'image_id': uuid, 'classification_detections': classification_detections})
         return detections
 
-    def _parse_file(self, model_information, filename) -> List[ClassificationDetection]:
+    @staticmethod
+    def _parse_file(model_information, filename) -> List[ClassificationDetection]:
         with open(filename.path, 'r') as f:
             content = f.readlines()
         classification_detections = []
 
         logging.error(content)
         for line in content:
-            logging.error(line)
             probability, c = line.split(' ')
             probability = float(probability) * 100
             c = c.strip()
+            logging.error(c)
             logging.error(model_information.categories)
-            category = [category for category in model_information.categories if category.name == c][0]
-            classification_detection = ClassificationDetection(
-                category_name=category.name, model_name=model_information.version, confidence=probability, category_id=category.id)
+            category = [category for category in model_information.categories if category.name == c]
+            if category:
+                category = category[0]
+                classification_detection = ClassificationDetection(
+                    category_name=category.name, model_name=model_information.version, confidence=probability, category_id=category.id)
 
-            classification_detections.append(classification_detection)
+                classification_detections.append(classification_detection)
         return classification_detections
 
     async def clear_training_data(self, training_folder: str) -> None:
