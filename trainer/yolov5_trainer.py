@@ -141,7 +141,7 @@ class Yolov5Trainer(Trainer):
 
         logging.error(content)
         for line in content:
-            probability, c = line.split(' ')
+            probability, c = line.split(' ', maxsplit=1)
             probability = float(probability) * 100
             c = c.strip()
             logging.error(c)
@@ -171,6 +171,7 @@ class Yolov5Trainer(Trainer):
     def provided_pretrained_models(self) -> List[PretrainedModel]:
         return [
             PretrainedModel(name='s-cls', label='YOLO v5 small classification', description='~5 fps on Jetson Nano'),
+            PretrainedModel(name='x-cls', label='YOLO v5 small classification', description='~5 fps on Jetson Nano'),
             # PretrainedModel(name='yolov5m', label='YOLO v5 medium', description='~2 fps on Jetson Nano'),
         ]
 
