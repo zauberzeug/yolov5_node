@@ -37,8 +37,8 @@ class Yolov5Trainer(Trainer):
         resolution = self.training.data.hyperparameter.resolution
 
         # batch_size = await batch_size_calculation.calc(self.training.training_folder, model, hyperparameter_path, f'{self.training.training_folder}/dataset.yaml', resolution)
-        batch_size = 4
-        cmd = f'python /yolov5/classify/train.py --exist-ok --batch-size {batch_size} --img {resolution} --data {self.training.training_folder} --model {model} --project {self.training.training_folder} --name result --epochs {self.epochs} {additional_parameters}'
+        batch_size = 8
+        cmd = f'python /yolov5/classify/train.py --exist-ok --batch-size {batch_size} --img {resolution} --data {self.training.training_folder} --model {model} --project {self.training.training_folder} --name result --epochs {self.epochs} --optimizer SGD {additional_parameters}'
         self.executor.start(cmd)
 
     def can_resume(self) -> bool:
@@ -141,6 +141,7 @@ class Yolov5Trainer(Trainer):
 
         logging.error(content)
         for line in content:
+            logging.error(line)
             probability, c = line.split(' ', maxsplit=1)
             probability = float(probability) * 100
             c = c.strip()
