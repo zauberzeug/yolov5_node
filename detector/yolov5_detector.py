@@ -1,86 +1,58 @@
-from typing import Any, List
+from typing import List
 from learning_loop_node import ModelInformation, Detector
-from learning_loop_node.detector import Detections, BoxDetection, PointDetection
-from learning_loop_node.data_classes import Category, CategoryType
+from learning_loop_node.detector import Detections
+from learning_loop_node.detector.classification_detection import ClassificationDetection
 import logging
-import os
-import subprocess
-import re
-import yolov5
-import ctypes
-import cv2
 import numpy as np
-import time
+import torch
+import cv2
+import torch.nn.functional as F
+import torchvision.transforms as T
+
+
+IMAGENET_MEAN = 0.485, 0.456, 0.406
+IMAGENET_STD = 0.229, 0.224, 0.225
+
+
+def classify_transforms(size=832):
+    return T.Compose([T.ToTensor(), T.Resize(size), T.CenterCrop(size), T.Normalize(IMAGENET_MEAN, IMAGENET_STD)])
 
 
 class Yolov5Detector(Detector):
 
     def __init__(self) -> None:
-        super().__init__('yolov5_wts')
+        super().__init__('yolov5_pytorch')
 
     def init(self,  model_info: ModelInformation):
         self.model_info = model_info
-        engine_file = self._create_engine(
-            model_info.resolution,
-            len(model_info.categories),
-            f'{model_info.model_root_path}/model.wts'
-        )
-        ctypes.CDLL('/tensorrtx/yolov5/build/libmyplugins.so')
-        self.yolov5 = yolov5.YoLov5TRT(engine_file)
-        for i in range(3):
-            warmup = yolov5.warmUpThread(self.yolov5)
-            warmup.start()
-            warmup.join()
+        self.imgsz = (model_info.resolution, model_info.resolution)
+        self.torch_transforms = classify_transforms(self.imgsz)
+        self.model = torch.hub.load('ultralytics/yolov5', 'custom',
+                                    path=f'{model_info.model_root_path}/model.pt', force_reload=True)
 
     def evaluate(self, image: List[np.uint8]) -> Detections:
+        self.model.warmup(imgsz=(1, 3, *self.imgsz))
         detections = Detections()
         try:
-            t = time.time()
-            results, inference_ms = self.yolov5.infer(cv2.imdecode(image, cv2.IMREAD_COLOR))
-            skipped_detections = []
-            logging.info(f'took {inference_ms} s, overall {time.time() -t} s')
-            for detection in results:
-                x, y, w, h, category, probability = detection
-                category = self.model_info.categories[category]
-                if w <= 2 or h <= 2:  # skip very small boxes.
-                    skipped_detections.append((category.name, detection))
-                    continue
+            image = cv2.imdecode(image, cv2.IMREAD_COLOR)
+            # Perform yolov5 preprocessing
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            image = self.torch_transforms(image)
+            image = image.unsqueeze(0)
 
-                if category.type == CategoryType.Box:
-                    detections.box_detections.append(BoxDetection(
-                        category.name, x, y, w, h, self.model_info.version, probability
-                    ))
-                elif category.type == CategoryType.Point:
-                    cx, cy = (np.average([x, x + w]), np.average([y, y + h]))
-                    detections.point_detections.append(PointDetection(
-                        category.name, int(cx), int(cy), self.model_info.version, probability
-                    ))
-            if skipped_detections:
-                log_msg = '\n'.join([str(d) for d in skipped_detections])
-                logging.warning(
-                    f'Removed very small detections from inference result (count={len(skipped_detections)}): \n{log_msg}')
+            image = torch.Tensor(image).cuda()
+            results = self.model(image)
+            pred = F.softmax(results, dim=1)
+
+            top_i = pred[0].argsort(0, descending=True)[:1].tolist()
+            if top_i:
+                category_index = top_i[0]
+                category = [category for category in self.model_info.categories if category.name ==
+                            self.model.names[category_index]][0]
+                detections.classification_detections.append(ClassificationDetection(
+                    category.name, self.model_info.version, pred[0][category_index].item(), category.id
+                ))
+
         except Exception as e:
             logging.exception('inference failed')
         return detections
-
-    def _create_engine(self, resolution: int, cat_count: int, wts_file: str) -> str:
-        engine_file = os.path.dirname(wts_file) + '/model.engine'
-        if os.path.isfile(engine_file):
-            logging.info(f'{engine_file} already exists, skipping conversion')
-            return engine_file
-
-        # NOTE cmake and inital building is done in Dockerfile (to speeds things up)
-        os.chdir('/tensorrtx/yolov5/build')
-        # Adapt resolution
-        with open('../plugin/yololayer.h', 'r+') as f:
-            content = f.read()
-            content = re.sub('(CLASS_NUM =) \d*', r'\1 ' + str(cat_count), content)
-            content = re.sub('(INPUT_[HW] =) \d*', r'\1 ' + str(resolution), content)
-            f.seek(0)
-            f.truncate()
-            f.write(content)
-        subprocess.run('make -j6 -Wno-deprecated-declarations', shell=True)
-        logging.warning('currently we assume a Yolov5 s6 model;\
-            parameterization of the variant (s, s6, m, m6, ...) still needs to be done')
-        subprocess.run(f'./yolov5_det -s {wts_file} {engine_file} s6', shell=True)  # TODO parameterize variant "s6"
-        return engine_file

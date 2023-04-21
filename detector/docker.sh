@@ -32,37 +32,49 @@ fi
 name="yolov5_detector_node"
 
 run_args="-it --rm" 
-# run_args+=" -v $(pwd)/../:/yolov5_node"
+run_args+=" -v $(pwd)/../:/yolov5_node"
 run_args+=" -v $HOME/data:/data"
 # run_args+=" -v $HOME/learning_loop_node/learning_loop_node:/usr/local/lib/python3.6/dist-packages/learning_loop_node"
 run_args+=" -h $HOSTNAME"
 #run_args+=" -e HOST=preview.learning-loop.ai"
 run_args+=" -e HOST=learning-loop.ai"
-run_args+=" -e ORGANIZATION=zauberzeug"
-run_args+=" -e PROJECT=demo"
+run_args+=" -e ORGANIZATION=neudorff"
+run_args+=" -e PROJECT=pflanzendoktor"
 run_args+=" --name $name"
 run_args+=" --runtime=nvidia"
 run_args+=" -e NVIDIA_VISIBLE_DEVICES=all"
 run_args+=" -p 8004:80"
 
+if [ -f /etc/nv_tegra_release ]
+then
+    # version discovery borrowed from https://github.com/dusty-nv/jetson-containers/blob/master/scripts/l4t_version.sh
+    L4T_VERSION_STRING=$(head -n 1 /etc/nv_tegra_release)
+    L4T_RELEASE=$(echo $L4T_VERSION_STRING | cut -f 2 -d ' ' | grep -Po '(?<=R)[^;]+')
+    L4T_REVISION=$(echo $L4T_VERSION_STRING | cut -f 2 -d ',' | grep -Po '(?<=REVISION: )[^;]+')
+    [ "$L4T_REVISION" = "5.1" ] && L4T_REVISION=5.0
+    L4T_VERSION="$L4T_RELEASE.$L4T_REVISION"
+fi
 
-# version discovery borrowed from https://github.com/dusty-nv/jetson-containers/blob/master/scripts/l4t_version.sh
-L4T_VERSION_STRING=$(head -n 1 /etc/nv_tegra_release)
-L4T_RELEASE=$(echo $L4T_VERSION_STRING | cut -f 2 -d ' ' | grep -Po '(?<=R)[^;]+')
-L4T_REVISION=$(echo $L4T_VERSION_STRING | cut -f 2 -d ',' | grep -Po '(?<=REVISION: )[^;]+')
-[ "$L4T_REVISION" = "5.1" ] && L4T_REVISION=5.0
-L4T_VERSION="$L4T_RELEASE.$L4T_REVISION"
+build_args=""
+[ -f /etc/nv_tegra_release ] && build_args+=" --build-arg BASE_IMAGE=zauberzeug/l4t-opencv:4.5.2-on-nano-r$L4T_VERSION"
+( nvidia-smi > /dev/null 2>&1 ) && build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:21.10-py3"
 
-build_args="--build-arg BASE_IMAGE=zauberzeug/l4t-opencv:4.5.2-on-nano-r$L4T_VERSION"
-image="zauberzeug/yolov5-detector:$L4T_VERSION"
+if [ -f /etc/nv_tegra_release ]
+then
+    image="zauberzeug/yolov5-detector-cls:$L4T_VERSION"
+    dockerfile="jetson.dockerfile"
+else
+    image="zauberzeug/yolov5-detector-cls:cloud"
+    dockerfile="cloud.dockerfile"
+fi
 
 cmd=$1
 cmd_args=${@:2}
 set -x
 case $cmd in
     b | build)
-        docker build . --target release -t $image $build_args $cmd_args
-        docker build . -t ${image}-dev $build_args $cmd_args
+        docker build . -f $dockerfile --target release -t $image $build_args $cmd_args
+        docker build . -f $dockerfile -t ${image}-dev $build_args $cmd_args
         ;;
     U | update)
 	    docker pull ${image}
