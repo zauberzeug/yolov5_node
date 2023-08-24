@@ -14,10 +14,11 @@ jobs:
           docker stop yolov5_trainer_node_github_action | echo "Nothing to do. No container running."
       - name: build
         if: github.ref != 'refs/heads/release'
+        run: docker run -it --rm nvcr.io/nvidia/l4t-pytorch:r32.6.1-pth1.9-py3 bash
         run: |
           cd trainer
           ./docker.sh b
-      - name: buildnocache
+      - name: buildnocaches
         if: github.ref == 'refs/heads/release'
         run: |
           cd trainer
