@@ -19,7 +19,7 @@ RUN apt update && \
     rm -rf /var/lib/apt/lists/*
 RUN python3 -m pip install --upgrade pip
 
-RUN python3 -m pip install seaborn thop coremltools onnx gsutil notebook wandb>=0.12.2 opencv-python==4.5.5.64 torchinfo
+RUN python3 -m pip install seaborn thop coremltools onnx gsutil notebook wandb>=0.12.2 albumentations opencv-python==4.5.5.64 torchinfo
 
 
 WORKDIR /
@@ -39,7 +39,7 @@ RUN python3 -m pip install --no-cache -r requirements.txt
 RUN pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof
 
 RUN python3 -m pip install autopep8 debugpy gunicorn pyyaml uvloop pytest-asyncio ruamel.yaml
-RUN python3 -m pip install "learning_loop_node==v0.7.50"
+RUN python3 -m pip install "learning_loop_node==v0.7.53"
 
 ADD ./ /yolov5_node/trainer/
 RUN ln -sf /yolov5_node/trainer /app

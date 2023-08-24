@@ -37,7 +37,7 @@ class Yolov5Trainer(Trainer):
         resolution = self.training.data.hyperparameter.resolution
 
         # batch_size = await batch_size_calculation.calc(self.training.training_folder, model, hyperparameter_path, f'{self.training.training_folder}/dataset.yaml', resolution)
-        batch_size = 8
+        batch_size = 4
         cmd = f'python /yolov5/classify/train.py --exist-ok --batch-size {batch_size} --img {resolution} --data {self.training.training_folder} --model {model} --project {self.training.training_folder} --name result --epochs {self.epochs} --optimizer SGD {additional_parameters}'
         self.executor.start(cmd)
 
