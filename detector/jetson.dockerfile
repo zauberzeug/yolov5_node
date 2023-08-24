@@ -32,7 +32,7 @@ RUN apt-get update && \
     && apt-get clean
 
 RUN pip3 install --no-cache-dir async_generator aiofiles psutil pillow multidict attrs yarl async_timeout idna_ssl cchardet aiosignal
-RUN pip3 install --no-cache-dir "learning_loop_node==v0.7.42"
+RUN pip3 install --no-cache-dir "learning_loop_node==v0.7.53"
 RUN pip3 install --no-cache-dir "gdown"
 RUN pip3 install --no-cache-dir starlette==0.16.0
 
