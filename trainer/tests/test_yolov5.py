@@ -249,10 +249,10 @@ async def test_clear_training_data():
 
 @pytest.fixture()
 def create_project():
-    test_helper.LiveServerSession().delete(f"/api/zauberzeug/projects/pytest?keep_images=true")
+    test_helper.LiveServerSession().delete(f"/zauberzeug/projects/pytest?keep_images=true")
     project_configuration = {'project_name': 'pytest', 'box_categories': 2,  'point_categories': 1, 'inbox': 0, 'annotate': 0, 'review': 0, 'complete': 0, 'image_style': 'plain',
                              'thumbs': False, 'trainings': 1}
-    assert test_helper.LiveServerSession().post(f"/api/zauberzeug/projects/generator",
+    assert test_helper.LiveServerSession().post(f"/zauberzeug/projects/generator",
                                                 json=project_configuration).status_code == 200
     yield
     test_helper.LiveServerSession().delete(f"/api/zauberzeug/projects/pytest?keep_images=true")
@@ -299,7 +299,7 @@ async def create_training_data(training: Training) -> TrainingData:
     training_data = TrainingData()
 
     image_data, _ = await TrainingsDownloader(training.context).download_training_data(training.images_folder)
-    response = test_helper.LiveServerSession().get(f"/api/zauberzeug/projects/demo/data")
+    response = test_helper.LiveServerSession().get(f"/zauberzeug/projects/demo/data")
     assert response.status_code == 200
     data = response.json()
     training_data.categories = Category.from_list(data['categories'])
