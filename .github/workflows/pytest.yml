@@ -15,7 +15,7 @@ jobs:
       - name: build
         if: github.ref != 'refs/heads/release'
         run: |
-          docker run -it --rm nvcr.io/nvidia/l4t-pytorch:r32.6.1-pth1.9-py3 bash
+          docker run -it --rm nvcr.io/nvidia/l4t-pytorch:r32.6.1-pth1.9-py3 echo "Nothing to do"
           cd trainer
           ./docker.sh b
       - name: buildnocaches
