@@ -15,8 +15,8 @@ jobs:
       - name: build
         if: github.ref != 'refs/heads/release'
         run: |
-          docker run -d -it --rm nvcr.io/nvidia/l4t-pytorch:r32.6.1-pth1.9-py3 echo "Nothing to do" 
-          docker run -d -it --rm nvcr.io/nvidia/pytorch:21.10-py3 echo "Nothing to do"
+          # docker run -d -it --rm nvcr.io/nvidia/l4t-pytorch:r32.6.1-pth1.9-py3 echo "Nothing to do" 
+          docker run -d -it --rm nvcr.io/nvidia/pytorch:21.10-py3 echo "I have to be startet to authenticate against nvcr.io"
           cd trainer
           ./docker.sh b
       - name: buildnocaches
