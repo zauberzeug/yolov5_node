@@ -72,10 +72,10 @@ class Yolov5Detector(Detector):
         # NOTE cmake and inital building is done in Dockerfile (to speeds things up)
         os.chdir('/tensorrtx/yolov5/build')
         # Adapt resolution
-        with open('../plugin/yololayer.h', 'r+') as f:
+        with open('../src/config.h', 'r+') as f:
             content = f.read()
-            content = re.sub('(CLASS_NUM =) \d*', r'\1 ' + str(cat_count), content)
-            content = re.sub('(INPUT_[HW] =) \d*', r'\1 ' + str(resolution), content)
+            content = re.sub('(kNumClass =) \d*', r'\1 ' + str(cat_count), content)
+            content = re.sub('(kInput[HW] =) \d*', r'\1 ' + str(resolution), content)
             f.seek(0)
             f.truncate()
             f.write(content)
