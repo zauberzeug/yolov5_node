@@ -1,15 +1,15 @@
 {
   "folders": [
     {
-      "path": "."
+      "path": "../"
     },
     {
       "name": "node lib",
-      "path": "/learning_loop_node"
+      "path": "../../learning_loop_node"
     },
     {
       "name": "yolov5",
-      "path": "/yolov5"
+      "path": "../../yolov5"
     }
   ],
   "settings": {
@@ -31,7 +31,15 @@
     }
   },
   "extensions": {
-    "recommendations": ["ms-python.vscode-pylance", "ms-python.python", "himanoa.python-autopep8", "esbenp.prettier-vscode", "littlefoxteam.vscode-python-test-adapter", "eamodio.gitlens", "mhutchie.git-graph"]
+    "recommendations": [
+      "ms-python.vscode-pylance",
+      "ms-python.python",
+      "himanoa.python-autopep8",
+      "esbenp.prettier-vscode",
+      "littlefoxteam.vscode-python-test-adapter",
+      "eamodio.gitlens",
+      "mhutchie.git-graph"
+    ]
   },
 
   "launch": {

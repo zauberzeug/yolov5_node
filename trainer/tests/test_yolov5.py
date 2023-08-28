@@ -1,24 +1,30 @@
-import os
-from typing import Dict
-from learning_loop_node import Context
-from learning_loop_node.trainer import Executor, Training, TrainingsDownloader
-from learning_loop_node.trainer.training_data import TrainingData
-from pydantic.types import Json
-import yolov5_format
-from yolov5_trainer import Yolov5Trainer
-import logging
-from time import sleep
-import pytest
-from uuid import uuid4
-import json
 import glob
-from learning_loop_node.trainer import Trainer
-from learning_loop_node.tests import test_helper
+import json
+import logging
+import os
+import time
+from time import sleep
+from typing import Dict
+from uuid import uuid4
+
+import pytest
+from learning_loop_node import Context
+from learning_loop_node.data_classes.category import Category
 from learning_loop_node.gdrive_downloader import g_download
 from learning_loop_node.loop import loop
-from learning_loop_node.data_classes.category import Category
-import time
+from learning_loop_node.tests import test_helper
+from learning_loop_node.trainer import (Executor, Trainer, Training,
+                                        TrainingsDownloader)
+from learning_loop_node.trainer.training_data import TrainingData
+from pydantic.types import Json
+
 import model_files
+import yolov5_format
+from yolov5_trainer import Yolov5Trainer
+
+# running local tests may require
+# from dotenv import load_dotenv
+# load_dotenv()
 
 
 @pytest.mark.asyncio()
@@ -57,7 +63,7 @@ async def test_create_file_structure_box_size(use_training_dir):
 
 
 @pytest.mark.asyncio()
-async def test_training_creates_model(use_training_dir):
+async def test_training_creates_model(use_training_dir):  # FLAKY! model.pt can sometimes not be accessed
     os.remove('/tmp/model.pt')
     training = Training(
         id=str(uuid4()),
@@ -87,7 +93,7 @@ async def test_training_creates_model(use_training_dir):
 
 
 @pytest.mark.asyncio()
-async def test_parse_progress_from_log(use_training_dir):
+async def test_parse_progress_from_log(use_training_dir):  # FLAKY! model.pt can sometimes not be accessed
     trainer = Yolov5Trainer()
     trainer.epochs = 2
     os.remove('/tmp/model.pt')
@@ -157,8 +163,8 @@ def test_newest_model_is_used(use_training_dir):
                                 images_folder='./', training_folder='./')
     trainer.training.data = TrainingData(image_data=[], categories=[
                                          Category(name='class_a', id='uuid_of_class_a', type='box')])
-    
-    #create some models.
+
+    # create some models.
     mock_epoch(10, {})
     mock_epoch(200, {})
 
@@ -166,8 +172,6 @@ def test_newest_model_is_used(use_training_dir):
     assert 'epoch10.pt' not in new_model.meta_information['weightfile']
     assert 'epoch200.pt' in new_model.meta_information['weightfile']
 
-
-    
 
 def test_old_model_files_are_deleted_on_publish(use_training_dir):
     trainer = Yolov5Trainer()
@@ -194,26 +198,26 @@ def test_old_model_files_are_deleted_on_publish(use_training_dir):
     _, _, files = next(os.walk("result/weights"))
     assert len(files) == 0
 
+
 def test_newer_model_files_are_kept_during_deleting(use_training_dir):
     trainer = Yolov5Trainer()
     trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
                                 images_folder='./', training_folder='./')
     trainer.training.data = TrainingData(image_data=[], categories=[
                                          Category(name='class_a', id='uuid_of_class_a', type='box')])
-    
-    #create some models.
+
+    # create some models.
     mock_epoch(10, {})
     mock_epoch(200, {})
     new_model = trainer.get_new_model()
     assert 'epoch200.pt' in new_model.meta_information['weightfile']
-    mock_epoch(201, {}) # An epoch is finished after during communication with the LearningLoop
+    mock_epoch(201, {})  # An epoch is finished after during communication with the LearningLoop
 
     trainer.on_model_published(new_model)
-    
+
     all_model_files = model_files.get_all(trainer.training.training_folder)
     assert len(all_model_files) == 1
     assert 'epoch201.pt' in all_model_files[0], 'Epoch201 is not yed synced. It should not be deleted.'
-    
 
 
 @pytest.mark.asyncio()
@@ -250,8 +254,9 @@ async def test_clear_training_data():
 @pytest.fixture()
 def create_project():
     test_helper.LiveServerSession().delete(f"/zauberzeug/projects/pytest?keep_images=true")
-    project_configuration = {'project_name': 'pytest', 'box_categories': 2,  'point_categories': 1, 'inbox': 0, 'annotate': 0, 'review': 0, 'complete': 0, 'image_style': 'plain',
-                             'thumbs': False, 'trainings': 1}
+    project_configuration = {
+        'project_name': 'pytest', 'box_categories': 2, 'point_categories': 1, 'inbox': 0, 'annotate': 0, 'review': 0,
+        'complete': 0, 'image_style': 'plain', 'thumbs': False, 'trainings': 1}
     assert test_helper.LiveServerSession().post(f"/zauberzeug/projects/generator",
                                                 json=project_configuration).status_code == 200
     yield

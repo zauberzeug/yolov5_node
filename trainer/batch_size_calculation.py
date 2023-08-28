@@ -1,13 +1,13 @@
+import asyncio
 import logging
 from multiprocessing import Process, Queue
-from torchinfo import summary
-from torchinfo import Verbosity
-import yaml
+
 import torch
-from utils.downloads import attempt_download
-from models.yolo import Model
-import asyncio
+import yaml
 from learning_loop_node.trainer import trainer_utils
+from models.yolo import Model
+from torchinfo import Verbosity, summary
+from utils.downloads import attempt_download
 
 
 async def calc(training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int) -> int:
@@ -33,7 +33,8 @@ async def calc(training_path: str, model_file: str, hyp_path: str, dataset_path:
     return batch_size
 
 
-def _calc_batch_size(queue: Queue, training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int) -> None:
+def _calc_batch_size(
+        queue: Queue, training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int) -> None:
     logging.error('calc_batch_size.....')
     import os
     os.chdir('/tmp')

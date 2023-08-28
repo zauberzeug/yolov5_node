@@ -1,18 +1,19 @@
-import os
-from dataclasses import dataclass
-import shutil
-from learning_loop_node import loop, ModelInformation
 import asyncio
+import logging
+import os
+import shutil
+from dataclasses import dataclass
 from glob import glob
-from yolov5_trainer import Yolov5Trainer
-from learning_loop_node.trainer import Trainer
+from typing import List
+
+from fastapi.encoders import jsonable_encoder
+from learning_loop_node import GLOBALS, ModelInformation, loop
 from learning_loop_node.context import Context
 from learning_loop_node.rest.downloader import DataDownloader
 from learning_loop_node.rest.downloads import download_model
-from fastapi.encoders import jsonable_encoder
-from typing import List
-import logging
-from learning_loop_node import GLOBALS
+from learning_loop_node.trainer import Trainer
+
+from yolov5_trainer import Yolov5Trainer
 
 logging.basicConfig(level=logging.INFO)
 

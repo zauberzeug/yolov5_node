@@ -1,10 +1,11 @@
-from learning_loop_node.trainer.training import Training
-import yaml
-from pathlib import Path
 import logging
 import os
-from learning_loop_node.trainer.hyperparameter import Hyperparameter
 import shutil
+from pathlib import Path
+
+import yaml
+from learning_loop_node.trainer.hyperparameter import Hyperparameter
+from learning_loop_node.trainer.training import Training
 
 
 def category_lookup_from_training(training: Training) -> dict:

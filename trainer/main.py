@@ -1,9 +1,12 @@
-from learning_loop_node import TrainerNode
-from yolov5_trainer import Yolov5Trainer
-import uvicorn
-import os
 import logging
+import os
+
 import icecream
+import uvicorn
+from learning_loop_node import TrainerNode
+
+from yolov5_trainer import Yolov5Trainer
+
 icecream.install()
 
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
