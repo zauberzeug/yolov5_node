@@ -8,6 +8,7 @@ from typing import Dict
 from uuid import uuid4
 
 import pytest
+from dotenv import load_dotenv
 from learning_loop_node import Context
 from learning_loop_node.data_classes.category import Category
 from learning_loop_node.gdrive_downloader import g_download
@@ -22,9 +23,8 @@ import model_files
 import yolov5_format
 from yolov5_trainer import Yolov5Trainer
 
-# running local tests may require
-# from dotenv import load_dotenv
-# load_dotenv()
+load_dotenv()
+print(f'loading .env from {os.getcwd()}')
 
 
 @pytest.mark.asyncio()
@@ -305,6 +305,7 @@ async def create_training_data(training: Training) -> TrainingData:
 
     image_data, _ = await TrainingsDownloader(training.context).download_training_data(training.images_folder)
     response = test_helper.LiveServerSession().get(f"/zauberzeug/projects/demo/data")
+    assert response.status_code != 401, 'Authentification error - did you set LOOP_USERNAME and LOOP_PASSWORD in your environment?'
     assert response.status_code == 200
     data = response.json()
     training_data.categories = Category.from_list(data['categories'])
