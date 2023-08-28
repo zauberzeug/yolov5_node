@@ -304,7 +304,15 @@ async def create_training_data(training: Training) -> TrainingData:
     training_data = TrainingData()
 
     image_data, _ = await TrainingsDownloader(training.context).download_training_data(training.images_folder)
-    response = test_helper.LiveServerSession().get(f"/zauberzeug/projects/demo/data")
+    lss = test_helper.LiveServerSession()
+    data = {
+        'username': os.environ.get('LOOP_USERNAME', None),
+        'password': os.environ.get('LOOP_PASSWORD', None),
+    }
+    print(data)
+    assert lss.cookies is not None, 'Authentification error'
+
+    response = test_helper.LiveServerSession().get("/zauberzeug/projects/demo/data")
     assert response.status_code != 401, 'Authentification error - did you set LOOP_USERNAME and LOOP_PASSWORD in your environment?'
     assert response.status_code == 200
     data = response.json()
