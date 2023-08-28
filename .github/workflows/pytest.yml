@@ -16,10 +16,12 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
         run: |
           docker stop yolov5_trainer_node_github_action | echo "Nothing to do. No container running."
+      - name: pre-connect to nvidia container
+        run: |
+          docker run -d -it --rm nvcr.io/nvidia/pytorch:23.07-py3 echo "I have to be startet to authenticate against nvcr.io"
       - name: build
         if: github.ref != 'refs/heads/release'
         run: |
-          docker run -d -it --rm nvcr.io/nvidia/pytorch:23.07-py3 echo "I have to be startet to authenticate against nvcr.io"
           cd trainer
           ./docker.sh b
       - name: buildnocaches
