@@ -56,8 +56,11 @@ then
 fi
 
 build_args=""
-[ -f /etc/nv_tegra_release ] && build_args+=" --build-arg BASE_IMAGE=zauberzeug/l4t-opencv:4.5.2-on-nano-r$L4T_VERSION"
-( nvidia-smi > /dev/null 2>&1 ) && build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:21.10-py3"
+if [ -f /etc/nv_tegra_release ]; then
+    build_args+=" --build-arg BASE_IMAGE=zauberzeug/l4t-opencv:4.5.2-on-nano-r$L4T_VERSION"
+else
+    build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
+fi
 
 if [ -f /etc/nv_tegra_release ]
 then

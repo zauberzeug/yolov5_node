@@ -1,9 +1,9 @@
-import pytest
+import logging
 import os
 import shutil
+
 import icecream
-import subprocess
-import logging
+import pytest
 
 icecream.install()
 logging.basicConfig(level=logging.INFO)

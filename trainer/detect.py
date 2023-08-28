@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
+import argparse
+
 import torch
-import torch.backends.cudnn as cudnn
 import torch_tensorrt
-from utils.torch_utils import select_device
-from utils.general import check_img_size
 from models.experimental import attempt_load
 from utils.datasets import LoadImages
-import argparse
+from utils.general import check_img_size
+from utils.torch_utils import select_device
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--weights', nargs='+', type=str, default='model.pt', help='model.pt path')

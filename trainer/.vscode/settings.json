@@ -2,5 +2,25 @@
   "files.watcherExclude": {
     "**/.git/objects/**": true,
     "**/.git/subtree-cache/**": true
+  },
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "python.analysis.typeCheckingMode": "basic",
+  "editor.formatOnSave": true,
+  "editor.minimap.enabled": false,
+  "autopep8.args": ["--max-line-length=120", "--experimental"],
+  "pylint.args": [
+    "--disable=C0103", // Invalid name (e.g., variable/function/class naming conventions)
+    "--disable=C0111", // Missing docstring (in function/class/method)
+    "--disable=C0114", // Missing module docstring
+    "--disable=C0301", // Line too long (exceeds character limit)
+    "--disable=W0718", // Catching too general exception
+    "--disable=W1203", // Use % formatting in logging functions and pass the % parameters as arguments
+    "--disable=W1514" // Using open without explicitly specifying an encoding
+  ],
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.autopep8",
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": true
+    }
   }
 }

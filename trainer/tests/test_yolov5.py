@@ -1,25 +1,24 @@
-import os
-from typing import Dict
-from learning_loop_node import Context
-from learning_loop_node.trainer import Executor, Training, TrainingsDownloader
-from learning_loop_node.trainer.training_data import TrainingData
-from pydantic.types import Json
-import yolov5_format
-from yolov5_trainer import Yolov5Trainer
-import logging
-from time import sleep
-import pytest
-from uuid import uuid4
-import json
 import glob
-from learning_loop_node.trainer import Trainer
-from learning_loop_node.tests import test_helper
-from learning_loop_node.gdrive_downloader import g_download
-from learning_loop_node.loop import loop
-from learning_loop_node.data_classes.category import Category, CategoryType
+import json
+import logging
+import os
 import time
 from pathlib import Path
+from time import sleep
+from typing import Dict
+from uuid import uuid4
+
+import pytest
+from learning_loop_node import Context
+from learning_loop_node.data_classes.category import Category, CategoryType
+from learning_loop_node.loop import loop
 from learning_loop_node.model_information import ModelInformation
+from learning_loop_node.tests import test_helper
+from learning_loop_node.trainer import Executor, Training, TrainingsDownloader
+from learning_loop_node.trainer.training_data import TrainingData
+
+import yolov5_format
+from yolov5_trainer import Yolov5Trainer
 
 
 @pytest.mark.asyncio()
@@ -215,8 +214,8 @@ async def test_clear_training_data():
 @pytest.fixture()
 def create_project():
     test_helper.LiveServerSession().delete(f"/api/zauberzeug/projects/pytest?keep_images=true")
-    project_configuration = {'project_name': 'pytest', 'classification_categories': 2, 'inbox': 0, 'annotate': 0, 'review': 0, 'complete': 0, 'image_style': 'plain',
-                             'thumbs': False, 'trainings': 1}
+    project_configuration = {'project_name': 'pytest', 'classification_categories': 2, 'inbox': 0,
+                             'annotate': 0, 'review': 0, 'complete': 0, 'image_style': 'plain', 'thumbs': False, 'trainings': 1}
     assert test_helper.LiveServerSession().post(f"/api/zauberzeug/projects/generator",
                                                 json=project_configuration).status_code == 200
     yield

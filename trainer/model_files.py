@@ -1,28 +1,22 @@
-from typing import Union
 import os
+from pathlib import Path
+from typing import Optional
 
 
-def get_best(training_path: str):
-    path = training_path + '/result/weights'
-    if not os.path.isdir(path):
-        return []
-    weightfiles = [os.path.join(path, f) for f in os.listdir(path) if 'best' in f and f.endswith('.pt')]
+def get_best(training_path: Path) -> Optional[Path]:
+    path = training_path / 'result/weights'
+    if not path.exists():
+        return None
+    weightfiles = [path / f for f in os.listdir(path) if 'best' in f and f.endswith('.pt')][0]
     return weightfiles
 
 
-def delete_json_for_weightfile(weightfile: str):
-    _try_remove(weightfile.replace('.pt', '.json'))
+def delete_json_for_weightfile(weightfile: Path):
+    _try_remove(weightfile.with_suffix('.json'))
 
 
-def _try_remove(file: str):
+def _try_remove(filepath: Path):
     try:
-        os.remove(file)
-    except:
+        os.remove(filepath)
+    except OSError:
         pass
-
-
-def get_new(training_path: str) -> Union[str, None]:
-    best = get_best(training_path)
-    if best:
-        return best[0]
-    return None

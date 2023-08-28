@@ -1,41 +1,42 @@
-import logging
-from multiprocessing import Process, Queue
-from torchinfo import summary
-from torchinfo import Verbosity
-import yaml
-import torch
-from utils.downloads import attempt_download
-from models.yolo import Model
 import asyncio
+import logging
+import os
+from multiprocessing import Process, Queue
+
+import torch
+import yaml
 from learning_loop_node.trainer import trainer_utils
+from models.yolo import Model
+from torchinfo import Verbosity, summary
+from utils.downloads import attempt_download
 
 
-async def calc(training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int) -> int:
+async def calculate_batchsize(training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int) -> int:
     queue = Queue()
     p = Process(target=_calc_batch_size, args=(queue, training_path, model_file, hyp_path, dataset_path, img_size))
     p.start()
 
     try:
         while p.is_alive():
-            await asyncio.sleep(1)
-            logging.warning('still calculating best batch size')
+            await asyncio.sleep(5)
+            logging.info('still calculating best batch size')
     except asyncio.CancelledError:
-        logging.warning('during batch size calculation, the training was cancelled')
+        logging.warning('training was cancelled during batch size calculation')
         p.kill()
         raise
 
     p.join()
     if p.exitcode != 0:
-        raise Exception('calc_batch_size failed')
+        raise RuntimeError(f'batch size calculation failed with exit code {p.exitcode}')
 
     batch_size = queue.get()
     logging.info(f'best batch size is {batch_size}')
     return batch_size
 
 
-def _calc_batch_size(queue: Queue, training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int) -> None:
-    logging.error('calc_batch_size.....')
-    import os
+def _calc_batch_size(
+        queue: Queue, training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int) -> None:
+
     os.chdir('/tmp')
 
     with open(hyp_path) as f:
@@ -43,7 +44,7 @@ def _calc_batch_size(queue: Queue, training_path: str, model_file: str, hyp_path
     with open(dataset_path) as f:
         dataset = yaml.safe_load(f)
 
-    # Try to download pretrained model. Its ok when its a 'Continued' training.
+    # Try to download pretrained model. Its ok when its a 'continued' training.
     attempt_download(model_file)
 
     t = torch.cuda.get_device_properties(0).total_memory
@@ -53,7 +54,7 @@ def _calc_batch_size(queue: Queue, training_path: str, model_file: str, hyp_path
     free_mem = trainer_utils.get_free_memory_mb()
     fraction = 0.95
     free_mem *= fraction
-    logging.info(f'We use only {fraction *100}% of the free memory ({free_mem})')
+    logging.info(f'{fraction:.0%} of free memory ({free_mem}) in use')
 
     device = torch.device('cuda', 0)
     torch.cuda.empty_cache()
@@ -95,5 +96,5 @@ def _calc_batch_size(queue: Queue, training_path: str, model_file: str, hyp_path
         queue.put(best_batch_size)
         logging.info(f'found best matching batch size:  {best_batch_size}')
     else:
-        logging.error(f'could not find best matching batch size')
-        raise Exception('could not find best matching batch size')
+        logging.error('could not find best matching batch size')
+        raise RuntimeError('could not find best matching batch size')

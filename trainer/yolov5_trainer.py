@@ -1,20 +1,23 @@
-from asyncio import sleep
-import logging
-from typing import Dict, List, Optional, Tuple, Union
-from learning_loop_node import GLOBALS
-from learning_loop_node.trainer import Trainer, BasicModel
-from learning_loop_node.trainer.model import PretrainedModel
-import yolov5_format
-import os
-import shutil
-import json
-from learning_loop_node.trainer.executor import Executor
-from learning_loop_node.model_information import ModelInformation
-from learning_loop_node.detector.classification_detection import ClassificationDetection
-import cv2
 import asyncio
+import json
+import logging
+import os
 import re
+import shutil
+from asyncio import sleep
+from pathlib import Path
+from typing import Dict, List, Optional, Union
+
+from fastapi.encoders import jsonable_encoder
+from learning_loop_node.detector.classification_detection import \
+    ClassificationDetection
+from learning_loop_node.model_information import ModelInformation
+from learning_loop_node.trainer import BasicModel, Trainer
+from learning_loop_node.trainer.executor import Executor
+from learning_loop_node.trainer.model import PretrainedModel
+
 import model_files
+import yolov5_format
 
 
 class Yolov5Trainer(Trainer):
@@ -24,16 +27,25 @@ class Yolov5Trainer(Trainer):
         self.latest_epoch = 0
         self.epochs = 1000
 
-    async def start_training_from_scratch(self, id: str) -> None:
-        await self.start_training(model=f'yolov5{id}.pt')
+    async def start_training_from_scratch(self, identifier: str) -> None:
+        await self.start_training(model=f'yolov5{identifier}.pt')
+
+    @property
+    def training_folder(self) -> Path:
+        assert self.training is not None
+        assert self.training.training_folder is not None
+        return Path(self.training.training_folder)
 
     async def start_training(self, model: str = 'model.pt') -> None:
+        assert self.training is not None
         yolov5_format.create_file_structure(self.training)
         if model == 'model.pt':
+            assert self.training is not None
             model = f'{self.training.training_folder}/model.pt'
         await self._start(model)
 
     async def _start(self, model: str, additional_parameters: str = ''):
+        assert self.training is not None
         resolution = self.training.data.hyperparameter.resolution
 
         # batch_size = await batch_size_calculation.calc(self.training.training_folder, model, hyperparameter_path, f'{self.training.training_folder}/dataset.yaml', resolution)
@@ -42,16 +54,16 @@ class Yolov5Trainer(Trainer):
         self.executor.start(cmd)
 
     def can_resume(self) -> bool:
-        path = f'{self.training.training_folder}/result/weights/published/latest.pt'
+        path = f'{self.training_folder}/result/weights/published/latest.pt'
         return os.path.exists(path)
 
     async def resume(self) -> None:
         logging.info('resume called')
-        await self._start(f'{self.training.training_folder}/result/weights/published/latest.pt')
+        await self._start(f'{self.training_folder}/result/weights/published/latest.pt')
 
-    def get_error(self) -> str:
+    def get_error(self) -> Optional[str]:
         if self.executor is None:
-            return
+            return None
 
         for line in self.executor.get_log_by_lines(since_last_start=True):
             if 'CUDA out of memory' in line:
@@ -61,12 +73,13 @@ class Yolov5Trainer(Trainer):
         return None
 
     def get_new_model(self) -> Optional[BasicModel]:
-        weightfile = model_files.get_new(self.training.training_folder)
+        assert self.training is not None
+        weightfile = model_files.get_best(self.training_folder)
         logging.info(weightfile)
         if not weightfile:
             return None
         # NOTE /yolov5 is patched to create confusion matrix json files
-        with open(weightfile[:-3] + '.json') as f:
+        with open(str(weightfile)[:-3] + '.json') as f:
             matrix = json.load(f)
             categories = yolov5_format.category_lookup_from_training(self.training)
             for category_name in list(matrix.keys()):
@@ -74,17 +87,17 @@ class Yolov5Trainer(Trainer):
         return BasicModel(confusion_matrix=matrix, meta_information={'weightfile': weightfile})
 
     def on_model_published(self, basic_model: BasicModel) -> None:
-        path = self.training.training_folder + '/result/weights/published'
-        if not os.path.isdir(path):
-            os.mkdir(path)
-        target = f'{path}/latest.pt'
+        path = self.training_folder / '/result/weights/published'
+        path.mkdir(parents=True, exist_ok=True)
+
+        target = path / 'latest.pt'
         weightfile = basic_model.meta_information['weightfile']
 
         shutil.move(weightfile, target)
         model_files.delete_json_for_weightfile(weightfile)
 
     def get_latest_model_files(self) -> Union[List[str], Dict[str, List[str]]]:
-        path = self.training.training_folder + '/result/weights/published'
+        path = self.training_folder / '/result/weights/published'
         weightfile = f'{path}/latest.pt'
         shutil.copy(weightfile, '/tmp/model.pt')
         training_path = '/'.join(weightfile.split('/')[:-4])
@@ -151,7 +164,8 @@ class Yolov5Trainer(Trainer):
             if category:
                 category = category[0]
                 classification_detection = ClassificationDetection(
-                    category_name=category.name, model_name=model_information.version, confidence=probability, category_id=category.id)
+                    category_name=category.name, model_name=model_information.version, confidence=probability,
+                    category_id=category.id)
 
                 classification_detections.append(classification_detection)
         return classification_detections
@@ -185,16 +199,15 @@ class Yolov5Trainer(Trainer):
         return self.get_progress_from_log()
 
     def get_progress_from_log(self) -> float:
-        if self.epochs == 1:
-            return 1.0  # NOTE: We would divide by 0 in this case
+        if self.epochs == 0:
+            return 1.0
         lines = list(reversed(self.executor.get_log_by_lines()))
         for line in lines:
             if re.search(f'/{self.epochs}', line):
                 found_line = line.split('/')
                 if found_line:
-                    epoch = int(found_line[0])
-                    progress = int(epoch) / int(self.epochs)
-                    return progress
+                    return float(found_line[0]) / float(self.epochs)
+        return 0.0
 
     @staticmethod
     def infer_image(model_folder: str, image_path: str):
@@ -207,10 +220,8 @@ class Yolov5Trainer(Trainer):
 
         trainer = Yolov5Trainer()
         model_information = ModelInformation.load_from_disk(model_folder)
-        import asyncio
 
         detections = asyncio.get_event_loop().run_until_complete(
             trainer._detect(model_information, [image_path], model_folder))
 
-        from fastapi.encoders import jsonable_encoder
         print(jsonable_encoder(detections))

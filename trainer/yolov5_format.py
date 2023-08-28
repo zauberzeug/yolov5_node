@@ -1,10 +1,9 @@
-from learning_loop_node.trainer.training import Training
-import yaml
-from pathlib import Path
 import logging
 import os
-from learning_loop_node.trainer.hyperparameter import Hyperparameter
 import shutil
+from pathlib import Path
+
+from learning_loop_node.trainer.training import Training
 
 
 def category_lookup_from_training(training: Training) -> dict:
@@ -42,13 +41,10 @@ def create_set(training: Training, set_name: str):
                 os.symlink(f'{os.path.abspath(training.images_folder)}/{image_name}', image_path)
 
 
-
-
 def create_file_structure(training: Training):
     path = training.training_folder
-    Path(path).mkdir(parents=True, exist_ok=True)
+    if path is not None:
+        Path(path).mkdir(parents=True, exist_ok=True)
 
-    create_set(training, 'test')
-    create_set(training, 'train')
-
-
+        create_set(training, 'test')
+        create_set(training, 'train')
