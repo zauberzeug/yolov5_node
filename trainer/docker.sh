@@ -57,9 +57,8 @@ run_args+=" -p 7442:80"
 
 image="zauberzeug/yolov5-trainer:latest"
 
-build_args=""
-[ -f /etc/nv_tegra_release ] && build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/l4t-pytorch:r32.6.1-pth1.9-py3"
-( nvidia-smi > /dev/null 2>&1 ) && build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.8
+# Check if nvidia-smi is available
+( nvidia-smi > /dev/null 2>&1 ) && build_arg=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
 
 cmd=$1
 cmd_args=${@:2}
