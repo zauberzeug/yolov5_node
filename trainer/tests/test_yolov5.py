@@ -243,9 +243,9 @@ async def test_clear_training_data(use_training_dir):
     data = glob.glob(trainer.training.training_folder + '/**', recursive=True)
     for file in data:
         print(file)
-    assert len(data) == 8
+    assert len(data) == 9
     files = [f for f in data if os.path.isfile(f)]
-    assert len(files) == 4
+    assert len(files) == 5
 
     await trainer.clear_training_data(trainer.training.training_folder)
     data = glob.glob(trainer.training.training_folder + '/**', recursive=True)
