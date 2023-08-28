@@ -57,8 +57,7 @@ run_args+=" -p 7442:80"
 
 image="zauberzeug/yolov5-trainer:latest"
 
-# Check if nvidia-smi is available
-build_arg=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
+build_args=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
 
 cmd=$1
 cmd_args=${@:2}
