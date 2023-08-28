@@ -2,6 +2,7 @@ import glob
 import json
 import logging
 import os
+import shutil
 import time
 from time import sleep
 from typing import Dict
@@ -224,9 +225,8 @@ def test_newer_model_files_are_kept_during_deleting(use_training_dir):
 @pytest.mark.asyncio()
 async def test_clear_training_data():
     trainer = Yolov5Trainer()
-    os.makedirs('/data/o/p/trainings/some_uuid', exist_ok=True)
     trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
-                                images_folder='./', training_folder='/data/o/p/trainings/some_uuid')
+                                images_folder='./', training_folder='./')
     os.makedirs(f'{trainer.training.training_folder}/result/weights/', exist_ok=True)
     os.makedirs(f'{trainer.training.training_folder}/result/weights/published/', exist_ok=True)
 
@@ -313,8 +313,6 @@ async def create_training_data(training: Training) -> TrainingData:
         'username': os.environ.get('LOOP_USERNAME', None),
         'password': os.environ.get('LOOP_PASSWORD', None),
     }
-    print(data)
-    print(os.environ.get('LOOP_HOST', None))
     assert lss.cookies is not None, 'Authentification error'
 
     response = test_helper.LiveServerSession().get("/zauberzeug/projects/demo/data")
