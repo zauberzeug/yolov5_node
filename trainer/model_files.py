@@ -1,5 +1,5 @@
-from typing import Union
 import os
+from typing import Union
 
 
 def get_all(training_path: str):
