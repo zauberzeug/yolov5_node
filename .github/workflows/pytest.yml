@@ -19,9 +19,9 @@ jobs:
       - name: build
         if: github.ref != 'refs/heads/release'
         run: |
-          docker run -d -it --rm nvcr.io/nvidia/pytorch:21.10-py3 echo "I have to be startet to authenticate against nvcr.io"
+          docker run -d -it --rm nvcr.io/nvidia/pytorch:23.07-py3 echo "I have to be startet to authenticate against nvcr.io"
           cd trainer
-          ./docker.sh bnc
+          ./docker.sh b
       - name: buildnocaches
         if: github.ref == 'refs/heads/release'
         run: |
