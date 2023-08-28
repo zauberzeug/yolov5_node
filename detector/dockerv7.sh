@@ -65,6 +65,10 @@ case $cmd in
         docker build . --target release -t ${image}-${yolo_version} $build_args $cmd_args
         docker build . -t ${image}-${yolo_version}-dev $build_args $cmd_args
         ;;
+    bnc | build-no-cache)
+        docker build --no-cache . --target release -t ${image}-${yolo_version} $build_args $cmd_args
+        docker build . -t ${image}-${yolo_version}-dev $build_args $cmd_args
+        ;;
     U | update)
 	    docker pull ${image}-${yolo_version}
         docker pull ${image}-${yolo_version}-dev

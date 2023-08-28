@@ -80,6 +80,10 @@ case $cmd in
         docker build . -f $dockerfile --target release -t $image $build_args $cmd_args
         docker build . -f $dockerfile -t ${image}-dev $build_args $cmd_args
         ;;
+    bnc | build-no-cache)
+        docker build --no-cache . -f $dockerfile --target release -t $image $build_args $cmd_args
+        docker build . -f $dockerfile -t ${image}-dev $build_args $cmd_args
+        ;;
     U | update)
 	    docker pull ${image}
         docker pull ${image}-dev
