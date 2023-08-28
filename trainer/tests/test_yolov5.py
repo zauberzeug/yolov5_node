@@ -223,7 +223,7 @@ def test_newer_model_files_are_kept_during_deleting(use_training_dir):
 
 
 @pytest.mark.asyncio()
-async def test_clear_training_data():
+async def test_clear_training_data(use_training_dir):
     trainer = Yolov5Trainer()
     trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
                                 images_folder='./', training_folder='./')
