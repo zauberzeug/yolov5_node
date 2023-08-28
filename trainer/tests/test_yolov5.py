@@ -23,8 +23,8 @@ import model_files
 import yolov5_format
 from yolov5_trainer import Yolov5Trainer
 
-load_dotenv()
-print(f'loading .env from {os.getcwd()}')
+# load_dotenv()
+# print(f'loading .env from {os.getcwd()}')
 
 
 @pytest.mark.asyncio()
@@ -310,6 +310,7 @@ async def create_training_data(training: Training) -> TrainingData:
         'password': os.environ.get('LOOP_PASSWORD', None),
     }
     print(data)
+    print(os.environ.get('LOOP_HOST', None))
     assert lss.cookies is not None, 'Authentification error'
 
     response = test_helper.LiveServerSession().get("/zauberzeug/projects/demo/data")
