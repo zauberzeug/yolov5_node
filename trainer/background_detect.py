@@ -17,6 +17,8 @@ from yolov5_trainer import Yolov5Trainer
 
 logging.basicConfig(level=logging.INFO)
 
+# NOTE: This feature is not yet ready to use and is not using the newest node lib
+
 
 @dataclass
 class Project:
