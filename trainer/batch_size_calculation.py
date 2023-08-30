@@ -54,7 +54,7 @@ def _calc_batch_size(
     free_mem = trainer_utils.get_free_memory_mb()
     fraction = 0.95
     free_mem *= fraction
-    logging.info(f'We use only {fraction *100}% of the free memory ({free_mem})')
+    logging.info(f'{fraction:.0%} of free memory ({free_mem}) in use')
 
     device = torch.device('cuda', 0)
     torch.cuda.empty_cache()
