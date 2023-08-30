@@ -2,10 +2,6 @@ name: Run Tests
 
 on: [push]
 
-# build job temporarily build without cache
-# alternative pre connection to nvidia container:
-#   docker run -d -it --rm nvcr.io/nvidia/l4t-pytorch:r32.6.1-pth1.9-py3 echo "Nothing to do"
-
 jobs:
   pytest:
     runs-on: [self-hosted, gpu]
