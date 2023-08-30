@@ -19,15 +19,13 @@ RUN apt update && \
     rm -rf /var/lib/apt/lists/*
 RUN python3 -m pip install --upgrade pip
 
-RUN python3 -m pip install seaborn thop coremltools onnx gsutil notebook wandb>=0.12.2 albumentations opencv-python==4.5.5.64 torchinfo
+RUN python3 -m pip install seaborn thop coremltools onnx gsutil notebook wandb>=0.12.2 albumentations opencv-python==4.5.5.64 torchinfo python-dotenv httptools
 
 
 WORKDIR /
 
 # https://githubmemory.com/repo/ultralytics/yolov5/issues/5374
 RUN pip install --no-cache -U torch torchvision numpy Pillow
-
-RUN pip install --no-cache torch==1.10.0+cu113 torchvision==0.11.1+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
 
 # fetch yolov5 code
 RUN git clone https://github.com/ultralytics/yolov5.git

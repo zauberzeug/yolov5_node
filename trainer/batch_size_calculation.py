@@ -10,6 +10,8 @@ from models.yolo import Model
 from torchinfo import Verbosity, summary
 from utils.downloads import attempt_download
 
+# NOTE this code is equivalent to the main branch
+
 
 async def calculate_batchsize(training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int) -> int:
     queue = Queue()
