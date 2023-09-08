@@ -18,9 +18,7 @@ from learning_loop_node.data_classes import (BasicModel, BoxDetection,
 from learning_loop_node.trainer.executor import Executor
 from learning_loop_node.trainer.trainer_logic import TrainerLogic
 
-import batch_size_calculation
-import model_files
-import yolov5_format
+from . import batch_size_calculation, model_files, yolov5_format
 
 
 class Yolov5TrainerLogic(TrainerLogic):
@@ -58,7 +56,7 @@ class Yolov5TrainerLogic(TrainerLogic):
         self.try_replace_optimized_hyperparameter()
         batch_size = await batch_size_calculation.calc(self.training.training_folder, model, hyperparameter_path, f'{self.training.training_folder}/dataset.yaml', resolution)
 
-        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --exist-ok --patience {self.patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs} {additional_parameters}'
+        cmd = f'WANDB_MODE=disabled python /app/yolov5/train.py --exist-ok --patience {self.patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs} {additional_parameters}'
 
         with open(hyperparameter_path) as f:
             logging.info(f'running training with command :\n {cmd} \nand hyperparameter\n{f.read()}')
