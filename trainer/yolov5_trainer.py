@@ -6,32 +6,40 @@ import re
 import shutil
 import subprocess
 from asyncio import sleep
-from glob import glob
+from dataclasses import asdict
 from typing import Dict, List, Optional, Tuple, Union
 
 import cv2
-from learning_loop_node import GLOBALS
-from learning_loop_node.detector.box_detection import BoxDetection
-from learning_loop_node.detector.point_detection import PointDetection
-from learning_loop_node.model_information import ModelInformation
-from learning_loop_node.trainer import BasicModel, Trainer
+from fastapi.encoders import jsonable_encoder
+from learning_loop_node.data_classes import (BasicModel, BoxDetection,
+                                             CategoryType, Detections,
+                                             Hyperparameter, ModelInformation,
+                                             PointDetection, PretrainedModel)
 from learning_loop_node.trainer.executor import Executor
-from learning_loop_node.trainer.model import PretrainedModel
+from learning_loop_node.trainer.trainer_logic import TrainerLogic
 
 import batch_size_calculation
 import model_files
 import yolov5_format
 
 
-class Yolov5Trainer(Trainer):
+class Yolov5TrainerLogic(TrainerLogic):
 
     def __init__(self) -> None:
         super().__init__(model_format='yolov5_pytorch')
         self.latest_epoch = 0
         self.epochs = 2000
+        self.patience = 300
 
-    async def start_training_from_scratch(self, id: str) -> None:
-        await self.start_training(model=f'yolov5{id}.pt')
+    async def start_training_from_scratch(self, identifier: str) -> None:
+        await self.start_training(model=f'yolov5{identifier}.pt')
+
+    @property
+    def hyperparameter(self) -> Hyperparameter:
+        assert self.is_initialized, 'Trainer is not initialized'
+        assert self.training.data is not None, 'Training should have data'
+        assert self.training.data.hyperparameter is not None, 'Training.data should have hyperparameter'
+        return self.training.data.hyperparameter
 
     async def start_training(self, model: str = 'model.pt') -> None:
         yolov5_format.create_file_structure(self.training)
@@ -39,18 +47,18 @@ class Yolov5Trainer(Trainer):
         hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
         if not os.path.isfile(hyperparameter_path):
             shutil.copy('/app/hyp.yaml', hyperparameter_path)
-        yolov5_format.update_hyp(hyperparameter_path, self.training.data.hyperparameter)
+
+        yolov5_format.update_hyp(hyperparameter_path, self.hyperparameter)
         await self._start(model, " --clear")
 
     async def _start(self, model: str, additional_parameters: str = ''):
-        resolution = self.training.data.hyperparameter.resolution
-        patience = 300
+        resolution = self.hyperparameter.resolution
 
         hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
         self.try_replace_optimized_hyperparameter()
         batch_size = await batch_size_calculation.calc(self.training.training_folder, model, hyperparameter_path, f'{self.training.training_folder}/dataset.yaml', resolution)
 
-        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --exist-ok --patience {patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs} {additional_parameters}'
+        cmd = f'WANDB_MODE=disabled python /yolov5/train.py --exist-ok --patience {self.patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs} {additional_parameters}'
 
         with open(hyperparameter_path) as f:
             logging.info(f'running training with command :\n {cmd} \nand hyperparameter\n{f.read()}')
@@ -65,19 +73,19 @@ class Yolov5Trainer(Trainer):
         await self._start(f'{self.training.training_folder}/result/weights/published/latest.pt')
 
     def try_replace_optimized_hyperparameter(self):
-        optimied_hyperparameter = f'{self.training.project_folder}/yolov5s6_evolved_hyperparameter.yaml'
-        if os.path.exists(optimied_hyperparameter):
+        optimized_hyp = f'{self.training.project_folder}/yolov5s6_evolved_hyperparameter.yaml'
+        if os.path.exists(optimized_hyp):
             logging.info('Found optimized hyperparameter')
-            shutil.copy(optimied_hyperparameter,
+            shutil.copy(optimized_hyp,
                         f'{self.training.training_folder}/hyp.yaml')
         else:
             logging.warning('NO optimized hyperparameter found (!)')
 
-    def get_error(self) -> str:
-        if self.executor is None:
+    def get_executor_error_from_log(self) -> Optional[str]:
+        if self._executor is None:
             return
 
-        for line in self.executor.get_log_by_lines(since_last_start=True):
+        for line in self._executor.get_log_by_lines(since_last_start=True):
             if 'CUDA out of memory' in line:
                 return 'graphics card is out of memory'
             if 'CUDA error: invalid device ordinal' in line:
@@ -99,12 +107,12 @@ class Yolov5Trainer(Trainer):
 
     def on_model_published(self, basic_model: BasicModel) -> None:
         path = self.training.training_folder + '/result/weights/published'
-        if not os.path.isdir(path):
-            os.mkdir(path)
-        target = f'{path}/latest.pt'
+        os.makedirs(path, exist_ok=True)
+
+        assert basic_model.meta_information is not None, 'meta_information should not be set'
         weightfile = basic_model.meta_information['weightfile']
 
-        shutil.move(weightfile, target)
+        shutil.move(weightfile, f'{path}/latest.pt')
         model_files.delete_json_for_weightfile(weightfile)
         model_files.delete_older_epochs(self.training.training_folder, weightfile)
 
@@ -114,14 +122,14 @@ class Yolov5Trainer(Trainer):
         shutil.copy(weightfile, '/tmp/model.pt')
         training_path = '/'.join(weightfile.split('/')[:-4])
 
-        subprocess.run(f'python3 /yolov5/gen_wts.py -w {weightfile} -o /tmp/model.wts', shell=True)
+        subprocess.run(f'python3 /yolov5/gen_wts.py -w {weightfile} -o /tmp/model.wts', shell=True, check=False)
         return {
             self.model_format: ['/tmp/model.pt', f'{training_path}/hyp.yaml'],
             'yolov5_wts': ['/tmp/model.wts']
         }
 
-    async def _detect(self, model_information: ModelInformation, images:  List[str], model_folder: str) -> List:
-        images_folder = f'/tmp/imagelinks_for_detecting'
+    async def _detect(self, model_information: ModelInformation, images:  List[str], model_folder: str) -> List[Detections]:
+        images_folder = '/tmp/imagelinks_for_detecting'
         shutil.rmtree(images_folder, ignore_errors=True)
         os.makedirs(images_folder)
         for img in images:
@@ -150,22 +158,23 @@ class Yolov5Trainer(Trainer):
 
         return detections
 
-    def _parse(self, labels_path, images_folder, model_information):
+    def _parse(self, labels_path: str, images_folder: str, model_information: ModelInformation) -> List[Detections]:
         detections = []
         if os.path.exists(labels_path):
             for filename in os.scandir(labels_path):
                 uuid = os.path.splitext(os.path.basename(filename.path))[0]
-                box_detections, point_detections = self._parse_file(model_information, images_folder, filename)
-                detections.append({'image_id': uuid, 'box_detections': box_detections,
-                                   'point_detections': point_detections})
+                box_detections, point_detections = self._parse_file(model_information, images_folder, filename.path)
+                detections.append(Detections(box_detections=box_detections,
+                                  point_detections=point_detections, image_id=uuid))
         return detections
 
-    def _parse_file(self, model_information, images_folder, filename) -> Tuple[BoxDetection, PointDetection]:
-        uuid = os.path.splitext(os.path.basename(filename.path))[0]
+    def _parse_file(self, model_info: ModelInformation, images_folder: str, filename: str) -> Tuple[
+            List[BoxDetection], List[PointDetection]]:
+        uuid = os.path.splitext(os.path.basename(filename))[0]
 
         image_path = f'{images_folder}/{uuid}.jpg'
         img_height, img_width, _ = cv2.imread(image_path).shape
-        with open(filename.path, 'r') as f:
+        with open(filename, 'r') as f:
             content = f.readlines()
         box_detections = []
         point_detections = []
@@ -179,19 +188,19 @@ class Yolov5Trainer(Trainer):
             h = float(h)
             probability = float(probability) * 100
 
-            category = model_information.categories[c]
+            category = model_info.categories[c]
             width = w*img_width
             height = h*img_height
             x = (x*img_width)-0.5*width
             y = (y*img_height)-0.5*height
-            if (category.type == 'box'):
+            if (category.type == CategoryType.Box):
                 box_detection = BoxDetection(
-                    category_name=category.name, x=x, y=y, width=width, height=height, net=model_information.version,
-                    confidence=probability, category_id=category.id)
+                    category_name=category.name, x=x, y=y, width=width, height=height,
+                    model_name=model_info.version, confidence=probability, category_id=category.id)
                 box_detections.append(box_detection)
-            elif (category.type == 'point'):
+            elif (category.type == CategoryType.Point):
                 point_detection = PointDetection(
-                    category_name=category.name, x=x + width / 2, y=y + height / 2, net=model_information.version,
+                    category_name=category.name, x=x + width / 2, y=y + height / 2, model_name=model_info.version,
                     confidence=probability, category_id=category.id)
                 point_detections.append(point_detection)
         return box_detections, point_detections
@@ -227,6 +236,7 @@ class Yolov5Trainer(Trainer):
         if self.epochs == 1:
             return 1.0  # NOTE: We would divide by 0 in this case
         lines = list(reversed(self.executor.get_log_by_lines()))
+        progress = 0.0
         for line in lines:
             if re.search(f'/{self.epochs -1}', line):
                 found_line = line.split(' ')
@@ -235,11 +245,12 @@ class Yolov5Trainer(Trainer):
                         epoch_and_total_epochs = item.split('/')
                         epoch = epoch_and_total_epochs[0]
                         total_epochs = epoch_and_total_epochs[1]
-                        progress = int(epoch) / int(total_epochs)
+                        progress = float(epoch) / float(total_epochs)
                         return progress
+        return progress
 
     @staticmethod
-    def infer_image(model_folder: str, image_path: str):
+    def infer_image(model_folder: str, image_path: str) -> None:
         '''
             Run this function from within the docker container.
             Example Usage
@@ -247,12 +258,12 @@ class Yolov5Trainer(Trainer):
 
         '''
 
-        trainer = Yolov5Trainer()
+        trainer_logic = Yolov5TrainerLogic()
         model_information = ModelInformation.load_from_disk(model_folder)
-        import asyncio
+        assert model_information is not None, 'model_information should not be None'
 
         detections = asyncio.get_event_loop().run_until_complete(
-            trainer._detect(model_information, [image_path], model_folder))
+            trainer_logic._detect(model_information, [image_path], model_folder))  # pylint: disable=protected-access
 
-        from fastapi.encoders import jsonable_encoder
-        print(jsonable_encoder(detections))
+        for detection in detections:
+            print(jsonable_encoder(asdict(detection)))

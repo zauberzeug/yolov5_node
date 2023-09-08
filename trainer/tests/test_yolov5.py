@@ -22,7 +22,7 @@ from pydantic.types import Json
 
 import model_files
 import yolov5_format
-from yolov5_trainer import Yolov5Trainer
+from yolov5_trainer import Yolov5TrainerLogic
 
 # load_dotenv()
 # print(f'loading .env from {os.getcwd()}')
@@ -49,7 +49,7 @@ async def test_create_file_structure_box_size(use_training_dir):
             'y': 70,
         }]
     }]
-    trainer = Yolov5Trainer()
+    trainer = Yolov5TrainerLogic()
     trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
                                 images_folder='./', training_folder='./')
     trainer.training.data = TrainingData(image_data=image_data, categories=categories)
@@ -96,7 +96,7 @@ async def test_training_creates_model(use_training_dir):  # FLAKY! model.pt can 
 @pytest.mark.skip(reason="This test does not work in compination with the other tests. It is not yet clear why.")
 @pytest.mark.asyncio()
 async def test_parse_progress_from_log(use_training_dir):  # FLAKY! model.pt can sometimes not be accessed
-    trainer = Yolov5Trainer()
+    trainer = Yolov5TrainerLogic()
     trainer.epochs = 2
     os.remove('/tmp/model.pt')
     trainer.training = Training(
@@ -122,7 +122,7 @@ async def test_parse_progress_from_log(use_training_dir):  # FLAKY! model.pt can
 
 
 def test_new_model_discovery(use_training_dir):
-    trainer = Yolov5Trainer()
+    trainer = Yolov5TrainerLogic()
     trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
                                 images_folder='./', training_folder='./')
     trainer.training.data = TrainingData(image_data=[], categories=[
@@ -160,7 +160,7 @@ def test_new_model_discovery(use_training_dir):
 
 
 def test_newest_model_is_used(use_training_dir):
-    trainer = Yolov5Trainer()
+    trainer = Yolov5TrainerLogic()
     trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
                                 images_folder='./', training_folder='./')
     trainer.training.data = TrainingData(image_data=[], categories=[
@@ -176,7 +176,7 @@ def test_newest_model_is_used(use_training_dir):
 
 
 def test_old_model_files_are_deleted_on_publish(use_training_dir):
-    trainer = Yolov5Trainer()
+    trainer = Yolov5TrainerLogic()
     trainer.training = Training(id='someid', context=Context(organization='o', project='p'),
                                 project_folder='./', images_folder='./', training_folder='./')
     trainer.training.data = TrainingData(image_data=[], categories=[
@@ -202,7 +202,7 @@ def test_old_model_files_are_deleted_on_publish(use_training_dir):
 
 
 def test_newer_model_files_are_kept_during_deleting(use_training_dir):
-    trainer = Yolov5Trainer()
+    trainer = Yolov5TrainerLogic()
     trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
                                 images_folder='./', training_folder='./')
     trainer.training.data = TrainingData(image_data=[], categories=[
@@ -217,14 +217,14 @@ def test_newer_model_files_are_kept_during_deleting(use_training_dir):
 
     trainer.on_model_published(new_model)
 
-    all_model_files = model_files.get_all(trainer.training.training_folder)
+    all_model_files = model_files.get_all_weightfiles(trainer.training.training_folder)
     assert len(all_model_files) == 1
     assert 'epoch201.pt' in all_model_files[0], 'Epoch201 is not yed synced. It should not be deleted.'
 
 
 @pytest.mark.asyncio()
 async def test_clear_training_data(use_training_dir):
-    trainer = Yolov5Trainer()
+    trainer = Yolov5TrainerLogic()
     trainer.training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
                                 images_folder='./', training_folder='./')
     os.makedirs(f'{trainer.training.training_folder}/result/weights/', exist_ok=True)
@@ -296,7 +296,7 @@ async def test_detecting(create_project):  # TODO: Fix this test (results in fil
         raise (Exception(msg))
     image = await response.json()
 
-    trainer = Yolov5Trainer()
+    trainer = Yolov5TrainerLogic()
     context = Context(organization='zauberzeug', project='pytest')
     trainer.training = Trainer.generate_training(context)
     trainer.training.model_id_for_detecting = model['id']

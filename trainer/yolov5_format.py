@@ -2,13 +2,16 @@ import logging
 import os
 import shutil
 from pathlib import Path
+from typing import Dict
 
 import yaml
-from learning_loop_node.trainer.hyperparameter import Hyperparameter
-from learning_loop_node.trainer.training import Training
+from learning_loop_node.data_classes import Hyperparameter, Training
+from ruamel.yaml import YAML
 
 
-def category_lookup_from_training(training: Training) -> dict:
+def category_lookup_from_training(training: Training) -> Dict:
+
+    assert training.data is not None, 'Training should have data'
     return {c.name: c.id for c in training.data.categories}
 
 
@@ -19,6 +22,8 @@ def create_set(training: Training, set_name: str):
 
     shutil.rmtree(images_path, ignore_errors=True)
     os.makedirs(images_path, exist_ok=True)
+
+    assert training.data is not None, 'Training should have data'
 
     for image in training.data.image_data:
         if image['set'] == set_name:
@@ -39,8 +44,9 @@ def create_set(training: Training, set_name: str):
                     box['width'] / width,
                     box['height'] / height,
                 ]
-                id = str(categories.index(box['category_id']))
-                yolo_boxes.append(id + ' ' + ' '.join([str("%.6f" % c) for c in coords]) + '\n')
+                c_id = str(categories.index(box['category_id']))
+                yolo_boxes.append(c_id + ' ' + ' '.join([f"{c:.6f}" for c in coords]) + '\n')
+
             for point in image['point_annotations']:
                 size = [c for c in training.data.categories if c.id == point['category_id']][0].point_size or 20
                 coords = [
@@ -49,8 +55,8 @@ def create_set(training: Training, set_name: str):
                     size/width,
                     size/height,
                 ]
-                id = str(categories.index(point['category_id']))
-                yolo_boxes.append(id + ' ' + ' '.join([str("%.6f" % c) for c in coords]) + '\n')
+                c_id = str(categories.index(point['category_id']))
+                yolo_boxes.append(c_id + ' ' + ' '.join([f"{c:.6f}" for c in coords]) + '\n')
 
             with open(f'{images_path}/{image["id"]}.txt', 'w') as l:
                 l.writelines(yolo_boxes)
@@ -81,13 +87,13 @@ def create_file_structure(training: Training):
 
 
 def update_hyp(yaml_path: str, hyperparameter: Hyperparameter):
-    from ruamel.yaml import YAML
-    yaml = YAML()
+    yaml_ = YAML()
 
     with open(yaml_path) as f:
-        content = yaml.load(f)
+        content = yaml_.load(f)
 
     content['fliplr'] = 0.5 if hyperparameter.flip_rl else 0
-    content['flipud'] = 0.00856 if hyperparameter.flip_ud else 0
+    content['flipud'] = 0.5 if hyperparameter.flip_ud else 0
+
     with open(yaml_path, 'w') as f:
-        yaml.dump(content, f)
+        yaml_.dump(content, f)

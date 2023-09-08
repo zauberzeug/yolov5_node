@@ -1,13 +1,15 @@
 import asyncio
 import logging
+import os
 from multiprocessing import Process, Queue
 
 import torch
 import yaml
-from learning_loop_node.trainer import trainer_utils
-from models.yolo import Model
+from learning_loop_node.helpers import get_free_memory_mb
 from torchinfo import Verbosity, summary
-from utils.downloads import attempt_download
+
+from .yolov5.models.yolo import Model
+from .yolov5.utils.downloads import attempt_download
 
 
 async def calc(training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int) -> int:
@@ -20,7 +22,7 @@ async def calc(training_path: str, model_file: str, hyp_path: str, dataset_path:
             await asyncio.sleep(1)
             logging.warning('still calculating best batch size')
     except asyncio.CancelledError:
-        logging.warning('during batch size calculation, the training was cancelled')
+        logging.warning('the training was cancelled during batch size calculation')
         p.kill()
         raise
 
@@ -35,8 +37,8 @@ async def calc(training_path: str, model_file: str, hyp_path: str, dataset_path:
 
 def _calc_batch_size(
         queue: Queue, training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int) -> None:
-    logging.error('calc_batch_size.....')
-    import os
+    logging.info('calc_batch_size.....')
+
     os.chdir('/tmp')
 
     with open(hyp_path) as f:
@@ -51,7 +53,7 @@ def _calc_batch_size(
     r = torch.cuda.memory_reserved(0)
     a = torch.cuda.memory_allocated(0)
     logging.error(f'{t}, {r}, {a}')
-    free_mem = trainer_utils.get_free_memory_mb()
+    free_mem = get_free_memory_mb()
     fraction = 0.95
     free_mem *= fraction
     logging.info(f'{fraction:.0%} of free memory ({free_mem}) in use')
@@ -61,7 +63,7 @@ def _calc_batch_size(
     try:
         ckpt = torch.load(model_file, map_location=device)
     except FileNotFoundError:
-        # Continued Training
+        # Continue Training
         ckpt = torch.load(f'{training_path}/{model_file}', map_location=device)
 
     model = Model(ckpt['model'].yaml, ch=3, nc=dataset.get('nc'), anchors=hyp.get('anchors')).to(device)  # create
@@ -96,5 +98,5 @@ def _calc_batch_size(
         queue.put(best_batch_size)
         logging.info(f'found best matching batch size:  {best_batch_size}')
     else:
-        logging.error(f'could not find best matching batch size')
-        raise Exception('could not find best matching batch size')
+        logging.error('Did not find best matching batch size')
+        raise Exception('Did not find best matching batch size')
