@@ -32,7 +32,7 @@ RUN git clone https://github.com/ultralytics/yolov5.git
 WORKDIR /yolov5
 RUN git checkout 342fe05e6c88221750ce7e90b7d2e8baabd397dc
 COPY yolov5_patches/*.patch ./
-RUN git apply confusion_matrices.patch && git apply clear_epochs.patch && git apply ignore_previous_fitness.patch && rm *.patch
+RUN git apply confusion_matrices.patch && git apply clear_epochs.patch && git apply ignore_previous_fitness.patch && git apply confusion_matrices_classification.patch && rm *.patch
 # TODO there is no requirements.txt file ?!
 RUN python3 -m pip install --no-cache -r requirements.txt
 RUN pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof

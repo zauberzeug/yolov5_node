@@ -15,7 +15,7 @@ def category_lookup_from_training(training: Training) -> Dict:
     return {c.name: c.id for c in training.data.categories}
 
 
-def create_set(training: Training, set_name: str):
+def _create_set(training: Training, set_name: str):
     categories = list(category_lookup_from_training(training).values())
     training_path = training.training_folder
     images_path = f'{training_path}/{set_name}'
@@ -24,7 +24,6 @@ def create_set(training: Training, set_name: str):
     os.makedirs(images_path, exist_ok=True)
 
     assert training.data is not None, 'Training should have data'
-
     for image in training.data.image_data:
         if image['set'] == set_name:
             image_name = image['id'] + '.jpg'
@@ -44,6 +43,8 @@ def create_set(training: Training, set_name: str):
                     box['width'] / width,
                     box['height'] / height,
                 ]
+                print('<<<<<<<<<<<<<', box['category_id'])
+                print('<<<<<<<<<<<<<', categories)
                 c_id = str(categories.index(box['category_id']))
                 yolo_boxes.append(c_id + ' ' + ' '.join([f"{c:.6f}" for c in coords]) + '\n')
 
@@ -62,6 +63,41 @@ def create_set(training: Training, set_name: str):
                 l.writelines(yolo_boxes)
 
 
+def _create_set_cla(training: Training, set_name: str):
+    training_path = training.training_folder
+    images_path = f'{training_path}/{set_name}'
+    print(images_path)
+
+    shutil.rmtree(images_path, ignore_errors=True)
+    os.makedirs(images_path, exist_ok=True)
+    for category in category_lookup_from_training(training).keys():
+        os.makedirs(f'{images_path}/{category}', exist_ok=True)
+
+    # classification format:
+        # dataset
+        # ├── train
+        # │   ├── class1
+        # │   │   ├── image1.jpg
+        # |── test
+        # │   ├── class1
+        # │   │   ├── image2.jpg
+
+    assert training.data is not None, 'Training should have data'
+    for image in training.data.image_data:
+        if image['set'] == set_name:
+            image_name = image['id'] + '.jpg'
+            classification = image['classification_annotation']
+            print(f'image {image_name} has classification {classification}')
+            if classification:
+                category = classification['category_id']
+                category_name = [c for c in training.data.categories if c.id == category][0].name
+                logging.error(f'category_name: {category_name}')
+                image_path = f"{images_path}/{category_name}/{image_name}"
+                logging.info('image_path: ' + image_path)
+                logging.info(f'linking {image_name} to {image_path}')
+                os.symlink(f'{os.path.abspath(training.images_folder)}/{image_name}', image_path)
+
+
 def create_yaml(training: Training):
     categories = category_lookup_from_training(training)
     path = training.training_folder
@@ -77,12 +113,22 @@ def create_yaml(training: Training):
         yaml.dump(data, f)
 
 
+def create_file_structure_cla(training: Training):
+    path = training.training_folder
+    assert path is not None, 'Training should have a path'
+    Path(path).mkdir(parents=True, exist_ok=True)
+    print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+
+    _create_set_cla(training, 'test')
+    _create_set_cla(training, 'train')
+
+
 def create_file_structure(training: Training):
     path = training.training_folder
     Path(path).mkdir(parents=True, exist_ok=True)
 
-    create_set(training, 'test')
-    create_set(training, 'train')
+    _create_set(training, 'test')
+    _create_set(training, 'train')
     create_yaml(training)
 
 

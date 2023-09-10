@@ -2,12 +2,12 @@
 import argparse
 
 import torch
-import torch.backends.cudnn as cudnn
 import torch_tensorrt
-from models.experimental import attempt_load
-from utils.datasets import LoadImages
-from utils.general import check_img_size
-from utils.torch_utils import select_device
+
+from .yolov5.models.experimental import attempt_load
+from .yolov5.utils.dataloaders import LoadImages
+from .yolov5.utils.general import check_img_size
+from .yolov5.utils.torch_utils import select_device
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--weights', nargs='+', type=str, default='model.pt', help='model.pt path')
@@ -17,7 +17,7 @@ args = parser.parse_args()
 imgsz = 800
 device = select_device('0')  # may be replaced with "cuda"
 
-model = attempt_load(args.weights, map_location=device)  # load FP32 model
+model = attempt_load(args.weights, device=device)  # load FP32 model
 imgsz = check_img_size(imgsz, s=model.stride.max())  # check img_size
 model.eval()  # set model to "inference mode"
 model.model[-1].export = True  # set Detect() layer export=True

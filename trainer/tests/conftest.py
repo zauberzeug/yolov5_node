@@ -38,14 +38,13 @@ def use_training_dir(request):
     os.makedirs('/tmp/test_training', exist_ok=True)
 
     # TODO Download has to be done every time, otherwise the pt file may be faulty
-    if not os.path.isfile('/tmp/model.pt') or True:
-        print('--------------Downloading model>')
-        url = 'https://github.com/ultralytics/yolov5/releases/download/v6.0/yolov5n.pt'
-        result = subprocess.run(f'curl  -L {url} -o /tmp/model.pt', shell=True, check=True)
-        assert result.returncode == 0
+    # if not os.path.isfile('/tmp/model.pt'):
+    print('--------------Downloading model>')
+    url = 'https://github.com/ultralytics/yolov5/releases/download/v6.0/yolov5n.pt'
+    result = subprocess.run(f'curl  -L {url} -o /tmp/model.pt', shell=True, check=True)
+    assert result.returncode == 0
 
     shutil.copyfile('/tmp/model.pt', '/tmp/test_training/model.pt')
-    print('-------------------------------TT>', os.listdir('/tmp/test_training/'))
 
     os.chdir('/tmp/test_training/')
     yield
@@ -59,6 +58,18 @@ async def create_project():
     project_configuration = {
         'project_name': 'pytest', 'box_categories': 2, 'point_categories': 1, 'inbox': 0, 'annotate': 0, 'review': 0,
         'complete': 0, 'image_style': 'plain', 'thumbs': False, 'trainings': 1}
+    assert (await lc.post("/zauberzeug/projects/generator", json=project_configuration)).status_code == 200
+    yield
+    await lc.delete("/zauberzeug/projects/pytest?keep_images=true")
+    await lc.shutdown()
+
+
+@pytest.fixture()
+async def create_cla_project():
+    lc = LoopCommunicator()
+    await lc.delete("/zauberzeug/projects/pytest?keep_images=true")
+    project_configuration = {'project_name': 'pytest', 'classification_categories': 2, 'inbox': 0,
+                             'annotate': 0, 'review': 0, 'complete': 0, 'image_style': 'plain', 'thumbs': False, 'trainings': 1}
     assert (await lc.post("/zauberzeug/projects/generator", json=project_configuration)).status_code == 200
     yield
     await lc.delete("/zauberzeug/projects/pytest?keep_images=true")

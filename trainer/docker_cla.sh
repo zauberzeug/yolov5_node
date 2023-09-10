@@ -36,13 +36,13 @@ fi
 # sourcing .env file to get configuration (see README.md)
 . .env || echo "you should provide an .env file with USERNAME and PASSWORD for the Learning Loop"
 
-name="yolov5_trainer_node"
+name="yolov5_cla_trainer_node"
 
 run_args="-it --rm" 
 run_args+=" -v $(pwd)/../:/yolov5_node/"
 run_args+=" -v $HOME/data:/data"
-run_args+=" -v $HOME/learning_loop_node/learning_loop_node:/opt/conda/lib/python3.10/site-packages/learning_loop_node" # TODO CHECK!
-run_args+=" -v $HOME/learning_loop_node:/learning_loop_node"
+#run_args+=" -v $HOME/learning_loop_node/learning_loop_node:/opt/conda/lib/python3.10/site-packages/learning_loop_node"
+#run_args+=" -v $HOME/learning_loop_node:/learning_loop_node"
 run_args+=" -v $HOME/.vscode-server:/root/.vscode-server"
 run_args+=" -e HOST=$HOST"
 run_args+=" -h ${HOSTNAME}_DEV"
@@ -56,7 +56,7 @@ run_args+=" --ipc host"
 run_args+=" -p 7442:80"
 
 
-image="zauberzeug/yolov5-trainer:latest"
+image="zauberzeug/yolov5-cla-trainer:latest"
 
 build_args=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
 

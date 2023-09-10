@@ -5,6 +5,7 @@ import logging
 import os
 import shutil
 import time
+from pathlib import Path
 from time import sleep
 from typing import Dict
 from uuid import uuid4
@@ -75,6 +76,8 @@ async def test_create_file_structure_box_size(use_training_dir):
             'y': 70,
         }]
     }]
+
+    os.environ['YOLOV5_MODE'] = 'DETECTION'
     trainer = Yolov5TrainerLogic()
     trainer._training = Training(id='someid', context=Context(organization='o', project='p'),  # pylint: disable=protected-access
                                  project_folder='./', images_folder='./', training_folder='./')
@@ -124,10 +127,8 @@ async def test_training_creates_model(use_training_dir, data_exchanger: DataExch
     assert os.path.isfile(best)
 
 
-# @pytest.mark.skip(reason="This test does not work in compination with the other tests. It is not yet clear why.")
-# @pytest.mark.asyncio()
-# FLAKY! model.pt can sometimes not be accessed
 async def test_parse_progress_from_log(use_training_dir, data_exchanger: DataExchanger, glc: LoopCommunicator):
+    os.environ['YOLOV5_MODE'] = 'DETECTION'
     trainer = Yolov5TrainerLogic()
     trainer.epochs = 2
     os.remove('/tmp/model.pt')
@@ -154,6 +155,7 @@ async def test_parse_progress_from_log(use_training_dir, data_exchanger: DataExc
 
 
 def test_new_model_discovery(use_training_dir):
+    os.environ['YOLOV5_MODE'] = 'DETECTION'
     trainer = Yolov5TrainerLogic()
     trainer._training = Training(id='someid', context=Context(organization='o', project='p'),  # pylint: disable=protected-access
                                  project_folder='./',  images_folder='./', training_folder='./')
@@ -195,10 +197,14 @@ def test_new_model_discovery(use_training_dir):
 
     # get_latest_model_file
     files = trainer.get_latest_model_files()
-    assert files == {'yolov5_pytorch': ['/tmp/model.pt', './/hyp.yaml'], 'yolov5_wts': ['/tmp/model.wts']}
+    print(files)
+    assert files == {
+        'yolov5_pytorch': ['/tmp/model.pt', '/tmp/test_training/hyp.yaml'],
+        'yolov5_wts': ['/tmp/model.wts']}
 
 
 def test_newest_model_is_used(use_training_dir):
+    os.environ['YOLOV5_MODE'] = 'DETECTION'
     trainer = Yolov5TrainerLogic()
     trainer._training = Training(id='someid', context=Context(organization='o', project='p'),  # pylint: disable=protected-access
                                  project_folder='./', images_folder='./', training_folder='./')
@@ -216,6 +222,7 @@ def test_newest_model_is_used(use_training_dir):
 
 
 def test_old_model_files_are_deleted_on_publish(use_training_dir):
+    os.environ['YOLOV5_MODE'] = 'DETECTION'
     trainer = Yolov5TrainerLogic()
     trainer._training = Training(id='someid', context=Context(organization='o', project='p'),  # pylint: disable=protected-access
                                  project_folder='./', images_folder='./', training_folder='./')
@@ -245,6 +252,7 @@ def test_old_model_files_are_deleted_on_publish(use_training_dir):
 
 
 def test_newer_model_files_are_kept_during_deleting(use_training_dir):
+    os.environ['YOLOV5_MODE'] = 'DETECTION'
     trainer = Yolov5TrainerLogic()
     trainer._training = Training(id='someid', context=Context(organization='o', project='p'),  # pylint: disable=protected-access
                                  project_folder='./',  images_folder='./', training_folder='./')
@@ -261,13 +269,14 @@ def test_newer_model_files_are_kept_during_deleting(use_training_dir):
 
     trainer.on_model_published(new_model)
 
-    all_model_files = model_files.get_all_weightfiles(trainer.training.training_folder)
+    all_model_files = model_files.get_all_weightfiles(Path(trainer.training.training_folder))
     assert len(all_model_files) == 1
-    assert 'epoch201.pt' in all_model_files[0], 'Epoch201 is not yed synced. It should not be deleted.'
+    assert 'epoch201.pt' in str(all_model_files[0]), 'Epoch201 is not yed synced. It should not be deleted.'
 
 
 @pytest.mark.asyncio()
 async def test_clear_training_data(use_training_dir):
+    os.environ['YOLOV5_MODE'] = 'DETECTION'
     trainer = Yolov5TrainerLogic()
     trainer._training = Training(id='someid', context=Context(organization='o', project='p'),  # pylint: disable=protected-access
                                  project_folder='./', images_folder='./', training_folder='./')
@@ -329,6 +338,7 @@ async def test_detecting(create_project, glc: LoopCommunicator):
     #     raise (Exception(msg))
     # image = await response.json()
 
+    os.environ['YOLOV5_MODE'] = 'DETECTION'
     trainer = Yolov5TrainerLogic()
     context = Context(organization='zauberzeug', project='demo')
     trainer._training = TrainerLogic.generate_training(context)  # pylint: disable=protected-access
