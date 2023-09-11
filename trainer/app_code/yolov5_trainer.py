@@ -38,10 +38,7 @@ class Yolov5TrainerLogic(TrainerLogic):
         self.patience = 300
 
     async def start_training_from_scratch(self, identifier: str) -> None:
-        if self.is_cla:
-            await self.start_training(model=f'yolov5_cla{identifier}.pt')
-        else:
-            await self.start_training(model=f'yolov5{identifier}.pt')
+        await self.start_training(model=f'yolov5{identifier}.pt')
 
     @property
     def hyperparameter(self) -> Hyperparameter:
