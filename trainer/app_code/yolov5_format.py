@@ -91,7 +91,6 @@ def _create_set_cla(training: Training, set_name: str):
         if image['set'] == set_name:
             image_name = image['id'] + '.jpg'
             classification = image['classification_annotation']
-            print(f'image {image_name} has classification {classification}')
             if classification:
                 category = classification['category_id']
                 category_name = [c for c in training.data.categories if c.id == category][0].name
@@ -119,7 +118,6 @@ def create_file_structure_cla(training: Training):
     path = training.training_folder
     assert path is not None, 'Training should have a path'
     Path(path).mkdir(parents=True, exist_ok=True)
-    print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 
     _create_set_cla(training, 'test')
     _create_set_cla(training, 'train')

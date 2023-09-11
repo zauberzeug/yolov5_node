@@ -86,6 +86,7 @@ class Yolov5TrainerLogic(TrainerLogic):
             cmd = f'WANDB_MODE=disabled python /app/app_code/yolov5/train.py --exist-ok --patience {self.patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs} {additional_parameters}'
             with open(hyperparameter_path) as f:
                 logging.info(f'running training with command :\n {cmd} \nand hyperparameter\n{f.read()}')
+        logging.info(f'running training with command :\n {cmd}')
         self.executor.start(cmd)
 
     def can_resume(self) -> bool:
