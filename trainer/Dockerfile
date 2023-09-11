@@ -18,7 +18,7 @@ RUN apt update && \
     apt install -y zip htop screen libgl1-mesa-glx libmpich-dev jpeginfo && \
     rm -rf /var/lib/apt/lists/*
 RUN python3 -m pip install --upgrade pip
-RUN python3 -m pip install seaborn thop coremltools onnx gsutil notebook wandb>=0.12.2 opencv-python==4.5.5.64 torchinfo python-dotenv httptools
+RUN python3 -m pip install seaborn thop coremltools onnx gsutil notebook wandb>=0.12.2 opencv-python==4.5.5.64 torchinfo python-dotenv httptools dacite
 # https://githubmemory.com/repo/ultralytics/yolov5/issues/5374
 RUN pip install --no-cache -U torch torchvision numpy Pillow
 # CHECK IF THIS IS NEEDED because the image is already based on pytorch
