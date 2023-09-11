@@ -78,7 +78,7 @@ class Yolov5TrainerLogic(TrainerLogic):
 
         if self.is_cla:
             batch_size = 4  # TODO check why batchsize is updated here
-            cmd = f'WANDB_MODE=disabled python /app/app_code/yolov5/classify/train.py --exist-ok --batch-size {batch_size} --img {resolution} --data {self.training.training_folder} --model {model} --project {self.training.training_folder} --name result --epochs {self.epochs} --optimizer SGD {additional_parameters}'
+            cmd = f'python /app/app_code/yolov5/classify/train.py --exist-ok --batch-size {batch_size} --img {resolution} --data {self.training.training_folder} --model {model} --project {self.training.training_folder} --name result --epochs {self.epochs} --optimizer SGD {additional_parameters}'
         else:
             hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
             self.try_replace_optimized_hyperparameter()
