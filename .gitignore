@@ -3,4 +3,3 @@ __pycache__/
 *.wts
 *.engine
 *.pt
-trainer/app_code/yolov5

@@ -14,6 +14,7 @@ Torchvision models: --model resnet50, efficientnet_b0, etc. See https://pytorch.
 """
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -27,8 +28,22 @@ import torch.distributed as dist
 import torch.hub as hub
 import torch.optim.lr_scheduler as lr_scheduler
 import torchvision
+from classify import val as validate
+from models.experimental import attempt_load
+from models.yolo import ClassificationModel, DetectionModel
 from torch.cuda import amp
 from tqdm import tqdm
+from utils.dataloaders import create_classification_dataloader
+from utils.general import (DATASETS_DIR, LOGGER, TQDM_BAR_FORMAT,
+                           WorkingDirectory, check_git_info, check_git_status,
+                           check_requirements, colorstr, download,
+                           increment_path, init_seeds, print_args, yaml_save)
+from utils.loggers import GenericLogger
+from utils.plots import imshow_cls
+from utils.torch_utils import (ModelEMA, model_info, reshape_classifier_output,
+                               select_device, smart_DDP, smart_optimizer,
+                               smartCrossEntropyLoss,
+                               torch_distributed_zero_first)
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[1]  # YOLOv5 root directory
@@ -36,16 +51,6 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
-from classify import val as validate
-from models.experimental import attempt_load
-from models.yolo import ClassificationModel, DetectionModel
-from utils.dataloaders import create_classification_dataloader
-from utils.general import (DATASETS_DIR, LOGGER, TQDM_BAR_FORMAT, WorkingDirectory, check_git_info, check_git_status,
-                           check_requirements, colorstr, download, increment_path, init_seeds, print_args, yaml_save)
-from utils.loggers import GenericLogger
-from utils.plots import imshow_cls
-from utils.torch_utils import (ModelEMA, model_info, reshape_classifier_output, select_device, smart_DDP,
-                               smart_optimizer, smartCrossEntropyLoss, torch_distributed_zero_first)
 
 LOCAL_RANK = int(os.getenv('LOCAL_RANK', -1))  # https://pytorch.org/docs/stable/elastic/run.html
 RANK = int(os.getenv('RANK', -1))
@@ -135,8 +140,8 @@ def train(opt, device):
         if opt.verbose:
             LOGGER.info(model)
         images, labels = next(iter(trainloader))
-        file = imshow_cls(images[:25], labels[:25], names=model.names, f=save_dir / 'train_images.jpg')
-        logger.log_images(file, name='Train Examples')
+        # file = imshow_cls(images[:25], labels[:25], names=model.names, f=save_dir / 'train_images.jpg')
+        # logger.log_images(file, name='Train Examples')
         logger.log_graph(model, imgsz)  # log model
 
     # Optimizer
@@ -145,7 +150,7 @@ def train(opt, device):
     # Scheduler
     lrf = 0.01  # final lr (fraction of lr0)
     # lf = lambda x: ((1 + math.cos(x * math.pi / epochs)) / 2) * (1 - lrf) + lrf  # cosine
-    lf = lambda x: (1 - x / epochs) * (1 - lrf) + lrf  # linear
+    def lf(x): return (1 - x / epochs) * (1 - lrf) + lrf  # linear
     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
     # scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=lr0, total_steps=epochs, pct_start=0.1,
     #                                    final_div_factor=1 / 25 / lrf)
@@ -203,10 +208,10 @@ def train(opt, device):
 
                 # Test
                 if i == len(pbar) - 1:  # last batch
-                    top1, top5, vloss = validate.run(model=ema.ema,
-                                                     dataloader=testloader,
-                                                     criterion=criterion,
-                                                     pbar=pbar)  # test accuracy, loss
+                    top1, top5, vloss, tp, fp, fn = validate.run(model=ema.ema,
+                                                                 dataloader=testloader,
+                                                                 criterion=criterion,
+                                                                 pbar=pbar)  # test accuracy, loss
                     fitness = top1  # define fitness as top1 accuracy
 
         # Scheduler
@@ -243,8 +248,18 @@ def train(opt, device):
 
                 # Save last, best and delete
                 torch.save(ckpt, last)
+                confusion_matrices = {}
+                LOGGER.error(model.names)
+                for idx, name in enumerate(model.names):
+                    confusion_matrices[name] = {'tp': int(tp[idx]), 'fp': int(fp[idx]), 'fn': int(fn[idx])}
+                if confusion_matrices:
+                    with open(f'{wdir}/last.json', 'w+') as f:
+                        json.dump(confusion_matrices, f)
                 if best_fitness == fitness:
                     torch.save(ckpt, best)
+                    if confusion_matrices:
+                        with open(f'{wdir}/best.json', 'w+') as f:
+                            json.dump(confusion_matrices, f)
                 del ckpt
 
     # Train complete
