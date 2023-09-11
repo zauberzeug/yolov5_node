@@ -213,14 +213,10 @@ class Yolov5TrainerLogic(TrainerLogic):
             content = f.readlines()
         classification_detections = []
 
-        logging.error(content)
         for line in content:
-            logging.error(line)
             probability, c = line.split(' ', maxsplit=1)
             probability = float(probability) * 100
             c = c.strip()
-            logging.error(c)
-            logging.error(model_info.categories)
             category = [category for category in model_info.categories if category.name == c]
             if category:
                 category = category[0]
