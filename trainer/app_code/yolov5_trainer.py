@@ -311,7 +311,7 @@ class Yolov5TrainerLogic(TrainerLogic):
         return self.get_progress_from_log()
 
     def get_progress_from_log_cla(self) -> float:
-        if self.epochs == 0:
+        if self.epochs == 0 or not self.is_initialized:
             return 0.0
         lines = list(reversed(self.executor.get_log_by_lines()))
         for line in lines:
