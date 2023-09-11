@@ -34,8 +34,7 @@ then
 fi
 
 # sourcing .env file to get configuration (see README.md)
-. .env || echo "you should provide an .env file with USERNAME and PASSWORD for the Learning Loop"
-source .env
+. .env || echo "you should provide an .env file for the Learning Loop"
 
 if [ "$YOLOV5_MODE" == "CLASSIFICATION" ]; then
     echo "Mode is set to CLASSIFICATION"
@@ -45,14 +44,18 @@ else
     name="yolov5_trainer_node"
 fi
 
+# Get the directory of this script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
 run_args="-it --rm" 
 run_args+=" -v $(pwd)/../:/yolov5_node/"
 run_args+=" -v $HOME/data:/data"
 if [ "$LINKLL" == "TRUE" ]; then
-    run_args+=" -v $HOME/learning_loop_node/learning_loop_node:/usr/local/lib/python3.10/site-packages/learning_loop_node"
-    run_args+=" -v $HOME/learning_loop_node:/learning_loop_node"
+    echo "Linking Learning Loop"
+    run_args+=" -v $SCRIPT_DIR/../../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.10/site-packages/learning_loop_node"
+    run_args+=" -v $SCRIPT_DIR/../../../learning_loop_node:/learning_loop_node"
 fi
-run_args+=" -v $HOME/.vscode-server:/root/.vscode-server"
+#run_args+=" -v $HOME/.vscode-server:/root/.vscode-server"
 run_args+=" -e HOST=$HOST"
 run_args+=" -h ${HOSTNAME}_DEV"
 run_args+=" -e USERNAME=$USERNAME -e PASSWORD=$PASSWORD"
