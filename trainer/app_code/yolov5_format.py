@@ -70,7 +70,6 @@ def _create_set(training: Training, set_name: str) -> int:
 def _create_set_cla(training: Training, set_name: str):
     training_path = training.training_folder
     images_path = f'{training_path}/{set_name}'
-    print(images_path)
 
     shutil.rmtree(images_path, ignore_errors=True)
     os.makedirs(images_path, exist_ok=True)
@@ -86,17 +85,20 @@ def _create_set_cla(training: Training, set_name: str):
         # │   ├── class1
         # │   │   ├── image2.jpg
 
+    count = 0
     assert training.data is not None, 'Training should have data'
     for image in training.data.image_data:
         if image['set'] == set_name:
             image_name = image['id'] + '.jpg'
             classification = image['classification_annotation']
             if classification:
+                count += 1
                 category = classification['category_id']
                 category_name = [c for c in training.data.categories if c.id == category][0].name
                 image_path = f"{images_path}/{category_name}/{image_name}"
-                logging.info(f'linking {image_name} to {image_path}')
+                # logging.info(f'linking {image_name} to {image_path}')
                 os.symlink(f'{os.path.abspath(training.images_folder)}/{image_name}', image_path)
+    logging.info(f'Created {count} image links')
 
 
 def create_yaml(training: Training):
