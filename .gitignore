@@ -3,4 +3,4 @@ __pycache__/
 *.wts
 *.engine
 *.pt
-trainer/yolov5
+trainer/app_code/yolov5
