@@ -65,7 +65,11 @@ run_args+=" --ipc host"
 run_args+=" -p 7442:80"
 
 
-image="zauberzeug/yolov5-trainer:latest"
+if [ "$YOLOV5_MODE" == "CLASSIFICATION" ]; then
+    image="zauberzeug/yolov5-cla-trainer:latest"
+else
+    image="zauberzeug/yolov5-trainer:latest"
+fi
 
 build_args=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
 
