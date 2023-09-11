@@ -15,17 +15,21 @@ def category_lookup_from_training(training: Training) -> Dict:
     return {c.name: c.id for c in training.data.categories}
 
 
-def _create_set(training: Training, set_name: str):
+def _create_set(training: Training, set_name: str) -> int:
     categories = list(category_lookup_from_training(training).values())
     training_path = training.training_folder
     images_path = f'{training_path}/{set_name}'
 
     shutil.rmtree(images_path, ignore_errors=True)
     os.makedirs(images_path, exist_ok=True)
+    img_count = 0
 
     assert training.data is not None, 'Training should have data'
+    logging.info(f'imagedata: {training.data.image_data}')
     for image in training.data.image_data:
+        logging.info(f'processing image {image["set"]} - {image["set"] == set_name}')
         if image['set'] == set_name:
+            img_count += 1
             image_name = image['id'] + '.jpg'
             image_path = f"{images_path}/{image_name}"
             width = float(image['width'])
@@ -43,8 +47,6 @@ def _create_set(training: Training, set_name: str):
                     box['width'] / width,
                     box['height'] / height,
                 ]
-                print('<<<<<<<<<<<<<', box['category_id'])
-                print('<<<<<<<<<<<<<', categories)
                 c_id = str(categories.index(box['category_id']))
                 yolo_boxes.append(c_id + ' ' + ' '.join([f"{c:.6f}" for c in coords]) + '\n')
 
@@ -61,6 +63,8 @@ def _create_set(training: Training, set_name: str):
 
             with open(f'{images_path}/{image["id"]}.txt', 'w') as l:
                 l.writelines(yolo_boxes)
+
+    return img_count
 
 
 def _create_set_cla(training: Training, set_name: str):
@@ -127,9 +131,11 @@ def create_file_structure(training: Training):
     path = training.training_folder
     Path(path).mkdir(parents=True, exist_ok=True)
 
-    _create_set(training, 'test')
-    _create_set(training, 'train')
+    num_test_imgs = _create_set(training, 'test')
+    num_train_imgs = _create_set(training, 'train')
     create_yaml(training)
+
+    logging.info(f'Prepared file structure with {num_train_imgs} training images and {num_test_imgs} test images')
 
 
 def update_hyp(yaml_path: str, hyperparameter: Hyperparameter):

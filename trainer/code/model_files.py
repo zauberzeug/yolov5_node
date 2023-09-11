@@ -52,7 +52,6 @@ def _try_remove(file: Path):
 
 def get_new(training_path: Path) -> Union[Path, None]:
     all_weightfiles = get_all_weightfiles(training_path)
-    print('<<<<<<<<<<<<<<<<<<', all_weightfiles)
     if all_weightfiles:
         all_weightfiles.sort(key=_epoch_from_weightfile)
         return all_weightfiles[-1]

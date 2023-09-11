@@ -79,10 +79,9 @@ async def test_cla_training_creates_model(use_training_dir, data_exchanger, glc)
     yolov5_format.create_file_structure_cla(training)
     logging.info(training.training_folder)  # /tmp/test_training/
     logging.info([p for p in Path(f'{training.training_folder}/train/green classification/').iterdir()])
-    print('<<<<<<<<<<<<<<<<< BEFORE EXECUTOR')
     executor = Executor(os.getcwd())
     # from https://github.com/WongKinYiu/yolor#training
-    cmd = f'WANDB_MODE=disabled python /app/yolov5/classify/train.py --project training --name result --batch 4 --img 416 --data {training.training_folder} --model yolov5s-cls.pt --epochs 1'
+    cmd = f'WANDB_MODE=disabled python /app/code/yolov5/classify/train.py --project training --name result --batch 4 --img 416 --data {training.training_folder} --model yolov5s-cls.pt --epochs 1'
     executor.start(cmd)
     while executor.is_process_running():
         sleep(1)
@@ -117,7 +116,7 @@ async def test_cla_parse_progress_from_log(use_training_dir, data_exchanger, glc
     await asyncio.sleep(120)
 
     trainer._executor = Executor(os.getcwd())
-    cmd = f'WANDB_MODE=disabled python /app/yolov5/classify/train.py --project training --name result --batch 4 --img 416 --data {trainer.training.training_folder} --model yolov5s-cls.pt --epochs {trainer.epochs}'
+    cmd = f'WANDB_MODE=disabled python /app/code/yolov5/classify/train.py --project training --name result --batch 4 --img 416 --data {trainer.training.training_folder} --model yolov5s-cls.pt --epochs {trainer.epochs}'
     trainer.executor.start(cmd)
     while trainer.executor.is_process_running():
         sleep(1)

@@ -78,12 +78,12 @@ class Yolov5TrainerLogic(TrainerLogic):
 
         if self.is_cla:
             batch_size = 4  # TODO check why batchsize is updated here
-            cmd = f'WANDB_MODE=disabled python /app/yolov5/classify/train.py --exist-ok --batch-size {batch_size} --img {resolution} --data {self.training.training_folder} --model {model} --project {self.training.training_folder} --name result --epochs {self.epochs} --optimizer SGD {additional_parameters}'
+            cmd = f'WANDB_MODE=disabled python /app/code/yolov5/classify/train.py --exist-ok --batch-size {batch_size} --img {resolution} --data {self.training.training_folder} --model {model} --project {self.training.training_folder} --name result --epochs {self.epochs} --optimizer SGD {additional_parameters}'
         else:
             hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
             self.try_replace_optimized_hyperparameter()
             batch_size = await batch_size_calculation.calc(self.training.training_folder, model, hyperparameter_path, f'{self.training.training_folder}/dataset.yaml', resolution)
-            cmd = f'WANDB_MODE=disabled python /app/yolov5/train.py --exist-ok --patience {self.patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs} {additional_parameters}'
+            cmd = f'WANDB_MODE=disabled python /app/code/yolov5/train.py --exist-ok --patience {self.patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs} {additional_parameters}'
             with open(hyperparameter_path) as f:
                 logging.info(f'running training with command :\n {cmd} \nand hyperparameter\n{f.read()}')
         self.executor.start(cmd)
@@ -155,7 +155,8 @@ class Yolov5TrainerLogic(TrainerLogic):
         if self.is_cla:
             return {self.model_format: ['/tmp/model.pt', f'{training_path}/result/opt.yaml']}
         else:
-            subprocess.run(f'python3 /app/yolov5/gen_wts.py -w {weightfile} -o /tmp/model.wts', shell=True, check=False)
+            subprocess.run(
+                f'python3 /app/code/yolov5/gen_wts.py -w {weightfile} -o /tmp/model.wts', shell=True, check=False)
             return {self.model_format: ['/tmp/model.pt', f'{training_path}/hyp.yaml'],
                     'yolov5_wts': ['/tmp/model.wts']}
 
@@ -168,15 +169,15 @@ class Yolov5TrainerLogic(TrainerLogic):
             os.symlink(img, f'{images_folder}/{image_name}')
 
         logging.info('start detections')
-        shutil.rmtree('/app/yolov5/runs', ignore_errors=True)
-        os.makedirs('/app/yolov5/runs')
+        shutil.rmtree('/app/code/yolov5/runs', ignore_errors=True)
+        os.makedirs('/app/code/yolov5/runs')
         executor = Executor(images_folder)
         img_size = model_information.resolution
 
         if self.is_cla:
-            cmd = f'python /app/yolov5/classify/predict.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --save-txt'
+            cmd = f'python /app/code/yolov5/classify/predict.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --save-txt'
         else:
-            cmd = f'python /app/yolov5/detect.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --conf-thres 0.2 --save-txt --save-conf'
+            cmd = f'python /app/code/yolov5/detect.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --conf-thres 0.2 --save-txt --save-conf'
         executor.start(cmd)
         while executor.is_process_running():
             await sleep(1)
@@ -187,7 +188,7 @@ class Yolov5TrainerLogic(TrainerLogic):
 
         detections = []
         logging.info('start parsing detections')
-        labels_path = '/app/yolov5/runs/predict-cls/exp/labels' if self.is_cla else '/yolov5/runs/detect/exp/labels'
+        labels_path = '/app/code/yolov5/runs/predict-cls/exp/labels' if self.is_cla else '/yolov5/runs/detect/exp/labels'
         detections = await asyncio.get_event_loop().run_in_executor(None, self._parse, labels_path, images_folder, model_information)
 
         return detections

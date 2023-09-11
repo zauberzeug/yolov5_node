@@ -13,7 +13,7 @@ from learning_loop_node.loop_communication import LoopCommunicator
 icecream.install()
 logging.basicConfig(level=logging.INFO)
 
-load_dotenv()
+# load_dotenv()
 
 
 @pytest.fixture()

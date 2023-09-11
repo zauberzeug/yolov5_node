@@ -46,9 +46,9 @@ RUN python3 -m pip install "learning_loop_node==v0.7.55"
 # fetch trainer code
 COPY ./ /yolov5_node/trainer/
 
-# link trainer code to /app and yolov5 into /app/yolov5
+# link trainer code to /app and yolov5 into /app/code/yolov5
 RUN ln -sf /yolov5_node/trainer /app 
-RUN ln -sf /yolov5 /app/yolov5
+RUN ln -sf /yolov5 /app/code/yolov5
 RUN git config --global --add safe.directory /yolov5_node && git config --global --add safe.directory /learning_loop_node
 
 WORKDIR /app
