@@ -95,9 +95,7 @@ def _create_set_cla(training: Training, set_name: str):
             if classification:
                 category = classification['category_id']
                 category_name = [c for c in training.data.categories if c.id == category][0].name
-                logging.error(f'category_name: {category_name}')
                 image_path = f"{images_path}/{category_name}/{image_name}"
-                logging.info('image_path: ' + image_path)
                 logging.info(f'linking {image_name} to {image_path}')
                 os.symlink(f'{os.path.abspath(training.images_folder)}/{image_name}', image_path)
 

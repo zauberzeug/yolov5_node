@@ -1,11 +1,12 @@
 import logging
 import os
-from code.yolov5_trainer import Yolov5TrainerLogic
 
 import icecream
 import uvicorn
 from dotenv import load_dotenv
 from learning_loop_node import TrainerNode
+
+from app_code.yolov5_trainer import Yolov5TrainerLogic
 
 icecream.install()
 
