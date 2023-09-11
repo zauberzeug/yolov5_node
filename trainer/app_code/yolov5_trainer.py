@@ -149,6 +149,8 @@ class Yolov5TrainerLogic(TrainerLogic):
     def get_latest_model_files(self) -> Union[List[str], Dict[str, List[str]]]:
         path = (self.training_folder / 'result/weights/published').absolute()
         weightfile = f'{path}/latest.pt'
+        if not os.path.isfile(weightfile):
+            raise Exception(f'No model found at {weightfile}')
         shutil.copy(weightfile, '/tmp/model.pt')
         training_path = '/'.join(weightfile.split('/')[:-4])
 
