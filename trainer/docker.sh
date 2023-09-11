@@ -52,9 +52,9 @@ run_args+=" -v $(pwd)/../:/yolov5_node/"
 run_args+=" -v $HOME/data:/data"
 if [ "$LINKLL" == "TRUE" ]; then
     echo "Linking Learning Loop from"
-    echo "$SCRIPT_DIR/../../../learning_loop_node"
-    run_args+=" -v $SCRIPT_DIR/../../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.10/site-packages/learning_loop_node"
-    # run_args+=" -v $SCRIPT_DIR/../../../learning_loop_node:/learning_loop_node"
+    echo "$SCRIPT_DIR/../../learning_loop_node"
+    run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.10/site-packages/learning_loop_node"
+    # run_args+=" -v $SCRIPT_DIR/../../learning_loop_node:/learning_loop_node"
 fi
 #run_args+=" -v $HOME/.vscode-server:/root/.vscode-server"
 run_args+=" -e HOST=$HOST"
