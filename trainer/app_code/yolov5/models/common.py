@@ -26,7 +26,7 @@ from IPython.display import display
 from PIL import Image
 from torch.cuda import amp
 
-sys.path.append("app_code/yolov5")
+sys.path.append(str(Path(__file__).resolve() / '../'))
 if True:
     from utils import TryExcept
     from utils.dataloaders import exif_transpose, letterbox

@@ -9,7 +9,7 @@ import numpy as np
 import torch
 from torch import nn
 
-sys.path.append("app_code/yolov5")
+sys.path.append(str(Path(__file__).resolve() / '../'))
 if True:
     from utils.downloads import attempt_download
 

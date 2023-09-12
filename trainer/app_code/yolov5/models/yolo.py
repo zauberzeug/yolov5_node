@@ -17,7 +17,7 @@ from pathlib import Path
 from .common import *
 from .experimental import *
 
-sys.path.append("app_code/yolov5")
+sys.path.append(str(Path(__file__).resolve() / '../'))
 if True:
     from utils.autoanchor import check_anchor_order
     from utils.general import (LOGGER, check_version, check_yaml,
