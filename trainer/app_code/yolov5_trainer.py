@@ -178,6 +178,8 @@ class Yolov5TrainerLogic(TrainerLogic):
             cmd = f'python /app/pred_cla.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --save-txt'
         else:
             cmd = f'python /app/pred_det.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --conf-thres 0.2 --save-txt --save-conf'
+        logging.info(f'running detection with command :\n {cmd}')
+
         executor.start(cmd)
         while executor.is_process_running():
             await sleep(1)
@@ -200,7 +202,7 @@ class Yolov5TrainerLogic(TrainerLogic):
                 uuid = os.path.splitext(os.path.basename(filename.path))[0]
                 if self.is_cla:
                     classification_detections = self._parse_file_cla(model_information, filename)
-                    detections.append({'image_id': uuid, 'classification_detections': classification_detections})
+                    detections.append(Detections(classification_detections=classification_detections, image_id=uuid))
                 else:
                     box_detections, point_detections = self._parse_file(model_information, images_folder, filename.path)
                     detections.append(Detections(box_detections=box_detections,
