@@ -102,7 +102,7 @@ case $cmd in
         docker stop $name $cmd_args
         ;;
     u | up)
-        docker run -d $name $cmd_args
+        docker run -d $run_args $image $cmd_args
         ;;
     k | kill)
         docker kill $name $cmd_args
