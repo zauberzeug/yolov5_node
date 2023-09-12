@@ -14,6 +14,16 @@ import sys
 from copy import deepcopy
 from pathlib import Path
 
+from ..utils.autoanchor import check_anchor_order
+from ..utils.general import (LOGGER, check_version, check_yaml, make_divisible,
+                             print_args)
+from ..utils.plots import feature_visualization
+from ..utils.torch_utils import (fuse_conv_and_bn, initialize_weights,
+                                 model_info, profile, scale_img, select_device,
+                                 time_sync)
+from .common import *
+from .experimental import *
+
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[1]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
@@ -21,13 +31,6 @@ if str(ROOT) not in sys.path:
 if platform.system() != 'Windows':
     ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
-from models.common import *
-from models.experimental import *
-from utils.autoanchor import check_anchor_order
-from utils.general import LOGGER, check_version, check_yaml, make_divisible, print_args
-from utils.plots import feature_visualization
-from utils.torch_utils import (fuse_conv_and_bn, initialize_weights, model_info, profile, scale_img, select_device,
-                               time_sync)
 
 try:
     import thop  # for FLOPs computation
@@ -191,7 +194,7 @@ class DetectionModel(BaseModel):
         if isinstance(m, (Detect, Segment)):
             s = 256  # 2x min stride
             m.inplace = self.inplace
-            forward = lambda x: self.forward(x)[0] if isinstance(m, Segment) else self.forward(x)
+            def forward(x): return self.forward(x)[0] if isinstance(m, Segment) else self.forward(x)
             m.stride = torch.tensor([s / x.shape[-2] for x in forward(torch.zeros(1, ch, s, s))])  # forward
             check_anchor_order(m)
             m.anchors /= m.stride.view(-1, 1, 1)

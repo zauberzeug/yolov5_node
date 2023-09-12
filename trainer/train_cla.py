@@ -25,28 +25,30 @@ from pathlib import Path
 
 import torch
 import torch.distributed as dist
-import torch.hub as hub
-import torch.optim.lr_scheduler as lr_scheduler
 import torchvision
+from torch import hub
 from torch.cuda import amp
+from torch.optim import lr_scheduler
 from tqdm import tqdm
 
-from ..models.experimental import attempt_load
-from ..models.yolo import ClassificationModel, DetectionModel
-from ..utils.dataloaders import create_classification_dataloader
-from ..utils.general import (DATASETS_DIR, LOGGER, TQDM_BAR_FORMAT,
-                             WorkingDirectory, check_git_info,
-                             check_git_status, check_requirements, colorstr,
-                             download, increment_path, init_seeds, print_args,
-                             yaml_save)
-from ..utils.loggers import GenericLogger
-from ..utils.plots import imshow_cls
-from ..utils.torch_utils import (ModelEMA, model_info,
-                                 reshape_classifier_output, select_device,
-                                 smart_DDP, smart_optimizer,
-                                 smartCrossEntropyLoss,
-                                 torch_distributed_zero_first)
-from . import val as validate
+from app_code.yolov5.classify import val as validate
+from app_code.yolov5.models.experimental import attempt_load
+from app_code.yolov5.models.yolo import ClassificationModel, DetectionModel
+from app_code.yolov5.utils.dataloaders import create_classification_dataloader
+from app_code.yolov5.utils.general import (DATASETS_DIR, LOGGER,
+                                           TQDM_BAR_FORMAT, WorkingDirectory,
+                                           check_git_info, check_git_status,
+                                           check_requirements, colorstr,
+                                           download, increment_path,
+                                           init_seeds, print_args, yaml_save)
+from app_code.yolov5.utils.loggers import GenericLogger
+from app_code.yolov5.utils.plots import imshow_cls
+from app_code.yolov5.utils.torch_utils import (ModelEMA, model_info,
+                                               reshape_classifier_output,
+                                               select_device, smart_DDP,
+                                               smart_optimizer,
+                                               smartCrossEntropyLoss,
+                                               torch_distributed_zero_first)
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[1]  # YOLOv5 root directory

@@ -3,7 +3,8 @@ import os
 import struct
 
 import torch
-from utils.torch_utils import select_device
+
+from .utils.torch_utils import select_device
 
 
 def parse_args():
