@@ -25,7 +25,9 @@ import os
 import sys
 from pathlib import Path
 
+import numpy as np
 import torch
+from sklearn.metrics import confusion_matrix
 from tqdm import tqdm
 
 from ..models.common import DetectMultiBackend
@@ -40,6 +42,14 @@ ROOT = FILE.parents[1]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
+
+
+def calculate_performance(confusion_matrix):
+    classes = confusion_matrix.shape[0]
+    tp = np.diag(confusion_matrix)
+    fn = [confusion_matrix[i, :].sum() - tp[i] for i in range(classes)]
+    fp = [confusion_matrix[:, i].sum() - tp[i] for i in range(classes)]
+    return tp, fn, fp
 
 
 @smart_inference_mode()
@@ -119,6 +129,8 @@ def run(
 
     loss /= n
     pred, targets = torch.cat(pred), torch.cat(targets)
+    cm = confusion_matrix(targets.cpu(), pred.cpu()[:, 0], labels=range(len(model.names)))
+    tp, fn, fp = calculate_performance(cm)
     correct = (targets[:, None] == pred).float()
     acc = torch.stack((correct[:, 0], correct.max(1).values), dim=1)  # (top1, top5) accuracy
     top1, top5 = acc.mean(0).tolist()
@@ -139,7 +151,7 @@ def run(
         LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms post-process per image at shape {shape}' % t)
         LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}")
 
-    return top1, top5, loss
+    return top1, top5, loss, tp, fp, fn
 
 
 def parse_opt():
