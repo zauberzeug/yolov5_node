@@ -4,12 +4,13 @@ Experimental modules
 """
 import math
 import sys
+from pathlib import Path
 
 import numpy as np
 import torch
 from torch import nn
 
-sys.path.append(str(Path(__file__).resolve() / '../'))
+sys.path.append(str(Path(__file__).parents[1].resolve()))
 if True:
     from utils.downloads import attempt_download
 

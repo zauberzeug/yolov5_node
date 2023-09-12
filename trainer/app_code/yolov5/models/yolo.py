@@ -17,7 +17,7 @@ from pathlib import Path
 from .common import *
 from .experimental import *
 
-sys.path.append(str(Path(__file__).resolve() / '../'))
+sys.path.append(str(Path(__file__).parents[1].resolve()))
 if True:
     from utils.autoanchor import check_anchor_order
     from utils.general import (LOGGER, check_version, check_yaml,
