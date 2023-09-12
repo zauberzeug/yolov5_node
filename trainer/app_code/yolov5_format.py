@@ -10,7 +10,6 @@ from ruamel.yaml import YAML
 
 
 def category_lookup_from_training(training: Training) -> Dict:
-
     assert training.data is not None, 'Training should have data'
     return {c.name: c.id for c in training.data.categories}
 

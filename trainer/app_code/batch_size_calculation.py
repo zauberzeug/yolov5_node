@@ -5,7 +5,7 @@ from multiprocessing import Process, Queue
 
 import torch
 import yaml
-from learning_loop_node.helpers import get_free_memory_mb
+from learning_loop_node.helper_functions.helpers import get_free_memory_mb
 from torchinfo import Verbosity, summary
 
 from .yolov5.models.yolo import Model
