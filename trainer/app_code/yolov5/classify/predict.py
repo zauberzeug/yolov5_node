@@ -37,19 +37,21 @@ from pathlib import Path
 import torch
 import torch.nn.functional as F
 
+from ..models.common import DetectMultiBackend
+from ..utils.augmentations import classify_transforms
+from ..utils.dataloaders import (IMG_FORMATS, VID_FORMATS, LoadImages,
+                                 LoadScreenshots, LoadStreams)
+from ..utils.general import (LOGGER, Profile, check_file, check_img_size,
+                             check_imshow, check_requirements, colorstr, cv2,
+                             increment_path, print_args, strip_optimizer)
+from ..utils.plots import Annotator
+from ..utils.torch_utils import select_device, smart_inference_mode
+
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[1]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
-
-from models.common import DetectMultiBackend
-from utils.augmentations import classify_transforms
-from utils.dataloaders import IMG_FORMATS, VID_FORMATS, LoadImages, LoadScreenshots, LoadStreams
-from utils.general import (LOGGER, Profile, check_file, check_img_size, check_imshow, check_requirements, colorstr, cv2,
-                           increment_path, print_args, strip_optimizer)
-from utils.plots import Annotator
-from utils.torch_utils import select_device, smart_inference_mode
 
 
 @smart_inference_mode()

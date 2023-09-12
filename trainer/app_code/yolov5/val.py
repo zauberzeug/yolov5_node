@@ -29,21 +29,23 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+from .models.common import DetectMultiBackend
+from .utils.callbacks import Callbacks
+from .utils.dataloaders import create_dataloader
+from .utils.general import (LOGGER, TQDM_BAR_FORMAT, Profile, check_dataset,
+                            check_img_size, check_requirements, check_yaml,
+                            coco80_to_coco91_class, colorstr, increment_path,
+                            non_max_suppression, print_args, scale_boxes,
+                            xywh2xyxy, xyxy2xywh)
+from .utils.metrics import ConfusionMatrix, ap_per_class, box_iou
+from .utils.plots import output_to_target, plot_images, plot_val_study
+from .utils.torch_utils import select_device, smart_inference_mode
+
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
-
-from models.common import DetectMultiBackend
-from utils.callbacks import Callbacks
-from utils.dataloaders import create_dataloader
-from utils.general import (LOGGER, TQDM_BAR_FORMAT, Profile, check_dataset, check_img_size, check_requirements,
-                           check_yaml, coco80_to_coco91_class, colorstr, increment_path, non_max_suppression,
-                           print_args, scale_boxes, xywh2xyxy, xyxy2xywh)
-from utils.metrics import ConfusionMatrix, ap_per_class, box_iou
-from utils.plots import output_to_target, plot_images, plot_val_study
-from utils.torch_utils import select_device, smart_inference_mode
 
 
 def save_one_txt(predn, save_conf, shape, file):
@@ -292,7 +294,7 @@ def run(
     for i, c in enumerate(ap_class):
         fn = tp[i] / r[i] - tp[i] if r[i] != 0 else 0
         confusion_matrices[names[c]] = {'tp': int(tp[i]), 'fp': int(fp[i]), 'fn': int(fn)}
-    
+
     # Print speeds
     t = tuple(x.t / seen * 1E3 for x in dt)  # speeds per image
     if not training:
