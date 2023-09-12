@@ -6,6 +6,8 @@ import torch
 
 from .utils.torch_utils import select_device
 
+# wget https://raw.githubusercontent.com/wang-xinyu/tensorrtx/master/yolov5/gen_wts.py
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Convert .pt file to .wts')

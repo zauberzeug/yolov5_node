@@ -4,15 +4,18 @@ if [ $# -eq 0 ]
 then
     echo "Usage:"
     echo
+    echo "  `basename $0` (a | attach)  [<containers>]      Exec bash"
     echo "  `basename $0` (b | build)   [<containers>]      Build or rebuild"
     echo "  `basename $0` (bnc | build-no-cache) [<c>]      Build or rebuild without cache"
-    echo "  `basename $0` (u | up)      [<containers>]      Create and start"
-    echo "  `basename $0` (U | upbuild) [<containers>]      Create and start (force build)"
-    echo "  `basename $0` (d | down)    [<containers>]      Stop and remove"
-    echo "  `basename $0` (s | start)   [<containers>]      Start"
-    echo "  `basename $0` (r | restart) [<containers>]      Restart"
-    echo "  `basename $0` (h | stop)    [<containers>]      Stop (halt)"
+    echo "  `basename $0` (d | debug)   [<containers>]      Start in debug mode"
+    echo "  `basename $0` (e | exec)    [<containers>]      Exec cmd"
+    echo "  `basename $0` (p | push)    [<containers>]      Push image"
+    echo "  `basename $0` (s | stop)    [<containers>]      Stop"
+    echo "  `basename $0` (r | run)     [<containers>]      Run"
+    echo "  `basename $0` (rm)          [<containers>]      Kill and remove"
+    echo "  `basename $0` (r | run)     [<containers>]      Run"
     echo "  `basename $0` (k | kill)    [<containers>]      Kill"
+    echo "  `basename $0` (l | log)     [<containers>]      Attach to log"
     echo "  `basename $0` ps            [<containers>]      List"
     echo "  `basename $0` rm            [<containers>]      Remove"
     echo "  `basename $0` stats                             Show statistics"
@@ -95,9 +98,6 @@ case $cmd in
     r | run)
         docker run -it $run_args $image $cmd_args
         ;;
-    ri | run-image)
-        docker run -it $run_args $image $cmd_args
-        ;;
     s | stop)
         docker stop $name $cmd_args
         ;;
@@ -109,7 +109,7 @@ case $cmd in
         docker rm $name $cmd_args
         ;;
     l | log | logs)
-        docker logs -f --tail 100 $cmd_args $name
+        docker logs -f -n 100 $cmd_args $name
         ;;
     e | exec)
         docker exec $name $cmd_args 
