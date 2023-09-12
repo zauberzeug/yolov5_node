@@ -3,12 +3,15 @@
 Experimental modules
 """
 import math
+import sys
 
 import numpy as np
 import torch
 from torch import nn
 
-from ..utils.downloads import attempt_download
+sys.path.append("app_code/yolov5")
+if True:
+    from utils.downloads import attempt_download
 
 
 class Sum(nn.Module):
@@ -72,7 +75,7 @@ class Ensemble(nn.ModuleList):
 
 def attempt_load(weights, device=None, inplace=True, fuse=True):
     # Loads an ensemble of models weights=[a,b,c] or a single model weights=[a] or weights=a
-    from models.yolo import Detect, Model
+    from .yolo import Detect, Model
 
     model = Ensemble()
     for w in weights if isinstance(weights, list) else [weights]:

@@ -8,6 +8,7 @@ import contextlib
 import json
 import math
 import platform
+import sys
 import warnings
 import zipfile
 from collections import OrderedDict, namedtuple
@@ -25,15 +26,17 @@ from IPython.display import display
 from PIL import Image
 from torch.cuda import amp
 
-from ..utils import TryExcept
-from ..utils.dataloaders import exif_transpose, letterbox
-from ..utils.general import (LOGGER, ROOT, Profile, check_requirements,
-                             check_suffix, check_version, colorstr,
-                             increment_path, is_notebook, make_divisible,
-                             non_max_suppression, scale_boxes, xywh2xyxy,
-                             xyxy2xywh, yaml_load)
-from ..utils.plots import Annotator, colors, save_one_box
-from ..utils.torch_utils import copy_attr, smart_inference_mode
+sys.path.append("app_code/yolov5")
+if True:
+    from utils import TryExcept
+    from utils.dataloaders import exif_transpose, letterbox
+    from utils.general import (LOGGER, ROOT, Profile, check_requirements,
+                               check_suffix, check_version, colorstr,
+                               increment_path, is_notebook, make_divisible,
+                               non_max_suppression, scale_boxes, xywh2xyxy,
+                               xyxy2xywh, yaml_load)
+    from utils.plots import Annotator, colors, save_one_box
+    from utils.torch_utils import copy_attr, smart_inference_mode
 
 
 def autopad(k, p=None, d=1):  # kernel, padding, dilation
@@ -331,7 +334,7 @@ class DetectMultiBackend(nn.Module):
         #   TensorFlow Lite:                *.tflite
         #   TensorFlow Edge TPU:            *_edgetpu.tflite
         #   PaddlePaddle:                   *_paddle_model
-        from models.experimental import (  # scoped to avoid circular import
+        from .experimental import (  # scoped to avoid circular import
             attempt_download, attempt_load)
 
         super().__init__()
@@ -604,8 +607,8 @@ class DetectMultiBackend(nn.Module):
     def _model_type(p='path/to/model.pt'):
         # Return model type from model path, i.e. path='path/to/model.onnx' -> type=onnx
         # types = [pt, jit, onnx, xml, engine, coreml, saved_model, pb, tflite, edgetpu, tfjs, paddle]
-        from export import export_formats
-        from utils.downloads import is_url
+        from ..export import export_formats
+        from ..utils.downloads import is_url
         sf = list(export_formats().Suffix)  # export suffixes
         if not is_url(p, check=False):
             check_suffix(p, sf)  # checks

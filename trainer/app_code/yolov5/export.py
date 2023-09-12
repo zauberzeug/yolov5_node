@@ -60,6 +60,16 @@ import pandas as pd
 import torch
 from torch.utils.mobile_optimizer import optimize_for_mobile
 
+from .models.experimental import attempt_load
+from .models.yolo import (ClassificationModel, Detect, DetectionModel,
+                          SegmentationModel)
+from .utils.dataloaders import LoadImages
+from .utils.general import (LOGGER, Profile, check_dataset, check_img_size,
+                            check_requirements, check_version, check_yaml,
+                            colorstr, file_size, get_default_args, print_args,
+                            url2file, yaml_save)
+from .utils.torch_utils import select_device, smart_inference_mode
+
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
@@ -67,12 +77,6 @@ if str(ROOT) not in sys.path:
 if platform.system() != 'Windows':
     ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
-from models.experimental import attempt_load
-from models.yolo import ClassificationModel, Detect, DetectionModel, SegmentationModel
-from utils.dataloaders import LoadImages
-from utils.general import (LOGGER, Profile, check_dataset, check_img_size, check_requirements, check_version,
-                           check_yaml, colorstr, file_size, get_default_args, print_args, url2file, yaml_save)
-from utils.torch_utils import select_device, smart_inference_mode
 
 MACOS = platform.system() == 'Darwin'  # macOS environment
 
@@ -319,9 +323,9 @@ def export_saved_model(model,
     except Exception:
         check_requirements(f"tensorflow{'' if torch.cuda.is_available() else '-macos' if MACOS else '-cpu'}")
         import tensorflow as tf
-    from tensorflow.python.framework.convert_to_constants import convert_variables_to_constants_v2
-
     from models.tf import TFModel
+    from tensorflow.python.framework.convert_to_constants import \
+        convert_variables_to_constants_v2
 
     LOGGER.info(f'\n{prefix} starting export with tensorflow {tf.__version__}...')
     f = str(file).replace('.pt', '_saved_model')
@@ -356,7 +360,8 @@ def export_saved_model(model,
 def export_pb(keras_model, file, prefix=colorstr('TensorFlow GraphDef:')):
     # YOLOv5 TensorFlow GraphDef *.pb export https://github.com/leimao/Frozen_Graph_TensorFlow
     import tensorflow as tf
-    from tensorflow.python.framework.convert_to_constants import convert_variables_to_constants_v2
+    from tensorflow.python.framework.convert_to_constants import \
+        convert_variables_to_constants_v2
 
     LOGGER.info(f'\n{prefix} starting export with tensorflow {tf.__version__}...')
     f = file.with_suffix('.pb')
