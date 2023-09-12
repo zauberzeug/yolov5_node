@@ -9,13 +9,13 @@ then
     echo "  `basename $0` (bnc | build-no-cache) [<c>]      Build or rebuild without cache"
     echo "  `basename $0` (d | debug)   [<containers>]      Start in debug mode"
     echo "  `basename $0` (e | exec)    [<containers>]      Exec cmd"
-    echo "  `basename $0` (p | push)    [<containers>]      Push image"
-    echo "  `basename $0` (s | stop)    [<containers>]      Stop"
-    echo "  `basename $0` (r | run)     [<containers>]      Run"
-    echo "  `basename $0` (rm)          [<containers>]      Kill and remove"
-    echo "  `basename $0` (r | run)     [<containers>]      Run"
     echo "  `basename $0` (k | kill)    [<containers>]      Kill"
     echo "  `basename $0` (l | log)     [<containers>]      Attach to log"
+    echo "  `basename $0` (p | push)    [<containers>]      Push image"
+    echo "  `basename $0` (r | run)     [<containers>]      Run"
+    echo "  `basename $0` (rm)          [<containers>]      Kill and remove"
+    echo "  `basename $0` (s | stop)    [<containers>]      Stop"
+    echo "  `basename $0` (u | up)      [<containers>]      Start detached"
     echo "  `basename $0` ps            [<containers>]      List"
     echo "  `basename $0` rm            [<containers>]      Remove"
     echo "  `basename $0` stats                             Show statistics"
@@ -100,6 +100,9 @@ case $cmd in
         ;;
     s | stop)
         docker stop $name $cmd_args
+        ;;
+    u | up)
+        docker run -d $name $cmd_args
         ;;
     k | kill)
         docker kill $name $cmd_args
