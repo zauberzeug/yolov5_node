@@ -116,7 +116,7 @@ async def test_training_creates_model(use_training_dir, data_exchanger: DataExch
 
     executor = Executor(os.getcwd())
     # from https://github.com/WongKinYiu/yolor#training
-    cmd = 'WANDB_MODE=disabled python /app/app_code/yolov5/train.py --project training --name result --batch 4 --img 416 --data training/dataset.yaml --weights model.pt --epochs 1'
+    cmd = 'WANDB_MODE=disabled python /app/train_det.py --project training --name result --batch 4 --img 416 --data training/dataset.yaml --weights model.pt --epochs 1'
     executor.start(cmd)
     while executor.is_process_running():
         sleep(1)
@@ -147,7 +147,7 @@ async def test_parse_progress_from_log(use_training_dir, data_exchanger: DataExc
     yolov5_format.create_file_structure(trainer.training)
 
     trainer._executor = Executor(os.getcwd())
-    cmd = f'WANDB_MODE=disabled python /app/app_code/yolov5/train.py --project training --name result --batch 4 --img 416 --data training/dataset.yaml --weights model.pt --epochs {trainer.epochs}'
+    cmd = f'WANDB_MODE=disabled python /app/train_det.py --project training --name result --batch 4 --img 416 --data training/dataset.yaml --weights model.pt --epochs {trainer.epochs}'
     trainer.executor.start(cmd)
     while trainer.executor.is_process_running():
         sleep(1)
