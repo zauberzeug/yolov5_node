@@ -26,14 +26,17 @@ RUN pip install --no-cache -U torch torchvision numpy Pillow
 WORKDIR /
 
 
+# fetch trainer code
+COPY ./ /yolov5_node/trainer/
+
 # fetch yolov5 code
-RUN git clone https://github.com/ultralytics/yolov5.git
-WORKDIR /yolov5
-RUN touch /yolov5/__init__.py
-RUN git checkout 342fe05e6c88221750ce7e90b7d2e8baabd397dc
-COPY yolov5_patches/*.patch ./
-RUN git apply confusion_matrices.patch && git apply clear_epochs.patch && git apply ignore_previous_fitness.patch && git apply confusion_matrices_classification.patch && rm *.patch
-RUN python3 -m pip install --no-cache -r requirements.txt
+#RUN git clone https://github.com/ultralytics/yolov5.git
+#WORKDIR /yolov5
+#RUN touch /yolov5/__init__.py
+#RUN git checkout 342fe05e6c88221750ce7e90b7d2e8baabd397dc
+#COPY yolov5_patches/*.patch ./
+#RUN git apply confusion_matrices.patch && git apply clear_epochs.patch && git apply ignore_previous_fitness.patch && git apply confusion_matrices_classification.patch && rm *.patch
+RUN python3 -m pip install --no-cache -r /yolov5_node/trainer/app_code/yolov5/requirements.txt
 RUN pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof
 
 # wts file generator for detector format
@@ -43,12 +46,10 @@ RUN python3 -m pip install autopep8 debugpy gunicorn pyyaml uvloop pytest-asynci
 # LL_NODE-Library can be overwritten by local version if environment variable LINKLL is set to TRUE
 RUN python3 -m pip install "learning_loop_node==v0.7.55"
 
-# fetch trainer code
-COPY ./ /yolov5_node/trainer/
 
 # link trainer code to /app and yolov5 into /app/app_code/yolov5
 RUN ln -sf /yolov5_node/trainer /app 
-RUN ln -sf /yolov5 /app/app_code/yolov5
+#RUN ln -sf /yolov5 /app/app_code/yolov5
 RUN git config --global --add safe.directory /yolov5_node && git config --global --add safe.directory /learning_loop_node
 
 WORKDIR /app
