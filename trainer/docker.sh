@@ -96,7 +96,7 @@ case $cmd in
         docker push $image
         ;;
     r | run)
-        docker run -it $run_args $image $cmd_args
+        docker run -it $run_args $image $cmd_args # WARNING: in this mode the GPU may not be available
         ;;
     s | stop)
         docker stop $name $cmd_args
