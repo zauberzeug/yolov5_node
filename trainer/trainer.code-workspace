@@ -10,10 +10,6 @@
     {
       "name": "yoloyv5_node",
       "path": "../"
-    },
-    {
-      "name": "yolov5",
-      "path": "../../yolov5"
     }
   ],
   "settings": {},

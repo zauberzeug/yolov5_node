@@ -305,15 +305,29 @@ def box_candidates(box1, box2, wh_thr=2, ar_thr=100, area_thr=0.1, eps=1e-16):  
 
 def classify_albumentations(
         augment=True,
+        hyp=None,
         size=224,
-        scale=(0.08, 1.0),
-        ratio=(0.75, 1.0 / 0.75),  # 0.75, 1.33
-        hflip=0.5,
-        vflip=0.0,
-        jitter=0.4,
         mean=IMAGENET_MEAN,
-        std=IMAGENET_STD,
-        auto_aug=False):
+        std=IMAGENET_STD):
+
+    if hyp is not None:
+        hflip = hyp['hflip']
+        vflip = hyp['vflip']
+        jitter = hyp['jitter']
+        s = hyp['min_scale']
+        r = hyp['min_ratio']
+        scale = (s, 1.0)
+        ratio = (r, 1.0 / r)
+        r90 = hyp['r90_prob']
+        hue_jitter = hyp['hue_jitter']
+    else:
+        r90 = 0.0
+        hflip = 0.5
+        vflip = 0.5
+        jitter = 0.4
+        scale = (0.08, 1.0),
+        ratio = (0.75, 1.0 / 0.75),  # 0.75, 1.33
+        hue_jitter = 0.015
     # YOLOv5 classification Albumentations (optional, only used if package is installed)
     prefix = colorstr('albumentations: ')
     try:
@@ -321,18 +335,13 @@ def classify_albumentations(
         from albumentations.pytorch import ToTensorV2
         check_version(A.__version__, '1.0.3', hard=True)  # version requirement
         if augment:  # Resize and crop
-            T = [A.RandomResizedCrop(height=size, width=size, scale=scale, ratio=ratio)]
-            if auto_aug:
-                # TODO: implement AugMix, AutoAug & RandAug in albumentation
-                LOGGER.info(f'{prefix}auto augmentations are currently not supported')
-            else:
-                if hflip > 0:
-                    T += [A.HorizontalFlip(p=hflip)]
-                if vflip > 0:
-                    T += [A.VerticalFlip(p=vflip)]
-                if jitter > 0:
-                    color_jitter = (float(jitter),) * 3  # repeat value for brightness, contrast, satuaration, 0 hue
-                    T += [A.ColorJitter(*color_jitter, 0)]
+            color_jitter = (float(jitter),) * 3  # repeat value for brightness, contrast, satuaration, 0 hue
+
+            T = [A.RandomRotate90(p=r90),
+                 A.RandomResizedCrop(height=size, width=size, scale=scale, ratio=ratio),
+                 A.HorizontalFlip(p=hflip),
+                 A.VerticalFlip(p=vflip),
+                 A.ColorJitter(*color_jitter, hue_jitter, p=1.0), ]
         else:  # Use fixed crop for eval set (reproducibility)
             T = [A.SmallestMaxSize(max_size=size), A.CenterCrop(height=size, width=size)]
         T += [A.Normalize(mean=mean, std=std), ToTensorV2()]  # Normalize and convert to Tensor

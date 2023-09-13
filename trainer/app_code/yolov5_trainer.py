@@ -72,17 +72,22 @@ class Yolov5TrainerLogic(TrainerLogic):
         return 'yolov5_cls' if self.is_cla else 'yolov5'
 
     async def start_training(self, model: str = 'model.pt') -> None:
+        app_root = Path(__file__).resolve().parents[0]
+
         if self.is_cla:
             yolov5_format.create_file_structure_cla(self.training)
             if model == 'model.pt':
                 model = f'{self.training.training_folder}/model.pt'
-            # TODO check why hyps are not updated
+            hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
+            assert (app_root / 'hyp_cla.yaml').exists(), 'Hyperparameter file not found at /app/hyp_cla.yaml'
+            shutil.copy(app_root / 'hyp_cla.yaml', hyperparameter_path)
+            yolov5_format.update_hyp(hyperparameter_path, self.hyperparameter)
             await self._start(model)
         else:
             yolov5_format.create_file_structure(self.training)
             hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
-            if not os.path.isfile(hyperparameter_path):
-                shutil.copy('/app/hyp.yaml', hyperparameter_path)
+            assert (app_root / 'hyp_cla.yaml').exists(), 'Hyperparameter file not found at /app/hyp_cla.yaml'
+            shutil.copy(app_root / 'hyp_det.yaml', hyperparameter_path)
             yolov5_format.update_hyp(hyperparameter_path, self.hyperparameter)
             await self._start(model, " --clear")
 
@@ -163,7 +168,7 @@ class Yolov5TrainerLogic(TrainerLogic):
             image_name = os.path.basename(img)
             os.symlink(img, f'{images_folder}/{image_name}')
 
-        logging.info('start detections')
+        logging.info('start detecting')
         shutil.rmtree('/app/runs', ignore_errors=True)
         os.makedirs('/app/runs')
         executor = Executor(images_folder)
@@ -209,12 +214,11 @@ class Yolov5TrainerLogic(TrainerLogic):
 
     async def _start(self, model: str, additional_parameters: str = ''):
         resolution = self.hyperparameter.resolution
+        hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
 
         if self.is_cla:
-            batch_size = 4  # TODO check why batchsize is fixed here
-            cmd = f'python /app/train_cla.py --exist-ok --batch-size {batch_size} --img {resolution} --data {self.training.training_folder} --model {model} --project {self.training.training_folder} --name result --epochs {self.epochs} --optimizer SGD {additional_parameters}'
+            cmd = f'python /app/train_cla.py --exist-ok --img {resolution} --data {self.training.training_folder} --model {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --optimizer SGD {additional_parameters}'
         else:
-            hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
             self.try_replace_optimized_hyperparameter()
             batch_size = await batch_size_calculation.calc(self.training.training_folder, model, hyperparameter_path, f'{self.training.training_folder}/dataset.yaml', resolution)
             cmd = f'WANDB_MODE=disabled python /app/train_det.py --exist-ok --patience {self.patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs} {additional_parameters}'

@@ -7,6 +7,7 @@ import contextlib
 import glob
 import hashlib
 import json
+import logging
 import math
 import os
 import random
@@ -1170,10 +1171,15 @@ class ClassificationDataset(torchvision.datasets.ImageFolder):
         album_transform: Albumentations transforms, used if installed
     """
 
-    def __init__(self, root, augment, imgsz, cache=False):
+    def __init__(self, root, augment, imgsz, cache=False, hyp=None):
         super().__init__(root=root)
         self.torch_transforms = classify_transforms(imgsz)
-        self.album_transforms = classify_albumentations(augment, imgsz) if augment else None
+        self.album_transforms = classify_albumentations(augment, imgsz, hyp=hyp) if augment else None
+        if self.album_transforms is not None:
+            logging.info('Albumentations augmentations applied')
+        else:
+            logging.info('Albumentations augmentations NOT applied')
+
         self.cache_ram = cache is True or cache == 'ram'
         self.cache_disk = cache == 'disk'
         self.samples = [list(x) + [Path(x[0]).with_suffix('.npy'), None] for x in self.samples]  # file, index, npy, im
@@ -1202,10 +1208,11 @@ def create_classification_dataloader(path,
                                      cache=False,
                                      rank=-1,
                                      workers=8,
-                                     shuffle=True):
+                                     shuffle=True,
+                                     hyp=None):
     # Returns Dataloader object to be used with YOLOv5 Classifier
     with torch_distributed_zero_first(rank):  # init dataset *.cache only once if DDP
-        dataset = ClassificationDataset(root=path, imgsz=imgsz, augment=augment, cache=cache)
+        dataset = ClassificationDataset(root=path, imgsz=imgsz, augment=augment, cache=cache, hyp=hyp)
     batch_size = min(batch_size, len(dataset))
     nd = torch.cuda.device_count()
     nw = min([os.cpu_count() // max(nd, 1), batch_size if batch_size > 1 else 0, workers])

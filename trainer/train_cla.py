@@ -26,6 +26,7 @@ from pathlib import Path
 import torch
 import torch.distributed as dist
 import torchvision
+import yaml
 from torch import hub
 from torch.cuda import amp
 from torch.optim import lr_scheduler
@@ -64,10 +65,16 @@ GIT_INFO = check_git_info()
 
 
 def train(opt, device):
+    hyp = opt.hyp
+    if isinstance(hyp, str):
+        with open(hyp, errors='ignore') as f:
+            hyp = yaml.safe_load(f)  # load hyps dict
+        hyp = {k: float(v) for k, v in hyp.items()}
+    LOGGER.info(colorstr('hyperparameters: ') + ', '.join(f'{k}={v}' for k, v in hyp.items()))
+
     init_seeds(opt.seed + 1 + RANK, deterministic=True)
-    save_dir, data, bs, epochs, nw, imgsz, pretrained = \
-        opt.save_dir, Path(opt.data), opt.batch_size, opt.epochs, min(os.cpu_count() - 1, opt.workers), \
-        opt.imgsz, str(opt.pretrained).lower() == 'true'
+    save_dir, data, bs, epochs, nw, imgsz, pretrained = opt.save_dir, Path(opt.data), int(hyp['batch_size']), int(
+        hyp['epochs']), min(os.cpu_count() - 1, opt.workers), opt.imgsz, str(opt.pretrained).lower() == 'true'
     cuda = device.type != 'cpu'
 
     # Directories
@@ -101,6 +108,7 @@ def train(opt, device):
                                                    imgsz=imgsz,
                                                    batch_size=bs // WORLD_SIZE,
                                                    augment=True,
+                                                   hyp=hyp,
                                                    cache=opt.cache,
                                                    rank=LOCAL_RANK,
                                                    workers=nw)
@@ -150,7 +158,7 @@ def train(opt, device):
         logger.log_graph(model, imgsz)  # log model
 
     # Optimizer
-    optimizer = smart_optimizer(model, opt.optimizer, opt.lr0, momentum=0.9, decay=opt.decay)
+    optimizer = smart_optimizer(model, opt.optimizer, hyp['lr0'], momentum=hyp['momentum'], decay=hyp['decay'])
 
     # Scheduler
     lrf = 0.01  # final lr (fraction of lr0)
@@ -169,7 +177,7 @@ def train(opt, device):
 
     # Train
     t0 = time.time()
-    criterion = smartCrossEntropyLoss(label_smoothing=opt.label_smoothing)  # loss function
+    criterion = smartCrossEntropyLoss(label_smoothing=hyp['label_smoothing'])  # loss function
     best_fitness = 0.0
     scaler = amp.GradScaler(enabled=cuda)
     val = test_dir.stem  # 'val' or 'test'
@@ -290,10 +298,10 @@ def train(opt, device):
 
 def parse_opt(known=False):
     parser = argparse.ArgumentParser()
+    parser.add_argument('--hyp', type=str, help='path to .hyp file')
     parser.add_argument('--model', type=str, default='yolov5s-cls.pt', help='initial weights path')
     parser.add_argument('--data', type=str, default='imagenette160', help='cifar10, cifar100, mnist, imagenet, ...')
     parser.add_argument('--epochs', type=int, default=10, help='total training epochs')
-    parser.add_argument('--batch-size', type=int, default=64, help='total batch size for all GPUs')
     parser.add_argument('--imgsz', '--img', '--img-size', type=int, default=224, help='train, val image size (pixels)')
     parser.add_argument('--nosave', action='store_true', help='only save final checkpoint')
     parser.add_argument('--cache', type=str, nargs='?', const='ram', help='--cache images in "ram" (default) or "disk"')
@@ -304,9 +312,6 @@ def parse_opt(known=False):
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--pretrained', nargs='?', const=True, default=True, help='start from i.e. --pretrained False')
     parser.add_argument('--optimizer', choices=['SGD', 'Adam', 'AdamW', 'RMSProp'], default='Adam', help='optimizer')
-    parser.add_argument('--lr0', type=float, default=0.001, help='initial learning rate')
-    parser.add_argument('--decay', type=float, default=5e-5, help='weight decay')
-    parser.add_argument('--label-smoothing', type=float, default=0.1, help='Label smoothing epsilon')
     parser.add_argument('--cutoff', type=int, default=None, help='Model layer cutoff index for Classify() head')
     parser.add_argument('--dropout', type=float, default=None, help='Dropout (fraction)')
     parser.add_argument('--verbose', action='store_true', help='Verbose mode')
@@ -323,10 +328,8 @@ def main(opt):
         check_requirements()
 
     # DDP mode
-    device = select_device(opt.device, batch_size=opt.batch_size)
+    device = select_device(opt.device)
     if LOCAL_RANK != -1:
-        assert opt.batch_size != -1, 'AutoBatch is coming soon for classification, please pass a valid --batch-size'
-        assert opt.batch_size % WORLD_SIZE == 0, f'--batch-size {opt.batch_size} must be multiple of WORLD_SIZE'
         assert torch.cuda.device_count() > LOCAL_RANK, 'insufficient CUDA devices for DDP command'
         torch.cuda.set_device(LOCAL_RANK)
         device = torch.device('cuda', LOCAL_RANK)
