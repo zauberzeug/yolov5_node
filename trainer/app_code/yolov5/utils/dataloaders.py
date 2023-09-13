@@ -1174,7 +1174,7 @@ class ClassificationDataset(torchvision.datasets.ImageFolder):
     def __init__(self, root, augment, imgsz, cache=False, hyp=None):
         super().__init__(root=root)
         self.torch_transforms = classify_transforms(imgsz)
-        self.album_transforms = classify_albumentations(augment, imgsz, hyp=hyp) if augment else None
+        self.album_transforms = classify_albumentations(augment, size=imgsz, hyp=hyp) if augment else None
         if self.album_transforms is not None:
             logging.info('Albumentations augmentations applied')
         else:
