@@ -89,7 +89,6 @@ def _create_set_cla(training: Training, set_name: str):
     for image in training.data.image_data:
         if image['set'] == set_name:
             image_name = image['id'] + '.jpg'
-            print(image['tags'])
             classification = image['classification_annotation']
             if classification:
                 count += 1
