@@ -331,9 +331,13 @@ class Yolov5TrainerLogic(TrainerLogic):
             probability = float(probability) * 100
 
             if (category.type == CategoryType.Box):
-                box_detections.append(BoxDetection(
-                    category_name=category.name, x=x - 0.5 * width, y=y - 0.5 * height, width=width, height=height,
-                    model_name=model_info.version, confidence=probability, category_id=category.id))
+                box_detections.append(
+                    BoxDetection(
+                        category_name=category.name, x=int(x - 0.5 * width),
+                        y=int(y - 0.5 * height),
+                        width=int(width),
+                        height=int(height),
+                        model_name=model_info.version, confidence=probability, category_id=category.id))
             elif (category.type == CategoryType.Point):
                 point_detections.append(
                     PointDetection(category_name=category.name, x=x, y=y, model_name=model_info.version,

@@ -24,9 +24,9 @@ def _create_set(training: Training, set_name: str) -> int:
     img_count = 0
 
     assert training.data is not None, 'Training should have data'
-    logging.info(f'imagedata: {training.data.image_data}')
+    # logging.info(f'imagedata: {training.data.image_data}')
     for image in training.data.image_data:
-        logging.info(f'processing image {image["set"]} - {image["set"] == set_name}')
+        # logging.info(f'processing image {image["set"]} - {image["set"] == set_name}')
         if image['set'] == set_name:
             img_count += 1
             image_name = image['id'] + '.jpg'
@@ -89,6 +89,7 @@ def _create_set_cla(training: Training, set_name: str):
     for image in training.data.image_data:
         if image['set'] == set_name:
             image_name = image['id'] + '.jpg'
+            print(image['tags'])
             classification = image['classification_annotation']
             if classification:
                 count += 1
@@ -97,6 +98,7 @@ def _create_set_cla(training: Training, set_name: str):
                 image_path = f"{images_path}/{category_name}/{image_name}"
                 # logging.info(f'linking {image_name} to {image_path}')
                 os.symlink(f'{os.path.abspath(training.images_folder)}/{image_name}', image_path)
+
     logging.info(f'Created {count} image links')
 
 
