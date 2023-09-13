@@ -31,3 +31,6 @@ fliplr: 0 # 0.5 # image flip left-right (probability)
 mosaic: 1.0 # image mosaic (probability)
 mixup: 0.243 # image mixup (probability)
 copy_paste: 0.0
+
+#own parameters
+epochs: 2000

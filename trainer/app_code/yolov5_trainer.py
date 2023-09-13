@@ -73,7 +73,7 @@ class Yolov5TrainerLogic(TrainerLogic):
         return 'yolov5_cls' if self.is_cla else 'yolov5'
 
     async def start_training(self, model: str = 'model.pt') -> None:
-        app_root = Path(__file__).resolve().parents[0]
+        app_root = Path(__file__).resolve().parents[1]
 
         if self.is_cla:
             yolov5_format.create_file_structure_cla(self.training)
