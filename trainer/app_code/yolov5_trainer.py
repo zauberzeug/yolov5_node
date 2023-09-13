@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
 import cv2
+import yaml
 from fastapi.encoders import jsonable_encoder
 from learning_loop_node.data_classes import (BasicModel, BoxDetection,
                                              CategoryType,
@@ -34,7 +35,7 @@ class Yolov5TrainerLogic(TrainerLogic):
 
         logging.info(f'------ STARTING YOLOV5 TRAINER LOGIC WITH MODE {os.getenv("YOLOV5_MODE")} ------')
         self.latest_epoch = 0
-        self.epochs = 1000 if self.is_cla else 2000
+        self.epochs = 0  # will be overwritten by hyp.yaml
         self.patience = 300
 
     @property
@@ -211,10 +212,18 @@ class Yolov5TrainerLogic(TrainerLogic):
                     shutil.rmtree(os.path.join(root, dir_))
 
     # ---------------------------------------- ADDITIONAL METHODS ----------------------------------------
+    def load_hyps_set_epochs(self, hyp_path: str) -> None:
+        with open(hyp_path, errors='ignore') as f:
+            hyp = yaml.safe_load(f)  # load hyps dict
+        hyp = {k: float(v) for k, v in hyp.items()}
+        hyp_str = 'hyps: ' + ', '.join(f'{k}={v}' for k, v in hyp.items())
+        logging.info(hyp_str)
+        self.epochs = int(hyp.get('epochs', self.epochs))
 
     async def _start(self, model: str, additional_parameters: str = ''):
         resolution = self.hyperparameter.resolution
         hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
+        self.load_hyps_set_epochs(hyperparameter_path)
 
         if self.is_cla:
             cmd = f'python /app/train_cla.py --exist-ok --img {resolution} --data {self.training.training_folder} --model {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --optimizer SGD {additional_parameters}'
