@@ -138,11 +138,12 @@ class Yolov5TrainerLogic(TrainerLogic):
         # TODO why are the older epochs not deleted for cla model? .. ignored atm
         model_files.delete_older_epochs(Path(self.training.training_folder), Path(weightfile))
 
-    def get_latest_model_files(self) -> Union[List[str], Dict[str, List[str]]]:
+    def get_latest_model_files(self) -> Optional[Union[List[str], Dict[str, List[str]]]]:
         path = (self.training_folder / 'result/weights/published').absolute()
         weightfile = f'{path}/latest.pt'
         if not os.path.isfile(weightfile):
-            raise Exception(f'No model found at {weightfile}')
+            logging.error(f'No model found at {weightfile}')
+            return None
         shutil.copy(weightfile, '/tmp/model.pt')
         training_path = '/'.join(weightfile.split('/')[:-4])
 
