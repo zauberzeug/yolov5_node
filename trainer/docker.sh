@@ -71,11 +71,7 @@ if [ "$LINKLL" == "TRUE" ]; then
     # run_args+=" -v $SCRIPT_DIR/../../learning_loop_node:/learning_loop_node"
 fi
 
-if [ "$YOLOV5_MODE" == "CLASSIFICATION" ]; then
-    image="zauberzeug/yolov5-cla-trainer:latest"
-else
-    image="zauberzeug/yolov5-trainer:latest"
-fi
+image="zauberzeug/yolov5-trainer:latest"
 
 build_args=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
 
