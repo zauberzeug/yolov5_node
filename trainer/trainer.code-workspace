@@ -12,7 +12,15 @@
       "path": "../"
     }
   ],
-  "settings": {},
+  "settings": {
+    "workbench.colorCustomizations": {
+      "titleBar.activeBackground": "#e8d0f0",
+      "titleBar.activeForeground": "#FFFFFF",
+      "statusBar.background": "#e8d0f0",
+      "activityBar.background": "#e8d0f0",
+      "activityBar.foreground": "#FFFFFF"
+    }
+  },
   "extensions": {
     "recommendations": [
       "esbenp.prettier-vscode",

@@ -52,7 +52,7 @@ from app_code.yolov5.utils.torch_utils import (select_device,
                                                smart_inference_mode)
 
 FILE = Path(__file__).resolve()
-ROOT = FILE.parents[0]  # YOLOv5 root directory
+ROOT = FILE.parents[0]/'app_code/yolov5'  # yolov5 root directory
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative

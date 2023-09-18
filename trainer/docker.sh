@@ -47,19 +47,10 @@ else
     name="yolov5_trainer_node"
 fi
 
-# Get the directory of this script
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 run_args="-it --rm" 
 run_args+=" -v $(pwd)/../:/yolov5_node/"
 run_args+=" -v $HOME/data:/data"
-if [ "$LINKLL" == "TRUE" ]; then
-    echo "Linking Learning Loop from"
-    echo "$SCRIPT_DIR/../../learning_loop_node"
-    run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.10/dist-packages/learning_loop_node"
-    # run_args+=" -v $SCRIPT_DIR/../../learning_loop_node:/learning_loop_node"
-fi
-#run_args+=" -v $HOME/.vscode-server:/root/.vscode-server"
 run_args+=" -e HOST=$HOST"
 run_args+=" -h ${HOSTNAME}_DEV"
 run_args+=" -e USERNAME=$USERNAME -e PASSWORD=$PASSWORD"
@@ -71,6 +62,14 @@ run_args+=" --gpus all"
 run_args+=" --ipc host"
 run_args+=" -p 7442:80"
 
+# Get the directory of this script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+if [ "$LINKLL" == "TRUE" ]; then
+    echo "Linking Learning Loop from"
+    echo "$SCRIPT_DIR/../../learning_loop_node"
+    run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.10/dist-packages/learning_loop_node"
+    # run_args+=" -v $SCRIPT_DIR/../../learning_loop_node:/learning_loop_node"
+fi
 
 if [ "$YOLOV5_MODE" == "CLASSIFICATION" ]; then
     image="zauberzeug/yolov5-cla-trainer:latest"

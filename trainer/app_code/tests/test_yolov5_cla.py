@@ -64,6 +64,7 @@ async def test_cla_create_file_structure(use_training_dir):
     assert Path('./test/classification_category_2/image_2.jpg').is_symlink()
 
 
+# NOTE: preview.learning-loop.ai > Zauberzeug > Demo is not setup properly by default!! Results in empty sets
 @pytest.mark.asyncio()
 async def test_cla_training_creates_model(use_training_dir, data_exchanger, glc):
     training = Training(
@@ -81,7 +82,9 @@ async def test_cla_training_creates_model(use_training_dir, data_exchanger, glc)
     logging.info([p for p in Path(f'{training.training_folder}/train/green classification/').iterdir()])
     executor = Executor(os.getcwd())
     # from https://github.com/WongKinYiu/yolor#training
-    cmd = f'WANDB_MODE=disabled python /app/train_cla.py --project training --name result --batch 4 --img 416 --data {training.training_folder} --model yolov5s-cls.pt --epochs 1'
+    ROOT = Path(__file__).resolve().parents[2]
+    hyp_path = ROOT / 'app_code' / 'tests' / 'test_data' / 'hyp_cla.yaml'
+    cmd = f'WANDB_MODE=disabled python {ROOT/"train_cla.py"} --project training --name result --hyp {hyp_path} --img 416 --data {training.training_folder} --model yolov5s-cls.pt --epochs 1'
     executor.start(cmd)
     while executor.is_process_running():
         sleep(1)
@@ -98,7 +101,7 @@ async def test_cla_training_creates_model(use_training_dir, data_exchanger, glc)
 async def test_cla_parse_progress_from_log(use_training_dir, data_exchanger, glc):
     os.environ['YOLOV5_MODE'] = 'CLASSIFICATION'
     trainer = Yolov5TrainerLogic()
-    trainer.epochs = 2
+    trainer.epochs = 3  # NOTE: must correspond to the value set in test_data/hyp_cla.yaml
     os.remove('/tmp/model.pt')
     trainer._training = Training(
         id=str(uuid4()),
@@ -111,12 +114,12 @@ async def test_cla_parse_progress_from_log(use_training_dir, data_exchanger, glc
     trainer.training.data = await create_training_data(trainer.training, data_exchanger, glc)
     yolov5_format.create_file_structure_cla(trainer.training)
 
-    print('-------------------')
-    print(trainer.training.training_folder)
-    await asyncio.sleep(120)
+    await asyncio.sleep(1)
 
     trainer._executor = Executor(os.getcwd())
-    cmd = f'WANDB_MODE=disabled python /app/train_cla.py --project training --name result --batch 4 --img 416 --data {trainer.training.training_folder} --model yolov5s-cls.pt --epochs {trainer.epochs}'
+    ROOT = Path(__file__).resolve().parents[2]
+    hyp_path = ROOT / 'app_code' / 'tests' / 'test_data' / 'hyp_cla.yaml'
+    cmd = f'WANDB_MODE=disabled python {ROOT/"train_cla.py"} --project training --name result --hyp {hyp_path} --img 416 --data {trainer.training.training_folder} --model yolov5s-cls.pt --epochs {trainer.epochs}'
     trainer.executor.start(cmd)
     while trainer.executor.is_process_running():
         sleep(1)

@@ -14,7 +14,7 @@ import pytest
 from learning_loop_node.data_classes import (Category, Context, Hyperparameter,
                                              Training, TrainingData)
 from learning_loop_node.data_exchanger import DataExchanger
-from learning_loop_node.gdrive_downloader import g_download
+from learning_loop_node.helper_functions.gdrive_downloader import g_download
 from learning_loop_node.loop_communication import LoopCommunicator
 from learning_loop_node.tests import test_helper
 from learning_loop_node.trainer.downloader import TrainingsDownloader
@@ -43,7 +43,7 @@ def test_update_hyperparameter():
             # assert key in content
             assert content[key] == value
 
-    shutil.copy('code/tests/test_data/hyp.yaml', '/tmp')
+    shutil.copy('app_code/tests/test_data/hyp.yaml', '/tmp')
 
     hyperparameter = Hyperparameter(resolution=600, flip_rl=True, flip_ud=True)
 
@@ -116,14 +116,16 @@ async def test_training_creates_model(use_training_dir, data_exchanger: DataExch
 
     executor = Executor(os.getcwd())
     # from https://github.com/WongKinYiu/yolor#training
-    cmd = 'WANDB_MODE=disabled python /app/train_det.py --project training --name result --batch 4 --img 416 --data training/dataset.yaml --weights model.pt --epochs 1'
+
+    ROOT = Path(__file__).resolve().parents[2]
+    cmd = f'WANDB_MODE=disabled python {ROOT/"train_det.py"} --project training --name result --batch 4 --img 416 --data training/dataset.yaml --weights model.pt --epochs 1'
     executor.start(cmd)
     while executor.is_process_running():
         sleep(1)
         # logging.debug(executor.get_log())
 
     logging.info(executor.get_log())
-    sleep(100)
+    sleep(1)
     assert '1 epochs completed' in executor.get_log()
     assert 'best.pt' in executor.get_log()
     best = training.training_folder + '/result/weights/best.pt'
@@ -147,7 +149,8 @@ async def test_parse_progress_from_log(use_training_dir, data_exchanger: DataExc
     yolov5_format.create_file_structure(trainer.training)
 
     trainer._executor = Executor(os.getcwd())
-    cmd = f'WANDB_MODE=disabled python /app/train_det.py --project training --name result --batch 4 --img 416 --data training/dataset.yaml --weights model.pt --epochs {trainer.epochs}'
+    ROOT = Path(__file__).resolve().parents[2]
+    cmd = f'WANDB_MODE=disabled python {ROOT/"train_det.py"} --project training --name result --batch 4 --img 416 --data training/dataset.yaml --weights model.pt --epochs {trainer.epochs}'
     trainer.executor.start(cmd)
     while trainer.executor.is_process_running():
         sleep(1)
@@ -316,7 +319,7 @@ async def test_clear_training_data(use_training_dir):
 async def test_detecting(create_project, glc: LoopCommunicator):
     # from learning_loop_node.loop import Loop
     # loop = Loop()
-    logging.debug('downloading model from gdrive')
+    logging.info('downloading model from gdrive')
 
     file_id = '1sZWa053fWT9PodrujDX90psmjhFVLyBV'
     destination = '/tmp/model.zip'
@@ -324,7 +327,7 @@ async def test_detecting(create_project, glc: LoopCommunicator):
 
     test_helper.unzip(destination, '/tmp/model')
 
-    logging.debug('uploading model')
+    logging.info('uploading model')
     data = ['/tmp/model/model.pt', '/tmp/model/model.json']
     response = await glc.put('zauberzeug/projects/demo/1/models/latest/yolov5_pytorch/file', files=data)
     if response.status_code != 200:
@@ -357,7 +360,7 @@ async def create_training_data(training: Training, data_exchanger: DataExchanger
     training_data = TrainingData()
 
     image_data, _ = await TrainingsDownloader(data_exchanger).download_training_data(training.images_folder)
-    logging.warning(f'got {len(image_data)} images')
+    logging.info(f'got {len(image_data)} images')
 
     response = await glc.get("/zauberzeug/projects/demo/data")
     assert response.status_code != 401, 'Authentification error - did you set LOOP_USERNAME and LOOP_PASSWORD in your environment?'
