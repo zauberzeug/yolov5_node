@@ -14,7 +14,7 @@ import pytest
 from learning_loop_node.data_classes import (Category, Context, Hyperparameter,
                                              Training, TrainingData)
 from learning_loop_node.data_exchanger import DataExchanger
-from learning_loop_node.helper_functions.gdrive_downloader import g_download
+from learning_loop_node.helpers.gdrive_downloader import g_download
 from learning_loop_node.loop_communication import LoopCommunicator
 from learning_loop_node.tests import test_helper
 from learning_loop_node.trainer.downloader import TrainingsDownloader
