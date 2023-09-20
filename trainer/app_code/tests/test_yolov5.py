@@ -203,7 +203,6 @@ def test_new_model_discovery(use_training_dir):
 
     # get_latest_model_file
     files = trainer.get_latest_model_files()
-    print(files)
     assert files == {
         'yolov5_pytorch': ['/tmp/model.pt', '/tmp/test_training/hyp.yaml'],
         'yolov5_wts': ['/tmp/model.wts']}
@@ -300,8 +299,6 @@ async def test_clear_training_data(use_training_dir):
         f.write(b'0')
 
     data = glob.glob(trainer.training.training_folder + '/**', recursive=True)
-    for file in data:
-        print(file)
     assert len(data) == 9
     files = [f for f in data if os.path.isfile(f)]
     assert len(files) == 5
