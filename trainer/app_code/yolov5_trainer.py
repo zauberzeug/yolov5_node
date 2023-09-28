@@ -170,8 +170,8 @@ class Yolov5TrainerLogic(TrainerLogic):
             os.symlink(img, f'{images_folder}/{image_name}')
 
         logging.info('start detecting')
-        shutil.rmtree('/app/runs', ignore_errors=True)
-        os.makedirs('/app/runs')
+        shutil.rmtree('/app/app_code/yolov5/runs', ignore_errors=True)
+        os.makedirs('/app/app_code/yolov5/runs')
         executor = Executor(images_folder)
         img_size = model_information.resolution
 
@@ -191,7 +191,7 @@ class Yolov5TrainerLogic(TrainerLogic):
 
         detections = []
         logging.info('start parsing detections')
-        labels_path = '/app/runs/predict-cls/exp/labels' if self.is_cla else '/app/runs/detect/exp/labels'
+        labels_path = '/app/app_code/yolov5/runs/predict-cls/exp/labels' if self.is_cla else '/app/app_code/yolov5/runs/detect/exp/labels'
         detections = await asyncio.get_event_loop().run_in_executor(None, self._parse, labels_path, images_folder, model_information)
 
         return detections

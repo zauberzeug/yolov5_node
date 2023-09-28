@@ -168,7 +168,6 @@ def test_cla_new_model_discovery(use_training_dir):
 
     # get_latest_model_file
     files = trainer.get_latest_model_files()
-    print(files)
     assert files == {'yolov5_cla_pytorch': ['/tmp/model.pt', '/tmp/test_training/result/opt.yaml']}
 
 
@@ -230,7 +229,6 @@ async def test_cla_clear_training_data(use_training_dir):
     data = glob.glob(trainer.training.training_folder + '/**', recursive=True)
     assert len(data) == 5
     files = [f for f in data if os.path.isfile(f)]
-    print(files)
     assert len(files) == 2  # Note: Do not delete last_training.log und last.pt
 
 
