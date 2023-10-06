@@ -54,7 +54,9 @@ class Yolov5TrainerLogic(TrainerLogic):
     # ---------------------------------------- IMPLEMENTED ABSTRACT METHODS ----------------------------------------
 
     @property
-    def progress(self) -> float:
+    def progress(self) -> Optional[float]:
+        if self._executor is None:
+            return None
         if self.is_cla:
             return self.get_progress_from_log_cla()
         return self.get_progress_from_log()
@@ -259,7 +261,7 @@ class Yolov5TrainerLogic(TrainerLogic):
         return detections
 
     def get_progress_from_log_cla(self) -> float:
-        if self.epochs == 0 or self._executor is None:
+        if self.epochs == 0:
             return 0.0
         lines = list(reversed(self.executor.get_log_by_lines()))
         for line in lines:
