@@ -23,7 +23,7 @@ from learning_loop_node.trainer.executor import Executor
 from learning_loop_node.trainer.trainer_logic import TrainerLogic
 
 from . import batch_size_calculation, model_files, yolov5_format
-
+from .yolov5 import gen_wts
 
 class Yolov5TrainerLogic(TrainerLogic):
 
@@ -81,17 +81,19 @@ class Yolov5TrainerLogic(TrainerLogic):
             yolov5_format.create_file_structure_cla(self.training)
             if model == 'model.pt':
                 model = f'{self.training.training_folder}/model.pt'
-            hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
-            assert (app_root / 'hyp_cla.yaml').exists(), 'Hyperparameter file not found at /app/hyp_cla.yaml'
-            shutil.copy(app_root / 'hyp_cla.yaml', hyperparameter_path)
-            yolov5_format.update_hyp(hyperparameter_path, self.hyperparameter)
+            parameter_destination_path = f'{self.training.training_folder}/hyp.yaml'
+            parameter_source_path = app_root / 'hyp_cla.yaml'
+            assert (parameter_source_path).exists(), 'Hyperparameter file not found at "{hyperparameter_source_path}"'
+            shutil.copy(parameter_source_path, parameter_destination_path)
+            yolov5_format.update_hyp(parameter_destination_path, self.hyperparameter)
             await self._start(model)
         else:
             yolov5_format.create_file_structure(self.training)
-            hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
-            assert (app_root / 'hyp_cla.yaml').exists(), 'Hyperparameter file not found at /app/hyp_cla.yaml'
-            shutil.copy(app_root / 'hyp_det.yaml', hyperparameter_path)
-            yolov5_format.update_hyp(hyperparameter_path, self.hyperparameter)
+            parameter_destination_path = f'{self.training.training_folder}/hyp.yaml'
+            parameter_source_path = app_root / 'hyp_det.yaml'
+            assert (parameter_source_path).exists(), 'Hyperparameter file not found at "{hyperparameter_source_path}"'
+            shutil.copy(parameter_source_path, parameter_destination_path)
+            yolov5_format.update_hyp(parameter_destination_path, self.hyperparameter)
             await self._start(model, " --clear")
 
     async def start_training_from_scratch(self, base_model_id: str) -> None:
@@ -158,8 +160,7 @@ class Yolov5TrainerLogic(TrainerLogic):
         if self.is_cla:
             return {self.model_format: ['/tmp/model.pt', f'{training_path}/result/opt.yaml']}
         else:
-            subprocess.run(
-                f'python3 /app/app_code/yolov5/gen_wts.py -w {weightfile} -o /tmp/model.wts', shell=True, check=False)
+            gen_wts(pt_file_path=weightfile, wts_file_path='/tmp/model.wts')
             return {self.model_format: ['/tmp/model.pt', f'{training_path}/hyp.yaml'],
                     'yolov5_wts': ['/tmp/model.wts']}
 
