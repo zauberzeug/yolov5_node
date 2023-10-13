@@ -51,7 +51,6 @@ then
     L4T_VERSION_STRING=$(head -n 1 /etc/nv_tegra_release)
     L4T_RELEASE=$(echo $L4T_VERSION_STRING | cut -f 2 -d ' ' | grep -Po '(?<=R)[^;]+')
     L4T_REVISION=$(echo $L4T_VERSION_STRING | cut -f 2 -d ',' | grep -Po '(?<=REVISION: )[^;]+')
-    [ "$L4T_REVISION" = "5.1" ] && L4T_REVISION=5.0
     L4T_VERSION="$L4T_RELEASE.$L4T_REVISION"
 fi
 
