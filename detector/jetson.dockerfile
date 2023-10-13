@@ -1,5 +1,5 @@
 ARG BASE_IMAGE
-FROM ${BASE_IMAGE} as release
+FROM ${BASE_IMAGE}
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
@@ -58,22 +58,3 @@ EXPOSE 80
 ENV HOST=learning-loop.ai
 ENV TZ=Europe/Amsterdam
 CMD /app/start.sh
-
-FROM release
-
-RUN python3 -m pip install --no-cache-dir retry debugpy pytest-asyncio icecream pytest autopep8
-
-
-RUN curl -sSL https://gist.githubusercontent.com/b01/0a16b6645ab7921b0910603dfb85e4fb/raw/5186ea07a06eac28937fd914a9c8f9ce077a978e/download-vs-code-server.sh | sed "s/server-linux-x64/server-linux-$(dpkg --print-architecture)/" | sed "s/amd64/x64/" | bash
-
-ENV VSCODE_SERVER=/root/.vscode-server/bin/*/server.sh
-
-RUN $VSCODE_SERVER --install-extension ms-python.vscode-pylance \
-    $VSCODE_SERVER --install-extension ms-python.python \
-    $VSCODE_SERVER --install-extension himanoa.python-autopep8 \
-    $VSCODE_SERVER --install-extension esbenp.prettier-vscode \
-    $VSCODE_SERVER --install-extension littlefoxteam.vscode-python-test-adapter
-
-ENV PYTHONFAULTHANDLER=1
-
-RUN apt-get update && apt-get install gnupg2 -y

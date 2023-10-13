@@ -57,7 +57,7 @@ fi
 # Check if we are on a Jetson device
 build_args=""
 if [ -f /etc/nv_tegra_release ]; then
-    build_args+=" --build-arg BASE_IMAGE=zauberzeug/l4t-opencv:4.5.2-on-nano-r$L4T_VERSION"
+    build_args+=" --build-arg BASE_IMAGE=zauberzeug/dustynv/opencv:r$L4T_VERSION"
 else
     build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
 fi
@@ -76,12 +76,10 @@ cmd_args=${@:2}
 set -x
 case $cmd in
     b | build)
-        docker build . -f $dockerfile --target release -t $image $build_args $cmd_args
-        docker build . -f $dockerfile -t ${image}-dev $build_args $cmd_args
+        docker build . -f $dockerfile -t $image $build_args $cmd_args
         ;;
     U | update)
 	    docker pull ${image}
-        docker pull ${image}-dev
 	;;
     d | debug)
         docker run $run_args $image-dev /app/start.sh debug
