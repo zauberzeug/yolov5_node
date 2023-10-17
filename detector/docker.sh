@@ -57,7 +57,7 @@ fi
 # Check if we are on a Jetson device
 build_args=""
 if [ -f /etc/nv_tegra_release ]; then
-    build_args+=" --build-arg BASE_IMAGE=zauberzeug/dustynv/opencv:r$L4T_VERSION"
+    build_args+=" --build-arg BASE_IMAGE=dustynv/opencv:r$L4T_VERSION"
 else
     build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
 fi

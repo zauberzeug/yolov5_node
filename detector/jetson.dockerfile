@@ -32,9 +32,9 @@ RUN apt-get update && \
     && apt-get clean
 
 RUN pip3 install --no-cache-dir async_generator aiofiles psutil pillow multidict attrs yarl async_timeout idna_ssl cchardet aiosignal
-RUN pip3 install --no-cache-dir "learning_loop_node==v0.7.52"
+RUN pip3 install --no-cache-dir "learning_loop_node==v0.7.56"
 RUN pip3 install --no-cache-dir "gdown"
-RUN pip3 install --no-cache-dir starlette==0.16.0
+RUN pip3 install --no-cache-dir numpy==1.23.1
 
 WORKDIR /data/models
 RUN gdown --fuzzy https://drive.google.com/file/d/1KGZe7OUX9QWZm-dnkssSV9lSXxCn7nD_/view?usp=sharing  -O coco.zip && unzip coco.zip && rm coco.zip
