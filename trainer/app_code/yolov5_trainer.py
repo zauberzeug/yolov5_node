@@ -285,7 +285,10 @@ class Yolov5TrainerLogic(TrainerLogic):
                         epoch_and_total_epochs = item.split('/')
                         epoch = epoch_and_total_epochs[0]
                         total_epochs = epoch_and_total_epochs[1]
-                        progress = float(epoch) / float(total_epochs)
+                        try:
+                            progress = float(epoch) / float(total_epochs)
+                        except ValueError:
+                            progress = -1.0
                         return progress
         return progress
 
