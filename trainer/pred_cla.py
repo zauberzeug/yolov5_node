@@ -67,7 +67,7 @@ def run(
         device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
         view_img=False,  # show results
         save_txt=False,  # save results to *.txt
-        nosave=False,  # do not save images/videos
+        nosave=True,  # do not save images/videos
         augment=False,  # augmented inference
         visualize=False,  # visualize features
         update=False,  # update all models
