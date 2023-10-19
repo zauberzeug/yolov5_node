@@ -17,8 +17,9 @@
       "titleBar.activeBackground": "#e8d0f0",
       "titleBar.activeForeground": "#FFFFFF",
       "statusBar.background": "#e8d0f0",
+      "statusBar.foreground": "#1d1d1d",
       "activityBar.background": "#e8d0f0",
-      "activityBar.foreground": "#FFFFFF"
+      "activityBar.foreground": "#1d1d1d"
     }
   },
   "extensions": {
