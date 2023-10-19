@@ -158,12 +158,13 @@ def create_dataloader(path,
 def load_image_delete_if_corrupt(path):
     try:
         return cv2.imread(path)  # BGR
-    except Exception:
+    except Exception as e:
         if os.path.islink(path):
-                original_file_path = os.readlink(path)
-                os.remove(original_file_path)
+            original_file_path = os.readlink(path)
+            os.remove(original_file_path)
         os.remove(path)
-        raise Exception(f'Image could not be loaded and will be deleted as it is likely corrupted ({path})')
+        raise Exception(f'Image could not be loaded and will be deleted as it is likely corrupted ({path})') from e
+
 
 class InfiniteDataLoader(dataloader.DataLoader):
     """ Dataloader that reuses workers
