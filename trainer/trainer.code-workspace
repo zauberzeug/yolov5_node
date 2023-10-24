@@ -11,6 +11,10 @@
       "name": "yoloyv5_node",
       "path": "../"
     }
+    {
+      "name": "detector",
+      "path": "../detector"
+    }
   ],
   "settings": {
     "workbench.colorCustomizations": {
