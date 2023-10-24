@@ -1,11 +1,14 @@
+import asyncio
 import logging
 import os
 import shutil
 import subprocess
+from typing import Dict
 
 import icecream
 import pytest
-from dotenv import load_dotenv
+from _pytest.fixtures import SubRequest
+# from dotenv import load_dotenv
 from learning_loop_node.data_classes import Context
 from learning_loop_node.data_exchanger import DataExchanger
 from learning_loop_node.loop_communication import LoopCommunicator
@@ -15,62 +18,88 @@ logging.basicConfig(level=logging.INFO)
 
 # load_dotenv()
 
+# -------------------- Session fixtures --------------------
 
-@pytest.fixture()
+
+@pytest.fixture(scope="session")
+def event_loop():
+    """Overrides pytest default function scoped event loop"""
+    policy = asyncio.get_event_loop_policy()
+    loop = policy.new_event_loop()
+    yield loop
+    loop.close()
+
+
+@pytest.fixture(scope="session")
+def prepare_model():
+    """Download model for testing"""
+    if not os.path.exists('app_code/tests/test_data/model.pt'):
+        url = 'https://github.com/ultralytics/yolov5/releases/download/v6.0/yolov5n.pt'
+        result = subprocess.run(f'curl  -L {url} -o app_code/tests/test_data/model.pt', shell=True, check=True)
+        assert result.returncode == 0
+    assert os.path.exists('app_code/tests/test_data/model.pt')
+    yield
+
+# -------------------- Class marks --------------------
+
+
+@pytest.fixture(autouse=True, scope='class')
+async def check_marks(request: SubRequest, glc: LoopCommunicator):  # pylint: disable=redefined-outer-name
+    """Set environment variables for testing and generate project if requested"""
+
+    markers = list(request.node.iter_markers('environment'))
+    assert len(markers) <= 1, 'Only one environment marker allowed'
+    if len(markers) == 1:
+        marker = markers[0]
+        os.environ['LOOP_ORGANIZATION'] = marker.kwargs['organization']
+        os.environ['LOOP_PROJECT'] = marker.kwargs['project']
+        os.environ['YOLOV5_MODE'] = marker.kwargs['mode']
+
+    markers = list(request.node.iter_markers('generate_project'))
+    assert len(markers) <= 1, 'Only one generate_project marker allowed'
+    if len(markers) == 1:
+        marker = markers[0]
+        configuration: Dict = marker.kwargs['configuration']
+        project = configuration['project_name']
+        # May not return 200 if project does not exist
+        await glc.delete(f"/zauberzeug/projects/{project}?keep_images=true")
+        await asyncio.sleep(1)
+        assert (await glc.post("/zauberzeug/projects/generator", json=configuration)).status_code == 200
+        await asyncio.sleep(1)
+        yield
+        # assert (await lc.delete(f"/zauberzeug/projects/{project}?keep_images=true")).status_code == 200
+    else:
+        yield
+
+
+# -------------------- Optional fixtures --------------------
+
+@pytest.fixture(scope="session")
 async def glc():
-    loop_communicator = LoopCommunicator()
-    yield loop_communicator
-    await loop_communicator.shutdown()
+    """The same LoopCommunicator is used for all tests
+    Credentials are read from environment variables"""
+
+    lc = LoopCommunicator()
+    await lc.ensure_login()
+    yield lc
+    await lc.shutdown()
 
 
 @pytest.fixture()
-async def data_exchanger():
-    loop_communicator = LoopCommunicator()
-    context = Context(organization='zauberzeug', project='demo')
-    dx = DataExchanger(context, loop_communicator)
+def data_exchanger(glc: LoopCommunicator):  # pylint: disable=redefined-outer-name
+    context = Context(organization=os.environ['LOOP_ORGANIZATION'], project=os.environ['LOOP_PROJECT'])
+    dx = DataExchanger(context, glc)
     yield dx
-    await loop_communicator.shutdown()
 
 
-@pytest.fixture(scope="function")
-def use_training_dir(request):
+@pytest.fixture()
+def use_training_dir(prepare_model, request: SubRequest):
+    """Step into a temporary directory for training tests and back out again"""
+
     shutil.rmtree('/tmp/test_training', ignore_errors=True)
     os.makedirs('/tmp/test_training', exist_ok=True)
-
-    # TODO Download has to be done every time, otherwise the pt file may be faulty
-    # if not os.path.isfile('/tmp/model.pt'):
-    print('--------------Downloading model>')
-    url = 'https://github.com/ultralytics/yolov5/releases/download/v6.0/yolov5n.pt'
-    result = subprocess.run(f'curl  -L {url} -o /tmp/model.pt', shell=True, check=True)
-    assert result.returncode == 0
-
-    shutil.copyfile('/tmp/model.pt', '/tmp/test_training/model.pt')
-
+    shutil.copyfile('app_code/tests/test_data/model.pt', '/tmp/test_training/model.pt')
     os.chdir('/tmp/test_training/')
     yield
+    shutil.rmtree('/tmp/test_training', ignore_errors=True)
     os.chdir(request.config.invocation_dir)
-
-
-@pytest.fixture()
-async def create_project():
-    lc = LoopCommunicator()
-    await lc.delete("/zauberzeug/projects/pytest?keep_images=true")
-    project_configuration = {
-        'project_name': 'pytest', 'box_categories': 2, 'point_categories': 1, 'inbox': 0, 'annotate': 0, 'review': 0,
-        'complete': 0, 'image_style': 'plain', 'thumbs': False, 'trainings': 1}
-    assert (await lc.post("/zauberzeug/projects/generator", json=project_configuration)).status_code == 200
-    yield
-    await lc.delete("/zauberzeug/projects/pytest?keep_images=true")
-    await lc.shutdown()
-
-
-@pytest.fixture()
-async def create_cla_project():
-    lc = LoopCommunicator()
-    await lc.delete("/zauberzeug/projects/pytest?keep_images=true")
-    project_configuration = {'project_name': 'pytest', 'classification_categories': 2, 'inbox': 0,
-                             'annotate': 0, 'review': 0, 'complete': 0, 'image_style': 'plain', 'thumbs': False, 'trainings': 1}
-    assert (await lc.post("/zauberzeug/projects/generator", json=project_configuration)).status_code == 200
-    yield
-    await lc.delete("/zauberzeug/projects/pytest?keep_images=true")
-    await lc.shutdown()

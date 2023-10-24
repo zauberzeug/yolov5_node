@@ -25,6 +25,7 @@ from learning_loop_node.trainer.trainer_logic import TrainerLogic
 from . import batch_size_calculation, model_files, yolov5_format
 from .yolov5 import gen_wts
 
+
 class Yolov5TrainerLogic(TrainerLogic):
 
     def __init__(self) -> None:
