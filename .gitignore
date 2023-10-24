@@ -3,3 +3,4 @@ __pycache__/
 *.wts
 *.engine
 *.pt
+trainer/runs

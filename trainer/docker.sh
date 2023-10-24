@@ -4,14 +4,18 @@ if [ $# -eq 0 ]
 then
     echo "Usage:"
     echo
+    echo "  `basename $0` (a | attach)  [<containers>]      Exec bash"
     echo "  `basename $0` (b | build)   [<containers>]      Build or rebuild"
-    echo "  `basename $0` (u | up)      [<containers>]      Create and start"
-    echo "  `basename $0` (U | upbuild) [<containers>]      Create and start (force build)"
-    echo "  `basename $0` (d | down)    [<containers>]      Stop and remove"
-    echo "  `basename $0` (s | start)   [<containers>]      Start"
-    echo "  `basename $0` (r | restart) [<containers>]      Restart"
-    echo "  `basename $0` (h | stop)    [<containers>]      Stop (halt)"
+    echo "  `basename $0` (bnc | build-no-cache) [<c>]      Build or rebuild without cache"
+    echo "  `basename $0` (d | debug)   [<containers>]      Start in debug mode"
+    echo "  `basename $0` (e | exec)    [<containers>]      Exec cmd"
     echo "  `basename $0` (k | kill)    [<containers>]      Kill"
+    echo "  `basename $0` (l | log)     [<containers>]      Attach to log"
+    echo "  `basename $0` (p | push)    [<containers>]      Push image"
+    echo "  `basename $0` (r | run)     [<containers>]      Run"
+    echo "  `basename $0` (rm)          [<containers>]      Kill and remove"
+    echo "  `basename $0` (s | stop)    [<containers>]      Stop"
+    echo "  `basename $0` (u | up)      [<containers>]      Start detached"
     echo "  `basename $0` ps            [<containers>]      List"
     echo "  `basename $0` rm            [<containers>]      Remove"
     echo "  `basename $0` stats                             Show statistics"
@@ -33,16 +37,20 @@ then
 fi
 
 # sourcing .env file to get configuration (see README.md)
-. .env || echo "you should provide an .env file with USERNAME and PASSWORD for the Learning Loop"
+. .env || echo "you should provide an .env file for the Learning Loop"
 
-name="yolov5_trainer_node"
+if [ "$YOLOV5_MODE" == "CLASSIFICATION" ]; then
+    echo "Mode is set to CLASSIFICATION"
+    name="yolov5_cla_trainer_node"
+else
+    echo "Mode is not set to CLASSIFICATION"
+    name="yolov5_trainer_node"
+fi
+
 
 run_args="-it --rm" 
 run_args+=" -v $(pwd)/../:/yolov5_node/"
 run_args+=" -v $HOME/data:/data"
-run_args+=" -v $HOME/learning_loop_node/learning_loop_node:/opt/conda/lib/python3.8/site-packages/learning_loop_node"
-run_args+=" -v $HOME/learning_loop_node:/learning_loop_node"
-run_args+=" -v $HOME/.vscode-server:/root/.vscode-server"
 run_args+=" -e HOST=$HOST"
 run_args+=" -h ${HOSTNAME}_DEV"
 run_args+=" -e USERNAME=$USERNAME -e PASSWORD=$PASSWORD"
@@ -54,6 +62,14 @@ run_args+=" --gpus all"
 run_args+=" --ipc host"
 run_args+=" -p 7442:80"
 
+# Get the directory of this script
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+if [ "$LINKLL" == "TRUE" ]; then
+    echo "Linking Learning Loop from"
+    echo "$SCRIPT_DIR/../../learning_loop_node"
+    run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.10/dist-packages/learning_loop_node"
+    # run_args+=" -v $SCRIPT_DIR/../../learning_loop_node:/learning_loop_node"
+fi
 
 image="zauberzeug/yolov5-trainer:latest"
 
@@ -75,13 +91,13 @@ case $cmd in
         docker push $image
         ;;
     r | run)
-        docker run -it $run_args $image $cmd_args
-        ;;
-    ri | run-image)
-        docker run -it $run_args $image $cmd_args
+        docker run -it $run_args $image $cmd_args # WARNING: in this mode the GPU may not be available
         ;;
     s | stop)
         docker stop $name $cmd_args
+        ;;
+    u | up)
+        docker run -d $run_args $image $cmd_args
         ;;
     k | kill)
         docker kill $name $cmd_args
@@ -91,7 +107,7 @@ case $cmd in
         docker rm $name $cmd_args
         ;;
     l | log | logs)
-        docker logs -f --tail 100 $cmd_args $name
+        docker logs -f -n 100 $cmd_args $name
         ;;
     e | exec)
         docker exec $name $cmd_args 

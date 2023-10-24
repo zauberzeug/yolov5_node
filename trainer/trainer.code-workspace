@@ -10,13 +10,18 @@
     {
       "name": "yoloyv5_node",
       "path": "../"
-    },
-    {
-      "name": "yolov5",
-      "path": "../../yolov5"
     }
   ],
-  "settings": {},
+  "settings": {
+    "workbench.colorCustomizations": {
+      "titleBar.activeBackground": "#e8d0f0",
+      "titleBar.activeForeground": "#FFFFFF",
+      "statusBar.background": "#e8d0f0",
+      "statusBar.foreground": "#1d1d1d",
+      "activityBar.background": "#e8d0f0",
+      "activityBar.foreground": "#1d1d1d"
+    }
+  },
   "extensions": {
     "recommendations": [
       "esbenp.prettier-vscode",
