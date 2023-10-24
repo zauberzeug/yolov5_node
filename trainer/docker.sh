@@ -39,24 +39,24 @@ fi
 # sourcing .env file to get configuration (see README.md)
 . .env || echo "you should provide an .env file for the Learning Loop"
 
-if [ "$YOLOV5_MODE" == "CLASSIFICATION" ]; then
-    echo "Mode is set to CLASSIFICATION"
-    name="yolov5_cla_trainer_node"
-else
-    echo "Mode is not set to CLASSIFICATION"
-    name="yolov5_trainer_node"
-fi
+# if [ "$YOLOV5_MODE" == "CLASSIFICATION" ]; then
+#     echo "Mode is set to CLASSIFICATION"
+#     name="yolov5_cla_trainer_node"
+# else
+#     echo "Mode is not set to CLASSIFICATION"
+#     name="yolov5_trainer_node"
+# fi
 
 
 run_args="-it --rm" 
 run_args+=" -v $(pwd)/../:/yolov5_node/"
-run_args+=" -v $HOME/data:/data"
+run_args+=" -v $HOME/node_data/$TRAINER_NAME:/data"
 run_args+=" -e HOST=$HOST"
 run_args+=" -h ${HOSTNAME}_DEV"
 run_args+=" -e USERNAME=$USERNAME -e PASSWORD=$PASSWORD"
 run_args+=" -e BATCH_SIZE=$BATCH_SIZE"
 run_args+=" -e NODE_TYPE=trainer"
-run_args+=" --name $name"
+run_args+=" --name $TRAINER_NAME"
 run_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all"
 run_args+=" --gpus all"
 run_args+=" --ipc host"
@@ -94,26 +94,26 @@ case $cmd in
         docker run -it $run_args $image $cmd_args # WARNING: in this mode the GPU may not be available
         ;;
     s | stop)
-        docker stop $name $cmd_args
+        docker stop $TRAINER_NAME $cmd_args
         ;;
     u | up)
         docker run -d $run_args $image $cmd_args
         ;;
     k | kill)
-        docker kill $name $cmd_args
+        docker kill $TRAINER_NAME $cmd_args
         ;;
     rm)
-        docker kill $name
-        docker rm $name $cmd_args
+        docker kill $TRAINER_NAME
+        docker rm $TRAINER_NAME $cmd_args
         ;;
     l | log | logs)
-        docker logs -f -n 100 $cmd_args $name
+        docker logs -f -n 100 $cmd_args $TRAINER_NAME
         ;;
     e | exec)
-        docker exec $name $cmd_args 
+        docker exec $TRAINER_NAME $cmd_args 
         ;;
     a | attach)
-        docker exec -it $cmd_args $name /bin/bash
+        docker exec -it $cmd_args $TRAINER_NAME /bin/bash
         ;;
     *)
         echo "Unsupported command \"$cmd\""
