@@ -4,23 +4,22 @@ if [ $# -eq 0 ]
 then
     echo "Usage:"
     echo
-    echo "  `basename $0` (b | build)   [<containers>]      Build or rebuild"
-    echo "  `basename $0` (U | update)  [<containers>]      download latest images"
-    echo "  `basename $0` (d | down)    [<containers>]      Stop and remove"
-    echo "  `basename $0` (r | run)     [<containers>]      Run"
-    echo "  `basename $0` (s | stop)    [<containers>]      Stop (halt)"
-    echo "  `basename $0` (k | kill)    [<containers>]      Kill"
-    echo "  `basename $0` ps            [<containers>]      List"
-    echo "  `basename $0` rm            [<containers>]      Remove"
-    echo "  `basename $0` stats                             Show statistics"
+    echo "  `basename $0` (b | build)     [<containers>]      Build or rebuild"
+    echo "  `basename $0` (bnc)           [<containers>]      Build or rebuild without using cache"
+    echo "  `basename $0` (d | debug)     [<containers>]      Stop and remove"
+    echo "  `basename $0` (p | push)      [<containers>]      Push images"
+    echo "  `basename $0` (r | run)       [<containers>]      Run"
+    echo "  `basename $0` (ri | run-image)[<containers>]      Run image (no dev)"
+    echo "  `basename $0` (s | stop)      [<containers>]      Stop"
+    echo "  `basename $0` (U | update)    [<containers>]      Download latest images"
+    echo "  `basename $0` (k | kill)      [<containers>]      Kill"
+    echo "  `basename $0` ps              [<containers>]      List"
+    echo "  `basename $0` rm              [<containers>]      Kill and remove"
+    echo "  `basename $0` stats                               Show statistics"
     echo
     echo "  `basename $0` (l | log)    <container>            Show log tail (last 100 lines)"
     echo "  `basename $0` (e | exec)   <container> <command>  Execute command"
     echo "  `basename $0` (a | attach) <container>            Attach to container with shell"
-    echo
-    echo "  `basename $0` prune      Remove all unused containers, networks and images"
-    echo "  `basename $0` stopall    Stop all running containers (system-wide!)"
-    echo "  `basename $0` killall    Kill all running containers (system-wide!)"
     echo
     echo "Arguments:"
     echo
@@ -57,17 +56,13 @@ fi
 
 # Check if we are on a Jetson device
 build_args=""
-if [ -f /etc/nv_tegra_release ]; then
-    build_args+=" --build-arg BASE_IMAGE=zauberzeug/l4t-opencv:4.5.2-on-nano-r$L4T_VERSION"
-else
-    build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
-fi
-
-if [ -f /etc/nv_tegra_release ]
+if [ -f /etc/nv_tegra_release ]; 
 then
+    build_args+=" --build-arg BASE_IMAGE=zauberzeug/l4t-opencv:4.5.2-on-nano-r$L4T_VERSION"
     image="zauberzeug/yolov5-detector:$L4T_VERSION"
     dockerfile="jetson.dockerfile"
 else
+    build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
     image="zauberzeug/yolov5-detector:cloud"
     dockerfile="cloud.dockerfile"
 fi
@@ -84,12 +79,16 @@ case $cmd in
         docker build --no-cache . -f $dockerfile --target release -t $image $build_args $cmd_args
         docker build . -f $dockerfile -t ${image}-dev $build_args $cmd_args
         ;;
+    d | debug)
+        docker run $run_args $image-dev /app/start.sh debug
+        ;;
     U | update)
 	    docker pull ${image}
         docker pull ${image}-dev
 	;;
-    d | debug)
-        docker run $run_args $image-dev /app/start.sh debug
+    p | push)
+        docker push ${image}-dev 
+        docker push $image
         ;;
     r | run)
         docker run $run_args $image-dev $cmd_args
@@ -97,17 +96,13 @@ case $cmd in
     ri | run-image)
     	docker run $run_args $image $cmd_args
         ;;
-    p | push)
-        docker push ${image}-dev 
-        docker push $image
-        ;;
     s | stop)
         docker stop $name $cmd_args
         ;;
     k | kill)
         docker kill $name $cmd_args
         ;;
-    d | rm)
+    rm)
         docker kill $name
         docker rm $name $cmd_args
         ;;
