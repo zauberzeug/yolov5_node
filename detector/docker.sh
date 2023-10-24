@@ -30,7 +30,7 @@ then
 fi
 
 # sourcing .env file to get configuration (see README.md)
-. .env || echo "you should provide an .env file for the Learning Loop"
+. .env || echo "you should provide an .env file to configure the detector"
 
 
 run_args="-it --rm" 

@@ -39,7 +39,8 @@ class Yolov5Detector(DetectorLogic):
         detections = Detections()
         try:
             t = time.time()
-            results, inference_ms = self.yolov5.infer(cv2.imdecode(image, cv2.IMREAD_COLOR))
+            results, inference_ms = self.yolov5.infer(
+                cv2.imdecode(image, cv2.IMREAD_COLOR))
             skipped_detections = []
             logging.info(f'took {inference_ms} s, overall {time.time() -t} s')
             for detection in results:
@@ -50,14 +51,15 @@ class Yolov5Detector(DetectorLogic):
                     continue
                 if category.type == CategoryType.Box:
                     detections.box_detections.append(BoxDetection(
-                        category.name, x, y, w, h, self.model_info.version, probability))
+                        category_name=category.name, x=x, y=y, width=w, height=h, model_name=self.model_info.version, confidence=probability))
                 elif category.type == CategoryType.Point:
                     cx, cy = (np.average([x, x + w]), np.average([y, y + h]))
                     detections.point_detections.append(PointDetection(
-                        category.name, int(cx), int(cy), self.model_info.version, probability))
+                        category_name=category.name, x=int(cx), y=int(cy), model_name=self.model_info.version, confidence=probability))
             if skipped_detections:
                 log_msg = '\n'.join([str(d) for d in skipped_detections])
-                logging.warning(f'Removed {len(skipped_detections)} small detections from result: \n{log_msg}')
+                logging.warning(
+                    f'Removed {len(skipped_detections)} small detections from result: \n{log_msg}')
         except Exception:
             logging.exception('inference failed')
         return detections
@@ -74,15 +76,19 @@ class Yolov5Detector(DetectorLogic):
         # Adapt resolution
         with open('../src/config.h', 'r+') as f:
             content = f.read()
-            content = re.sub('(kNumClass =) \d*', r'\1 ' + str(cat_count), content)
-            content = re.sub('(kInput[HW] =) \d*', r'\1 ' + str(resolution), content)
+            content = re.sub('(kNumClass =) \d*', r'\1 ' +
+                             str(cat_count), content)
+            content = re.sub('(kInput[HW] =) \d*',
+                             r'\1 ' + str(resolution), content)
             f.seek(0)
             f.truncate()
             f.write(content)
 
-        subprocess.run('make -j6 -Wno-deprecated-declarations', shell=True, check=True)
+        subprocess.run('make -j6 -Wno-deprecated-declarations',
+                       shell=True, check=True)
         logging.warning('currently we assume a Yolov5 s6 model;\
             parameterization of the variant (s, s6, m, m6, ...) still needs to be done')
         # TODO parameterize variant "s6"
-        subprocess.run(f'./yolov5_det -s {wts_file} {engine_file} s6', shell=True, check=True)
+        subprocess.run(
+            f'./yolov5_det -s {wts_file} {engine_file} s6', shell=True, check=True)
         return engine_file
