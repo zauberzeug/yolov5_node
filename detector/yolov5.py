@@ -40,6 +40,7 @@ class YoLov5TRT(object):
 
     def __init__(self, engine_file_path: str):
         # Create a Context on this device,
+        cuda.init()
         self.ctx = cuda.Device(0).make_context()
         stream = cuda.Stream()
         TRT_LOGGER = trt.Logger(trt.Logger.INFO)
@@ -122,7 +123,8 @@ class YoLov5TRT(object):
         # Do postprocess
         detections = []
         Detection = namedtuple('Detection', 'x y w h category probability')
-        result_boxes, result_scores, result_classid = self.post_process(output[0:LEN_ALL_RESULT], origin_h, origin_w)
+        result_boxes, result_scores, result_classid = self.post_process(
+            output[0:LEN_ALL_RESULT], origin_h, origin_w)
         for j, box in enumerate(result_boxes):
             x, y, br_x, br_y = box
             w = br_x - x
@@ -233,7 +235,8 @@ class YoLov5TRT(object):
         """
 
         num = int(output[0])  # Get the num of boxes detected
-        pred = np.reshape(output[1:], (-1, LEN_ONE_RESULT))[:num, :]  # Reshape to a 2D ndarray
+        # Reshape to a 2D ndarray
+        pred = np.reshape(output[1:], (-1, LEN_ONE_RESULT))[:num, :]
         pred = pred[:, :6]
         # Do nms
         boxes = self.non_max_suppression(
@@ -255,14 +258,20 @@ class YoLov5TRT(object):
         """
         if not x1y1x2y2:
             # Transform from center and width to exact coordinates
-            b1_x1, b1_x2 = box1[:, 0] - box1[:, 2] / 2, box1[:, 0] + box1[:, 2] / 2
-            b1_y1, b1_y2 = box1[:, 1] - box1[:, 3] / 2, box1[:, 1] + box1[:, 3] / 2
-            b2_x1, b2_x2 = box2[:, 0] - box2[:, 2] / 2, box2[:, 0] + box2[:, 2] / 2
-            b2_y1, b2_y2 = box2[:, 1] - box2[:, 3] / 2, box2[:, 1] + box2[:, 3] / 2
+            b1_x1, b1_x2 = box1[:, 0] - box1[:, 2] / \
+                2, box1[:, 0] + box1[:, 2] / 2
+            b1_y1, b1_y2 = box1[:, 1] - box1[:, 3] / \
+                2, box1[:, 1] + box1[:, 3] / 2
+            b2_x1, b2_x2 = box2[:, 0] - box2[:, 2] / \
+                2, box2[:, 0] + box2[:, 2] / 2
+            b2_y1, b2_y2 = box2[:, 1] - box2[:, 3] / \
+                2, box2[:, 1] + box2[:, 3] / 2
         else:
             # Get the coordinates of bounding boxes
-            b1_x1, b1_y1, b1_x2, b1_y2 = box1[:, 0], box1[:, 1], box1[:, 2], box1[:, 3]
-            b2_x1, b2_y1, b2_x2, b2_y2 = box2[:, 0], box2[:, 1], box2[:, 2], box2[:, 3]
+            b1_x1, b1_y1, b1_x2, b1_y2 = box1[:,
+                                              0], box1[:, 1], box1[:, 2], box1[:, 3]
+            b2_x1, b2_y1, b2_x2, b2_y2 = box2[:,
+                                              0], box2[:, 1], box2[:, 2], box2[:, 3]
 
         # Get the coordinates of the intersection rectangle
         inter_rect_x1 = np.maximum(b1_x1, b2_x1)
