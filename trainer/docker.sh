@@ -50,7 +50,7 @@ fi
 
 run_args="-it --rm" 
 run_args+=" -v $(pwd)/../:/yolov5_node/"
-run_args+=" -v $HOME/node_data/$TRAINER_NAME:/data"
+run_args+=" -v $HOME/trainer_nodes_data:/data"
 run_args+=" -e HOST=$HOST"
 run_args+=" -h ${HOSTNAME}_DEV"
 run_args+=" -e USERNAME=$USERNAME -e PASSWORD=$PASSWORD"
