@@ -140,7 +140,7 @@ class Yolov5TrainerLogic(TrainerLogic):
         path = (self.training_folder / 'result/weights/published').absolute()
         path.mkdir(parents=True, exist_ok=True)
 
-        assert basic_model.meta_information is not None, 'meta_information should not be set'
+        assert basic_model.meta_information is not None, 'meta_information should be set'
         weightfile = basic_model.meta_information['weightfile']
 
         target = path / 'latest.pt'
@@ -234,7 +234,7 @@ class Yolov5TrainerLogic(TrainerLogic):
         else:
             self.try_replace_optimized_hyperparameter()
             batch_size = await batch_size_calculation.calc(self.training.training_folder, model, hyperparameter_path, f'{self.training.training_folder}/dataset.yaml', resolution)
-            cmd = f'WANDB_MODE=disabled python /app/train_det.py --exist-ok --patience {self.patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs} {additional_parameters} --nosave'
+            cmd = f'WANDB_MODE=disabled python /app/train_det.py --exist-ok --patience {self.patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs} {additional_parameters}'
             with open(hyperparameter_path) as f:
                 logging.info(f'running training with command :\n {cmd} \nand hyperparameter\n{f.read()}')
         logging.info(f'running training with command :\n {cmd}')
@@ -283,9 +283,7 @@ class Yolov5TrainerLogic(TrainerLogic):
                 found_line = line.split(' ')
                 for item in found_line:
                     if f'/{self.epochs -1}' in item:
-                        epoch_and_total_epochs = item.split('/')
-                        epoch = epoch_and_total_epochs[0]
-                        total_epochs = epoch_and_total_epochs[1]
+                        epoch, total_epochs = item.split('/')[:2]
                         try:
                             progress = float(epoch) / float(total_epochs)
                         except ValueError:
