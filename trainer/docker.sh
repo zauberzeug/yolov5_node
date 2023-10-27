@@ -65,13 +65,11 @@ run_args+=" -p 7442:80"
 # Get the directory of this script
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 if [ "$LINKLL" == "TRUE" ]; then
-    echo "Linking Learning Loop from"
-    echo "$SCRIPT_DIR/../../learning_loop_node"
+    echo "Linking Learning Loop from $SCRIPT_DIR/../../learning_loop_node"
     run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.10/dist-packages/learning_loop_node"
-    # run_args+=" -v $SCRIPT_DIR/../../learning_loop_node:/learning_loop_node"
 fi
 
-image="zauberzeug/yolov5-trainer:latest"
+image="zauberzeug/yolov5-trainer:nlv0.8.3"
 
 build_args=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
 

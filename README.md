@@ -1,8 +1,7 @@
 # Yolov5 Nodes
 
 Learning Loop Trainer and Detector Node for Yolov5 (object detection and classification of images). The DL part is based on https://github.com/ultralytics/yolov5
-This repository is an implementation of Nodes that interact with the [Zauberzeug Learning Loop](https://github.com/zauberzeug/learning_loop_node).
-
+This repository is an implementation of Nodes that interact with the Zauberzeug Learning Loop using the [Zauberzeug Learning Loop Node Library](https://github.com/zauberzeug/learning_loop_node).
 
 # Trainer
 
@@ -12,33 +11,54 @@ This node is used to train Yolov5 Models in the Learning Loop. It is based on [t
 
 Trainer Docker-Images are published on https://hub.docker.com/r/zauberzeug/yolov5-trainer
 
-Images can be pulled with `docker pull zauberzeug/yolov5-trainer:latest`.
-The script `docker.sh` in the folder `training` is recommended used to interact with this image. 
-It is required to setup a .env file in the training folder with the following values
+New images can bbe pulled with `docker pull zauberzeug/yolov5-trainer:lnvX.Y.Z`, where `X.Y.Z` is the version of the node-lib used.
+Legacy image can be pulled with `docker pull zauberzeug/yolov5-trainer:latest`.
 
-- HOST=learning-loop.ai"
-- ORGANIZATION=zauberzeug"
-- PROJECT=demo"
-- YOLOV5_MODE=CLASSIFICATION | DETECTION
+During development, i.e. when building the container from code it is recommended to use the script `docker.sh` in the folder `training` to build/start/interact with the image.
+When using the script it is required to setup a .env file in the training folder that contains the loop-related configuration. Besides the variables described in [Zauberzeug Learning Loop Node Library](https://github.com/zauberzeug/learning_loop_node) the following variables should be set:
 
-# Detector
+| Name         | Purpose                                   | Value                       | Required only with ./docker.sh |
+| ------------ | ----------------------------------------- | --------------------------- | ------------------------------ |
+| YOLOV5_MODE  | Mode of the trainer                       | CLASSIFICATION or DETECTION | No                             |
+| LINKLL       | Link the node library into the container? | TRUE or FALSE               | Yes                            |
+| TRAINER_NAME | Will be the name of the container         | String                      | Yes                            |
+
+# Detector (Object detection)
 
 ## Images
 
-Detector Images are published on https://hub.docker.com/r/zauberzeug/yolov5-detector
+Detector Images are published on https://hub.docker.com/r/zauberzeug/yolov5-detector.
+There are two variants of the detector:
 
-Images can be pulled with `docker pull zauberzeug/yolov5-detector:32.6.1`, where `32.6.1` is the used `Tag`(see https://hub.docker.com/r/zauberzeug/yolov5-detector/tags). It corresponds to the L4T version. Right now, `32.6.1` and `32.5.0` are supported.
+- to be deployed on a regular linux computer, e.g. running ubuntu (referred to as cloud-detectors)
+- to be deployed on a jetson nano running linux4tegra (L4T)
+
+### Cloud-Detector
+
+New images can be pulled with `docker pull zauberzeug/yolov5-detector:nlvX.Y.Z-cloud`, where `X.Y.Z` is the version of the node-lib used.
+Legacy image can be pulled with `docker pull zauberzeug/yolov5-detector:cloud`.
 
 Pulled images can be run with the `docker.sh` script by calling `./docker.sh run-image`.
-Local builds can be run with `./docker.sh run`
-Mandatory parameters (Please adapt as needed):
+Local builds can be run with `./docker.sh run`.
+If the container does not use the GPU, try `./docker.sh d`.
+Mandatory parameters are those described in [Zauberzeug Learning Loop Node Library](https://github.com/zauberzeug/learning_loop_node). Besides, the following parameters may bbe set
 
-- HOST=learning-loop.ai"
-- ORGANIZATION=zauberzeug"
-- PROJECT=demo"
-- YOLOV5_MODE=CLASSIFICATION | DETECTION
+| Name          | Purpose                                   | Value         | Required only with ./docker.sh |
+| ------------- | ----------------------------------------- | ------------- | ------------------------------ |
+| LINKLL        | Link the node library into the container? | TRUE or FALSE | Yes                            |
+| DETECTOR_NAME | Will be the name of the container         | String        | Yes                            |
 
-## Publish a new release
+### L4T-Detector
+
+New images will be published to `docker pull zauberzeug/yolov5-detector:nlvX.Y.Z-A.B.C`, where `X.Y.Z` is the version of the node-lib used and `A.B.C` is the L4T version. Right now, the newer detector images DO NOT SUPPORT L4T.
+
+Legacy images can be pulled with `docker pull zauberzeug/yolov5-detector:32.6.1`, where `32.6.1` is the used `Tag`(see https://hub.docker.com/r/zauberzeug/yolov5-detector/tags). It corresponds to the L4T version. Right now, `32.6.1` and `32.5.0` are supported.
+
+# Detector (Classification)
+
+This variant is currently in seperate subfolder yolov5_node/detector_cla. This detector is not maintained at the moment. However, the last images should work on a Linux PC
+
+# Publish a new release
 
 ```
 # build docker image

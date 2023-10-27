@@ -58,16 +58,11 @@ fi
 build_args=""
 if [ -f /etc/nv_tegra_release ]; then
     build_args+=" --build-arg BASE_IMAGE=zauberzeug/l4t-opencv:4.5.2-on-nano-r$L4T_VERSION"
-else
-    build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
-fi
-
-if [ -f /etc/nv_tegra_release ]
-then
-    image="zauberzeug/yolov5-detector-cls:$L4T_VERSION"
+    image="zauberzeug/yolov5-detector-cls:nlv0.7.54-$L4T_VERSION"
     dockerfile="jetson.dockerfile"
 else
-    image="zauberzeug/yolov5-detector-cls:cloud"
+    build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
+    image="zauberzeug/yolov5-detector-cls:nlv0.8.3-cloud"
     dockerfile="cloud.dockerfile"
 fi
 

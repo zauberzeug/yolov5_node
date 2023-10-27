@@ -39,23 +39,24 @@ class Yolov5Detector(DetectorLogic):
         detections = Detections()
         try:
             t = time.time()
-            results, inference_ms = self.yolov5.infer(
-                cv2.imdecode(image, cv2.IMREAD_COLOR))
+            results, inference_ms = self.yolov5.infer(cv2.imdecode(image, cv2.IMREAD_COLOR))
             skipped_detections = []
             logging.info(f'took {inference_ms} s, overall {time.time() -t} s')
             for detection in results:
-                x, y, w, h, category, probability = detection
-                category = self.model_info.categories[category]
+                x, y, w, h, category_idx, probability = detection
+                category = self.model_info.categories[category_idx]
                 if w <= 2 or h <= 2:  # skip very small boxes.
                     skipped_detections.append((category.name, detection))
                     continue
                 if category.type == CategoryType.Box:
-                    detections.box_detections.append(BoxDetection(
-                        category_name=category.name, x=x, y=y, width=w, height=h, model_name=self.model_info.version, confidence=probability))
+                    detections.box_detections.append(
+                        BoxDetection(category_name=category.name, x=x, y=y, width=w, height=h, category_id=category.id,
+                                     model_name=self.model_info.version, confidence=probability))
                 elif category.type == CategoryType.Point:
                     cx, cy = (np.average([x, x + w]), np.average([y, y + h]))
-                    detections.point_detections.append(PointDetection(
-                        category_name=category.name, x=int(cx), y=int(cy), model_name=self.model_info.version, confidence=probability))
+                    detections.point_detections.append(
+                        PointDetection(category_name=category.name, x=int(cx), y=int(cy), category_id=category.id,
+                                       model_name=self.model_info.version, confidence=probability))
             if skipped_detections:
                 log_msg = '\n'.join([str(d) for d in skipped_detections])
                 logging.warning(
