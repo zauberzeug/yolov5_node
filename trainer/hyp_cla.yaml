@@ -1,0 +1,21 @@
+# Own set of hyps that are forwarded to albumentation
+
+# Optimizer is hardcoded to SGD
+
+lr0: 0.001 # initial learning rate (SGD=1E-2, Adam=1E-3)
+momentum: 0.843 # SGD momentum/Adam beta1
+decay: 0.00001 # optimizer weight decay
+label_smoothing: 0.1 # Label smoothing epsilon
+batch_size: 4
+epochs: 100
+
+# Augmentation
+jitter: 0.4 # colour jitter forr brightness, contrast, satuaration (hue is c-jitter/2)
+hue_jitter: 0.1
+min_scale: 0.1 # minimum image scale for augmentation
+min_ratio: 0.75 # minimum aspect ratio for augmentation
+r90_prob: 0.0 # rotate 90 probability
+
+# Maybe overwritten by learning loop
+hflip: 0.5 # horizontal flip probability
+vflip: 0.5 # vertical flip probability
