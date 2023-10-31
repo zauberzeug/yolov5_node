@@ -101,6 +101,7 @@ This code is licensed under the [AGPL-3.0 License](https://opensource.org/licens
 - `trainer/app_code/pred_cla.py`
 - `trainer/app_code/pred_det.py`
 - `detetor_cla/app_code/yolov5`
+
 is largely based on the repository https://github.com/ultralytics/yolov5 which is also published under the [AGPL-3.0 License] for non-commercial use.
 
 ### Original license disclaimer in https://github.com/ultralytics/yolov5:
