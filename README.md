@@ -91,3 +91,24 @@ with open('test.jpg', 'rb') as f:
 The trainer uses the `yolov5_pytorch` format identifier (`yolov5_cla_pytorch` for classification).
 When it saves a model to the Learning Loop it saves the model as `yolov5_pytorch` and `yolov5_wts` (respectively `yolov5_cla_pytorch` and `yolov5_cla_wts` for classification).
 The wts formats may be used by a detector wunning on a NVIDIA jetson device to create an engine file as required by tensorrtx (see https://github.com/wang-xinyu/tensorrtx/tree/master/yolov5).
+
+# License
+
+This code is licensed under the [AGPL-3.0 License](https://opensource.org/license/agpl-v3/). The code in
+- `trainer/app_code/yolov5`
+- `trainer/app_code/train_cla.py`
+- `trainer/app_code/train_det.py`
+- `trainer/app_code/pred_cla.py`
+- `trainer/app_code/pred_det.py`
+- `detetor_cla/app_code/yolov5`
+is largely based on the repository https://github.com/ultralytics/yolov5 which is also published under the [AGPL-3.0 License] for non-commercial use.
+
+### Original license disclaimer in https://github.com/ultralytics/yolov5:
+
+Ultralytics offers two licensing options to accommodate diverse use cases:
+
+- **AGPL-3.0 License**: This [OSI-approved](https://opensource.org/licenses/) open-source license is ideal for students and enthusiasts, promoting open collaboration and knowledge sharing. See the [LICENSE](https://github.com/ultralytics/yolov5/blob/master/LICENSE) file for more details.
+- **Enterprise License**: Designed for commercial use, this license permits seamless integration of Ultralytics software and AI models into commercial goods and services, bypassing the open-source requirements of AGPL-3.0. If your scenario involves embedding our solutions into a commercial offering, reach out through [Ultralytics Licensing](https://ultralytics.com/license).
+
+
+
