@@ -182,7 +182,7 @@ class Yolov5TrainerLogic(TrainerLogic):
         if self.is_cla:
             cmd = f'python /app/pred_cla.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --save-txt'
         else:
-            cmd = f'python /app/pred_det.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --conf-thres 0.2 --save-txt --save-conf'
+            cmd = f'python /app/pred_det.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --conf-thres 0.2 --save-txt --save-conf --nosave'
         logging.info(f'running detection with command :\n {cmd}')
 
         executor.start(cmd)
