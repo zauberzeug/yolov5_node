@@ -49,6 +49,7 @@ def _calc_batch_size(
     # Try to download pretrained model. Its ok when its a 'Continued' training.
     attempt_download(model_file)
 
+    torch.cuda.init()
     t = torch.cuda.get_device_properties(0).total_memory
     r = torch.cuda.memory_reserved(0)
     a = torch.cuda.memory_allocated(0)
