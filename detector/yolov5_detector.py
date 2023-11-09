@@ -77,6 +77,7 @@ class Yolov5Detector(DetectorLogic):
         # Adapt resolution
         with open('../src/config.h', 'r+') as f:
             content = f.read()
+            content = content.replace('#define USE_FP16', '#define USE_FP32')
             content = re.sub('(kNumClass =) \d*', r'\1 ' +
                              str(cat_count), content)
             content = re.sub('(kInput[HW] =) \d*',
