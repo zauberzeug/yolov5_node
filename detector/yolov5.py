@@ -3,6 +3,7 @@ Original from https://github.com/wang-xinyu/tensorrtx/blob/7b79de466c7ac2fcf179e
 MIT License
 """
 
+import logging
 import os
 import threading
 import time
@@ -12,6 +13,7 @@ import cv2
 import numpy as np
 import pycuda.driver as cuda
 import tensorrt as trt
+from pycuda._driver import Error as CudaError
 
 CONF_THRESH = 0.2
 IOU_THRESHOLD = 0.4
@@ -33,14 +35,22 @@ def get_img_path_batches(batch_size, img_dir):
     return ret
 
 
-class YoLov5TRT(object):
+class YoLov5TRT():
     """
     description: A YOLOv5 class that warps TensorRT ops, preprocess and postprocess ops.
     """
 
     def __init__(self, engine_file_path: str):
         # Create a Context on this device,
-        cuda.init()
+        try:
+            cuda.init()
+        except CudaError as e:
+            logging.exception('cuda init error:', e)
+            self.cuda_init_error = True
+            return
+
+        self.cuda_init_error = False
+
         self.ctx = cuda.Device(0).make_context()
         stream = cuda.Stream()
         TRT_LOGGER = trt.Logger(trt.Logger.INFO)
@@ -87,7 +97,13 @@ class YoLov5TRT(object):
         self.bindings = bindings
         self.batch_size = 1
 
+    def check_cuda_init_error(self):
+        if self.cuda_init_error:
+            raise RuntimeError('cuda.init() failed .. detector cannot be used! Try to restart the machine.')
+
     def infer(self, image_raw):
+        self.check_cuda_init_error()
+
         threading.Thread.__init__(self)
         # Make self the active context, pushing it on top of the context stack.
         self.ctx.push()
@@ -101,7 +117,7 @@ class YoLov5TRT(object):
         cuda_outputs = self.cuda_outputs
         bindings = self.bindings
         # Do image preprocess
-        input_image, image_raw, origin_h, origin_w = self.preprocess_image(
+        input_image, image_raw, origin_h, origin_w = self._preprocess_image(
             image_raw)
         # Copy input image to host buffer
         np.copyto(host_inputs[0], input_image.ravel())
@@ -123,7 +139,7 @@ class YoLov5TRT(object):
         # Do postprocess
         detections = []
         Detection = namedtuple('Detection', 'x y w h category probability')
-        result_boxes, result_scores, result_classid = self.post_process(
+        result_boxes, result_scores, result_classid = self._post_process(
             output[0:LEN_ALL_RESULT], origin_h, origin_w)
         for j, box in enumerate(result_boxes):
             x, y, br_x, br_y = box
@@ -141,9 +157,10 @@ class YoLov5TRT(object):
         """
         description: Ready data for warmup
         """
+        self.check_cuda_init_error()
         return np.zeros([self.input_h, self.input_w, 3], dtype=np.uint8)
 
-    def preprocess_image(self, raw_bgr_image):
+    def _preprocess_image(self, raw_bgr_image):
         """
         description: Convert BGR image to RGB,
                      resize and pad it to target size, normalize to [0,1],
@@ -221,7 +238,7 @@ class YoLov5TRT(object):
 
         return y
 
-    def post_process(self, output, origin_h, origin_w):
+    def _post_process(self, output, origin_h, origin_w):
         """
         description: postprocess the prediction
         param:
@@ -239,7 +256,7 @@ class YoLov5TRT(object):
         pred = np.reshape(output[1:], (-1, LEN_ONE_RESULT))[:num, :]
         pred = pred[:, :6]
         # Do nms
-        boxes = self.non_max_suppression(
+        boxes = self._non_max_suppression(
             pred, origin_h, origin_w, conf_thres=CONF_THRESH, nms_thres=IOU_THRESHOLD)
         result_boxes = boxes[:, :4] if len(boxes) else np.array([])
         result_scores = boxes[:, 4] if len(boxes) else np.array([])
@@ -289,7 +306,7 @@ class YoLov5TRT(object):
 
         return iou
 
-    def non_max_suppression(self, prediction, origin_h, origin_w, conf_thres=0.5, nms_thres=0.4):
+    def _non_max_suppression(self, prediction, origin_h, origin_w, conf_thres=0.5, nms_thres=0.4):
         """
         description: Removes detections with lower object confidence score than 'conf_thres' and performs
         Non-Maximum Suppression to further filter detections.
@@ -330,7 +347,7 @@ class YoLov5TRT(object):
 
 
 class warmUpThread(threading.Thread):
-    def __init__(self, yolov5_wrapper):
+    def __init__(self, yolov5_wrapper: YoLov5TRT):
         threading.Thread.__init__(self)
         self.yolov5_wrapper = yolov5_wrapper
 
