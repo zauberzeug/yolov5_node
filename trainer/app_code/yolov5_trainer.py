@@ -254,7 +254,7 @@ class Yolov5TrainerLogic(TrainerLogic):
             for filename in os.scandir(labels_path):
                 uuid = os.path.splitext(os.path.basename(filename.path))[0]
                 if self.is_cla:
-                    classification_detections = self._parse_file_cla(model_information, filename)
+                    classification_detections = self._parse_file_cla(model_information, filename.path)
                     detections.append(Detections(classification_detections=classification_detections, image_id=uuid))
                 else:
                     box_detections, point_detections = self._parse_file(model_information, images_folder, filename.path)
@@ -294,18 +294,18 @@ class Yolov5TrainerLogic(TrainerLogic):
     # ---------------------------------------- HELPER METHODS ----------------------------------------
 
     @staticmethod
-    def _parse_file_cla(model_info, filename) -> List[ClassificationDetection]:
-        with open(filename.path, 'r') as f:
+    def _parse_file_cla(model_info: ModelInformation, filepath: str) -> List[ClassificationDetection]:
+        with open(filepath, 'r') as f:
             content = f.readlines()
         classification_detections = []
 
         for line in content:
-            probability, c = line.split(' ', maxsplit=1)
-            probability = float(probability) * 100
+            probability_str, c = line.split(' ', maxsplit=1)
+            probability = float(probability_str) * 100
             c = c.strip()
-            category = [category for category in model_info.categories if category.name == c]
-            if category:
-                category = category[0]
+            categories = [category for category in model_info.categories if category.name == c]
+            if categories:
+                category = categories[0]
                 classification_detection = ClassificationDetection(
                     category_name=category.name, model_name=model_info.version, confidence=probability,
                     category_id=category.id)
