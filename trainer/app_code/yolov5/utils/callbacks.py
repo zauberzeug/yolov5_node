@@ -32,7 +32,7 @@ class Callbacks:
             'on_model_save': [],
             'on_train_end': [],
             'on_params_update': [],
-            'teardown': [],}
+            'teardown': [], }
         self.stop_training = False  # set True to interrupt training
 
     def register_action(self, hook, name='', callback=None):
@@ -69,8 +69,8 @@ class Callbacks:
         """
 
         assert hook in self._callbacks, f"hook '{hook}' not found in callbacks {self._callbacks}"
-        for logger in self._callbacks[hook]:
-            if thread:
-                threading.Thread(target=logger['callback'], args=args, kwargs=kwargs, daemon=True).start()
-            else:
-                logger['callback'](*args, **kwargs)
+        # for logger in self._callbacks[hook]:
+        #     if thread:
+        #         threading.Thread(target=logger['callback'], args=args, kwargs=kwargs, daemon=True).start()
+        #     else:
+        #         logger['callback'](*args, **kwargs)

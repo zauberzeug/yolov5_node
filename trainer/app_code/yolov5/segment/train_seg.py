@@ -52,8 +52,6 @@ from ..utils.plots import plot_evolve, plot_labels
 from ..utils.segment.dataloaders import create_dataloader
 from ..utils.segment.loss import ComputeLoss
 from ..utils.segment.metrics import KEYS, fitness
-from ..utils.segment.plots import (plot_images_and_masks,
-                                   plot_results_with_masks)
 from ..utils.torch_utils import (EarlyStopping, ModelEMA, de_parallel,
                                  select_device, smart_DDP, smart_optimizer,
                                  smart_resume, torch_distributed_zero_first)
@@ -344,13 +342,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 # if callbacks.stop_training:
                 #    return
 
-                # Mosaic plots
-                if plots:
-                    if ni < 3:
-                        plot_images_and_masks(imgs, targets, masks, paths, save_dir / f"train_batch{ni}.jpg")
-                    if ni == 10:
-                        files = sorted(save_dir.glob('train*.jpg'))
-                        logger.log_images(files, "Mosaics", epoch)
             # end batch ------------------------------------------------------------------------------------------------
 
         # Scheduler
@@ -455,13 +446,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         logger.log_metrics(dict(zip(KEYS[4:16], results)), epochs)
         if not opt.evolve:
             logger.log_model(best, epoch)
-        if plots:
-            plot_results_with_masks(file=save_dir / 'results.csv')  # save results.png
-            files = ['results.png', 'confusion_matrix.png', *(f'{x}_curve.png' for x in ('F1', 'PR', 'P', 'R'))]
-            files = [(save_dir / f) for f in files if (save_dir / f).exists()]  # filter
-            LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}")
-            logger.log_images(files, "Results", epoch + 1)
-            logger.log_images(sorted(save_dir.glob('val*.jpg')), "Validation", epoch + 1)
+
     torch.cuda.empty_cache()
     return results
 

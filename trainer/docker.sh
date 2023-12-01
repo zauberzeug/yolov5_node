@@ -51,11 +51,10 @@ fi
 run_args="-it --rm" 
 run_args+=" -v $(pwd)/../:/yolov5_node/"
 run_args+=" -v $HOME/trainer_nodes_data:/data"
-run_args+=" -e HOST=$HOST"
 run_args+=" -h ${HOSTNAME}_DEV"
-run_args+=" -e USERNAME=$USERNAME -e PASSWORD=$PASSWORD"
-run_args+=" -e BATCH_SIZE=$BATCH_SIZE"
-run_args+=" -e NODE_TYPE=trainer"
+run_args+=" -e HOST=$HOST -e USERNAME=$USERNAME -e PASSWORD=$PASSWORD"
+run_args+=" -e BATCH_SIZE=$BATCH_SIZE -e UVICORN_RELOAD=$UVICORN_RELOAD"
+run_args+=" -e NODE_TYPE=trainer -e YOLOV5_MODE=$YOLOV5_MODE"
 run_args+=" --name $TRAINER_NAME"
 run_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all"
 run_args+=" --gpus all"
@@ -69,7 +68,7 @@ if [ "$LINKLL" == "TRUE" ]; then
     run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.10/dist-packages/learning_loop_node"
 fi
 
-image="zauberzeug/yolov5-trainer:nlv0.8.3"
+image="zauberzeug/yolov5-trainer:nlv0.8.4"
 
 build_args=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
 
