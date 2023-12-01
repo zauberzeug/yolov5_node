@@ -1,4 +1,5 @@
 import logging
+import multiprocessing
 import os
 
 import icecream
@@ -19,5 +20,8 @@ trainer_logic = Yolov5TrainerLogic()
 node = TrainerNode(name='Yolov5 Trainer ' + os.uname()[1], trainer_logic=trainer_logic)
 
 if __name__ == "__main__":
+    multiprocessing.set_start_method('spawn', force=True)
+    logging.info(f'using multiprocessing start method {multiprocessing.get_start_method()}')
+
     uvicorn.run("main:node", host="0.0.0.0", port=80, lifespan='on',
                 reload=os.getenv('UVICORN_RELOAD', 'FALSE').lower() == 'true')
