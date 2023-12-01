@@ -20,6 +20,8 @@ class Yolov5Detector(DetectorLogic):
     def __init__(self) -> None:
         super().__init__('yolov5_wts')
         self.yolov5: Optional[yolov5.YoLov5TRT] = None
+        self.weight_type = os.getenv('WEIGHT_TYPE', 'FP16')
+        assert self.weight_type in ['FP16', 'FP32', 'INT8'], 'WEIGHT_TYPE must be one of FP16, FP32, INT8'
 
     def init(self) -> None:
         resolution = self.model_info.resolution
@@ -70,6 +72,7 @@ class Yolov5Detector(DetectorLogic):
         if os.path.isfile(engine_file):
             logging.info(f'{engine_file} already exists, skipping conversion')
             return engine_file
+        logging.info(f'converting {wts_file} to {engine_file}')
 
         # NOTE cmake and inital building is done in Dockerfile (to speeds things up)
         os.chdir('/tensorrtx/yolov5/build')
@@ -77,7 +80,15 @@ class Yolov5Detector(DetectorLogic):
         # Adapt resolution
         with open('../src/config.h', 'r+') as f:
             content = f.read()
-            content = content.replace('#define USE_FP16', '#define USE_FP32')
+            if self.weight_type == 'INT8':
+                logging.info('using INT8')
+                content = content.replace('#define USE_FP16', '#define USE_INT8')
+            elif self.weight_type == 'FP32':
+                logging.info('using FP32')
+                content = content.replace('#define USE_FP16', '#define USE_FP32')
+            else:
+                logging.info('using FP16')
+
             content = re.sub('(kNumClass =) \d*', r'\1 ' +
                              str(cat_count), content)
             content = re.sub('(kInput[HW] =) \d*',

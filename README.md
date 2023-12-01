@@ -43,10 +43,11 @@ Local builds can be run with `./docker.sh run`.
 If the container does not use the GPU, try `./docker.sh d`.
 Mandatory parameters are those described in [Zauberzeug Learning Loop Node Library](https://github.com/zauberzeug/learning_loop_node). Besides, the following parameters may bbe set
 
-| Name          | Purpose                                   | Value         | Required only with ./docker.sh |
-| ------------- | ----------------------------------------- | ------------- | ------------------------------ |
-| LINKLL        | Link the node library into the container? | TRUE or FALSE | Yes                            |
-| DETECTOR_NAME | Will be the name of the container         | String        | Yes                            |
+| Name          | Purpose                                   | Value                     | Required only with ./docker.sh |
+| ------------- | ----------------------------------------- | ------------------------- | ------------------------------ |
+| LINKLL        | Link the node library into the container? | TRUE or FALSE             | Yes                            |
+| DETECTOR_NAME | Will be the name of the container         | String                    | Yes                            |
+| WEIGHT_TYPE   | Data type to convert weights to           | String [FP32, FP16, INT8] | Yes                            |
 
 ### L4T-Detector
 
@@ -95,6 +96,7 @@ The wts formats may be used by a detector wunning on a NVIDIA jetson device to c
 # License
 
 This code is licensed under the [AGPL-3.0 License](https://opensource.org/license/agpl-v3/). The code in
+
 - `trainer/app_code/yolov5`
 - `trainer/app_code/train_cla.py`
 - `trainer/app_code/train_det.py`
@@ -110,6 +112,3 @@ Ultralytics offers two licensing options to accommodate diverse use cases:
 
 - **AGPL-3.0 License**: This [OSI-approved](https://opensource.org/licenses/) open-source license is ideal for students and enthusiasts, promoting open collaboration and knowledge sharing. See the [LICENSE](https://github.com/ultralytics/yolov5/blob/master/LICENSE) file for more details.
 - **Enterprise License**: Designed for commercial use, this license permits seamless integration of Ultralytics software and AI models into commercial goods and services, bypassing the open-source requirements of AGPL-3.0. If your scenario involves embedding our solutions into a commercial offering, reach out through [Ultralytics Licensing](https://ultralytics.com/license).
-
-
-
