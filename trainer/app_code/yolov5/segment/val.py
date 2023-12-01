@@ -41,12 +41,11 @@ from ..utils.general import (LOGGER, NUM_THREADS, TQDM_BAR_FORMAT, Profile,
                              increment_path, non_max_suppression, print_args,
                              scale_boxes, xywh2xyxy, xyxy2xywh)
 from ..utils.metrics import ConfusionMatrix, box_iou
-from ..utils.plots import output_to_target, plot_val_study
+from ..utils.plots import plot_val_study
 from ..utils.segment.dataloaders import create_dataloader
 from ..utils.segment.general import (mask_iou, process_mask,
                                      process_mask_native, scale_image)
 from ..utils.segment.metrics import Metrics, ap_per_class_box_and_mask
-from ..utils.segment.plots import plot_images_and_masks
 from ..utils.torch_utils import (de_parallel, select_device,
                                  smart_inference_mode)
 
@@ -325,14 +324,6 @@ def run(
                                          pred_masks.permute(1, 2, 0).contiguous().cpu().numpy(), shape, shapes[si][1])
                 save_one_json(predn, jdict, path, class_map, pred_masks)  # append to COCO-JSON dictionary
             # callbacks.run('on_val_image_end', pred, predn, path, names, im[si])
-
-        # Plot images
-        if plots and batch_i < 3:
-            if len(plot_masks):
-                plot_masks = torch.cat(plot_masks, dim=0)
-            plot_images_and_masks(im, targets, masks, paths, save_dir / f'val_batch{batch_i}_labels.jpg', names)
-            plot_images_and_masks(im, output_to_target(preds, max_det=15), plot_masks, paths,
-                                  save_dir / f'val_batch{batch_i}_pred.jpg', names)  # pred
 
         # callbacks.run('on_val_batch_end')
 
