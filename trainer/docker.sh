@@ -68,7 +68,7 @@ if [ "$LINKLL" == "TRUE" ]; then
     run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.10/dist-packages/learning_loop_node"
 fi
 
-image="zauberzeug/yolov5-trainer:nlv0.8.3"
+image="zauberzeug/yolov5-trainer:nlv0.8.4"
 
 build_args=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
 
