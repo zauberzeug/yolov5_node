@@ -68,11 +68,11 @@ then
     L4T_REVISION=$(echo $L4T_VERSION_STRING | cut -f 2 -d ',' | grep -Po '(?<=REVISION: )[^;]+')
     L4T_VERSION="$L4T_RELEASE.$L4T_REVISION"
     build_args+=" --build-arg BASE_IMAGE=zauberzeug/l4t-opencv:4.5.2-on-nano-r$L4T_VERSION" # this is python 3.6
-    image="zauberzeug/yolov5-detector:nlv0.8.4-$L4T_VERSION"
+    image="zauberzeug/yolov5-detector:nlv0.8.6-$L4T_VERSION"
     dockerfile="jetson.dockerfile"
 else
     build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
-    image="zauberzeug/yolov5-detector:nlv0.8.4-cloud"
+    image="zauberzeug/yolov5-detector:nlv0.8.6-cloud"
     dockerfile="cloud.dockerfile"
 fi
 
