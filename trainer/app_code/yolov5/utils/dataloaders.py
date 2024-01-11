@@ -17,6 +17,7 @@ from itertools import repeat
 from multiprocessing.pool import Pool, ThreadPool
 from pathlib import Path
 from threading import Thread
+from typing import List
 from urllib.parse import urlparse
 
 import numpy as np
@@ -118,7 +119,9 @@ def create_dataloader(path,
                       image_weights=False,
                       quad=False,
                       prefix='',
-                      shuffle=False):
+                      shuffle=False,
+                      point_ids: List[int] = [],
+                      point_sizes: List[int] = []):
     if rect and shuffle:
         LOGGER.warning('WARNING ⚠️ --rect is incompatible with DataLoader shuffle, setting shuffle=False')
         shuffle = False
@@ -135,7 +138,9 @@ def create_dataloader(path,
             stride=int(stride),
             pad=pad,
             image_weights=image_weights,
-            prefix=prefix)
+            prefix=prefix,
+            point_ids=point_ids,
+            point_sizes=point_sizes)
 
     batch_size = min(batch_size, len(dataset))
     nd = torch.cuda.device_count()  # number of CUDA devices
@@ -462,7 +467,9 @@ class LoadImagesAndLabels(Dataset):
                  stride=32,
                  pad=0.0,
                  min_items=0,
-                 prefix=''):
+                 prefix='',
+                 point_ids: List[int] = [],
+                 point_sizes: List[int] = []):
         self.img_size = img_size
         self.augment = augment
         self.hyp = hyp
@@ -473,6 +480,8 @@ class LoadImagesAndLabels(Dataset):
         self.stride = stride
         self.path = path
         self.albumentations = Albumentations(size=img_size) if augment else None
+        self.point_ids = point_ids
+        self.point_sizes = point_sizes
 
         try:
             f = []  # image files
@@ -726,6 +735,14 @@ class LoadImagesAndLabels(Dataset):
             # Cutouts
             # labels = cutout(img, labels, p=0.5)
             # nl = len(labels)  # update after cutout
+
+        # Modification by Zauberzeug: Reset height and width of points
+        if len(self.point_ids) > 0:
+            for label in labels:
+                if label[0] in self.point_ids:
+                    target_point_size_px = self.point_sizes[self.point_ids.index(label[0])]
+                    label[3] = img.shape[1] / target_point_size_px
+                    label[4] = img.shape[0] / target_point_size_px
 
         labels_out = torch.zeros((nl, 6))
         if nl:

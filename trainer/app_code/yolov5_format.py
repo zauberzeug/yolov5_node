@@ -2,20 +2,45 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List, Tuple
 
-import yaml
+import yaml  # type: ignore
+from learning_loop_node.data_classes import CategoryType  # type: ignore
 from learning_loop_node.data_classes import Hyperparameter, Training
 from ruamel.yaml import YAML
 
 
-def category_lookup_from_training(training: Training) -> Dict:
+def get_ids_and_sizes_of_point_classes(training: Training) -> Tuple[List[str], List[str]]:
+    """Returns a list of trainingids and sizes (in px) of point classes in the training data."""
+    assert training.data is not None, 'Training should have data'
+    sorted_category_uuids = sorted([c.id for c in training.data.categories])
+    point_ids, point_sizes = [], []
+    for i in range(len(sorted_category_uuids)):
+        category = training.data.categories[i]
+        if category.type == CategoryType.Point:
+            point_ids.append(str(i))
+            point_sizes.append(str(category.point_size or 20))
+    return point_ids, point_sizes
+
+
+def category_lookup_from_training(training: Training) -> Dict[str, str]:
     assert training.data is not None, 'Training should have data'
     return {c.name: c.id for c in training.data.categories}
 
 
 def _create_set(training: Training, set_name: str) -> int:
+    """Create training folder structure for a set (train or test).
+    - Images in the set are linked from the images folder (symlinks)
+    - Annotations are created in the set folder
+    Annotations are boxes in the format:
+    "class(id) x_center y_center width height" (normalized by image width and height)
+    Note that the id here is not the uuid but the training id (0, 1, 2, ...).
+    [see here](https://docs.ultralytics.com/tutorials/train-custom-datasets/)."""
+    assert training.data is not None, 'Training should have data'
+
     categories = list(category_lookup_from_training(training).values())
+    categories = sorted(categories)
+
     training_path = training.training_folder
     images_path = f'{training_path}/{set_name}'
 
@@ -23,10 +48,7 @@ def _create_set(training: Training, set_name: str) -> int:
     os.makedirs(images_path, exist_ok=True)
     img_count = 0
 
-    assert training.data is not None, 'Training should have data'
-    # logging.info(f'imagedata: {training.data.image_data}')
     for image in training.data.image_data:
-        # logging.info(f'processing image {image["set"]} - {image["set"] == set_name}')
         if image['set'] == set_name:
             img_count += 1
             image_name = image['id'] + '.jpg'
@@ -35,9 +57,7 @@ def _create_set(training: Training, set_name: str) -> int:
             height = float(image['height'])
             os.symlink(f'{os.path.abspath(training.images_folder)}/{image_name}', image_path)
 
-            # box format: https://docs.ultralytics.com/tutorials/train-custom-datasets/
-            # class x_center y_center width height
-            # normalized coordinates
+            # Create annotation file
             yolo_boxes = []
             for box in image['box_annotations']:
                 coords = [

@@ -230,13 +230,23 @@ class Yolov5TrainerLogic(TrainerLogic):
         self.load_hyps_set_epochs(hyperparameter_path)
 
         if self.is_cla:
-            cmd = f'python /app/train_cla.py --exist-ok --img {resolution} --data {self.training.training_folder} --model {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --optimizer SGD {additional_parameters}'
+            cmd = f'python /app/train_cla.py --exist-ok --img {resolution} \
+                --data {self.training.training_folder} --model {model} \
+                --project {self.training.training_folder} --name result \
+                --hyp {hyperparameter_path} --optimizer SGD {additional_parameters}'
         else:
+            p_ids, p_sizes = yolov5_format.get_ids_and_sizes_of_point_classes(self.training)
             self.try_replace_optimized_hyperparameter()
-            batch_size = await batch_size_calculation.calc(self.training.training_folder, model, hyperparameter_path, f'{self.training.training_folder}/dataset.yaml', resolution)
-            cmd = f'WANDB_MODE=disabled python /app/train_det.py --exist-ok --patience {self.patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs} {additional_parameters}'
+            batch_size = await batch_size_calculation.calc(self.training.training_folder, model, hyperparameter_path,
+                                                           f'{self.training.training_folder}/dataset.yaml', resolution)
+            cmd = f'WANDB_MODE=disabled python /app/train_det.py --exist-ok --patience {self.patience} \
+                --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} \
+                --project {self.training.training_folder} --name result --hyp {hyperparameter_path} \
+                --epochs {self.epochs} {additional_parameters} --point_ids {",".join(p_ids)} --point_sizes {",".join(p_sizes)}'
+
             with open(hyperparameter_path) as f:
                 logging.info(f'running training with command :\n {cmd} \nand hyperparameter\n{f.read()}')
+
         logging.info(f'running training with command :\n {cmd}')
         self.executor.start(cmd)
 
