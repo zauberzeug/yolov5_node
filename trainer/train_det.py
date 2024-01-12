@@ -86,7 +86,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     callbacks.run('on_pretrain_routine_start')
 
     # Modification by Zauberzeug
-    point_ids: List[int] = [int(x) for x in opt.point_uuids.split(',')]  # type: ignore
+    point_ids: List[int] = [int(x) for x in opt.point_ids.split(',')]  # type: ignore
     point_sizes: List[int] = [int(x) for x in opt.point_sizes.split(',')]  # type: ignore
 
     # Directories

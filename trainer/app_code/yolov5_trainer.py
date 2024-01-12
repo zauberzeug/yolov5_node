@@ -4,7 +4,6 @@ import logging
 import os
 import re
 import shutil
-import subprocess
 from asyncio import sleep
 from dataclasses import asdict
 from pathlib import Path
