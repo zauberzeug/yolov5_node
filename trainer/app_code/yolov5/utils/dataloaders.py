@@ -482,6 +482,7 @@ class LoadImagesAndLabels(Dataset):
         self.albumentations = Albumentations(size=img_size) if augment else None
         self.point_ids = point_ids
         self.point_sizes = point_sizes
+        self.prefix = prefix
 
         try:
             f = []  # image files
@@ -712,9 +713,11 @@ class LoadImagesAndLabels(Dataset):
         if nl:
             labels[:, 1:5] = xyxy2xywhn(labels[:, 1:5], w=img.shape[1], h=img.shape[0], clip=True, eps=1E-3)
 
+        # print('label info. image shape (before augmentation):', self.prefix, img.shape)
         if self.augment:
             # Albumentations
-            img, labels = self.albumentations(img, labels)
+            assert self.albumentations is not None
+            img, labels = self.albumentations(img, labels)  # albumentations does a random-resized crop
             nl = len(labels)  # update after albumentations
 
             # HSV color-space
@@ -736,13 +739,30 @@ class LoadImagesAndLabels(Dataset):
             # labels = cutout(img, labels, p=0.5)
             # nl = len(labels)  # update after cutout
 
+        # print('label info. image shape in:', self.prefix, img.shape)
+        # print('Reset points is set to:', os.getenv('RESET_POINTS', 'TRUE').lower() in ['true', '1'])
+        for label in labels:
+            if label[0] in self.point_ids:
+                target_point_size_px = self.point_sizes[self.point_ids.index(label[0])]
+                # target_point_size_px = 10
+                print('point:', label[0], label[1], label[2], label[3], label[4], '->',
+                      target_point_size_px / self.img_size, target_point_size_px / self.img_size)
+            else:
+                print('box:', label[0], label[1], label[2], label[3], label[4])
+
         # Modification by Zauberzeug: Reset height and width of points
-        if len(self.point_ids) > 0:
+        # at this point, boxes are already in xywhn format, where x is right and y is down
+        # all coorinates are normalized to the image size, i.e. xywh are in [0, 1]
+        # Note that img.size may be larger than self.img_size, e.g. when using mosaic augmentation
+
+        reset_points = os.getenv('RESET_POINTS', 'FALSE').lower() in ['true', '1']
+        if reset_points and len(self.point_ids) > 0:
             for label in labels:
                 if label[0] in self.point_ids:
                     target_point_size_px = self.point_sizes[self.point_ids.index(label[0])]
-                    label[3] = img.shape[1] / target_point_size_px
-                    label[4] = img.shape[0] / target_point_size_px
+                    # target_point_size_px = 10
+                    label[3] = target_point_size_px / self.img_size
+                    label[4] = target_point_size_px / self.img_size
 
         labels_out = torch.zeros((nl, 6))
         if nl:
