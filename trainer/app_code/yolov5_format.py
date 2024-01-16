@@ -13,10 +13,8 @@ from ruamel.yaml import YAML
 def get_ids_and_sizes_of_point_classes(training: Training) -> Tuple[List[str], List[str]]:
     """Returns a list of trainingids and sizes (in px) of point classes in the training data."""
     assert training.data is not None, 'Training should have data'
-    sorted_category_uuids = sorted([c.id for c in training.data.categories])
     point_ids, point_sizes = [], []
-    for i in range(len(sorted_category_uuids)):
-        category = training.data.categories[i]
+    for i, category in enumerate(training.data.categories):
         if category.type == CategoryType.Point:
             point_ids.append(str(i))
             point_sizes.append(str(category.point_size or 20))
@@ -38,8 +36,7 @@ def _create_set(training: Training, set_name: str) -> int:
     [see here](https://docs.ultralytics.com/tutorials/train-custom-datasets/)."""
     assert training.data is not None, 'Training should have data'
 
-    categories = list(category_lookup_from_training(training).values())
-    categories = sorted(categories)
+    category_uuids = list(category_lookup_from_training(training).values())
 
     training_path = training.training_folder
     images_path = f'{training_path}/{set_name}'
@@ -66,7 +63,7 @@ def _create_set(training: Training, set_name: str) -> int:
                     box['width'] / width,
                     box['height'] / height,
                 ]
-                c_id = str(categories.index(box['category_id']))
+                c_id = str(category_uuids.index(box['category_id']))
                 yolo_boxes.append(c_id + ' ' + ' '.join([f"{c:.6f}" for c in coords]) + '\n')
 
             for point in image['point_annotations']:
@@ -77,7 +74,7 @@ def _create_set(training: Training, set_name: str) -> int:
                     size/width,
                     size/height,
                 ]
-                c_id = str(categories.index(point['category_id']))
+                c_id = str(category_uuids.index(point['category_id']))
                 yolo_boxes.append(c_id + ' ' + ' '.join([f"{c:.6f}" for c in coords]) + '\n')
 
             with open(f'{images_path}/{image["id"]}.txt', 'w') as l:
