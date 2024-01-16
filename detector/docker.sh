@@ -33,7 +33,7 @@ fi
 . .env || echo "you should provide an .env file to configure the detector"
 
 
-run_args="-it --rm" 
+run_args="-it --restart_always" 
 run_args+=" -v $HOME/node_data/$DETECTOR_NAME:/data"
 run_args+=" -h $HOSTNAME"
 run_args+=" -e HOST=$LOOP_HOST"
