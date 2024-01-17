@@ -49,7 +49,6 @@ WORKDIR /
 
 RUN git clone https://github.com/wang-xinyu/tensorrtx.git
 WORKDIR /tensorrtx/yolov5/build
-RUN git checkout 9243edf59e527bb25e5b966c2d1ae4d1b0c78d5f
 
 RUN cmake ..
 RUN make -j6
