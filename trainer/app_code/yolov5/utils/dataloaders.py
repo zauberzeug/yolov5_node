@@ -738,14 +738,14 @@ class LoadImagesAndLabels(Dataset):
 
         # print('label info. image shape in:', self.prefix, img.shape)
         # print('Reset points is set to:', os.getenv('RESET_POINTS', 'TRUE').lower() in ['true', '1'])
-        for label in labels:
-            if label[0] in self.point_sizes_by_id:
-                target_point_size_px = self.point_sizes_by_id[label[0]]
-                # target_point_size_px = 10
-                print('point:', label[0], label[1], label[2], label[3], label[4], '->',
-                      target_point_size_px / self.img_size, target_point_size_px / self.img_size)
-            else:
-                print('box:', label[0], label[1], label[2], label[3], label[4])
+        # for label in labels:
+        #     if label[0] in self.point_sizes_by_id:
+        #         target_point_size_px = self.point_sizes_by_id[label[0]]
+        #         # target_point_size_px = 10
+        #         print('point:', label[0], label[1], label[2], label[3], label[4], '->',
+        #               target_point_size_px / self.img_size, target_point_size_px / self.img_size)
+        #     else:
+        #         print('box:', label[0], label[1], label[2], label[3], label[4])
 
         # Modification by Zauberzeug: Reset height and width of points
         # at this point, boxes are already in xywhn format, where x is right and y is down
