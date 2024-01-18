@@ -50,7 +50,7 @@ if [ "$LINKLL" == "TRUE" ]; then
     echo "Linking Learning Loop from $SCRIPT_DIR/../../learning_loop_node"
     if [ -f /etc/nv_tegra_release ]
     then
-        run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.6/dist-packages/learning_loop_node"
+        run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.9/dist-packages/learning_loop_node"
     else
         run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.10/dist-packages/learning_loop_node"
     fi
@@ -68,14 +68,14 @@ then
     --build-arg 
     OPENCV_VERSION=4.6.0
     MAKEFLAGS=-j6
-    build_args+=" --build-arg BASE_IMAGE=zauberzeug/l4t-python38-pytorch-trt:$L4T_VERSION" # this is python 3.8
+    build_args+=" --build-arg BASE_IMAGE=zauberzeug/l4t-python38-pytorch-trt:$L4T_VERSION" # this is python 3.9
     # build_args+=" --build-arg JETSON_BASE=nvcr.io/nvidia/l4t-base:r$L4T_VERSION"
     build_args+=" --build-arg MAKEFLAGS=$MAKEFLAGS --build-arg OPENCV_VERSION=$OPENCV_VERSION"
-    image="zauberzeug/yolov5-detector:nlv0.8.4-$L4T_VERSION"
+    image="zauberzeug/yolov5-detector:nlv0.8.7-$L4T_VERSION"
     dockerfile="jetson.dockerfile"
 else
     build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
-    image="zauberzeug/yolov5-detector:nlv0.8.6-cloud"
+    image="zauberzeug/yolov5-detector:nlv0.8.7-cloud"
     dockerfile="cloud.dockerfile"
 fi
 

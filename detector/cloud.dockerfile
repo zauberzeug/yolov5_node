@@ -35,7 +35,7 @@ RUN pip3 install --no-cache-dir pycuda==2022.2.2
 RUN pip3 install --no-cache-dir "uvicorn" 
 RUN pip3 install --no-cache-dir async_generator aiofiles psutil pillow multidict attrs yarl async_timeout idna_ssl cchardet aiosignal
 # LL_NODE-Library can be overwritten by local version if environment variable LINKLL is set to TRUE
-RUN pip3 install --no-cache-dir "learning_loop_node==v0.8.6"
+RUN pip3 install --no-cache-dir "learning_loop_node==v0.8.7"
 RUN pip3 install --no-cache-dir "gdown"
 RUN pip3 install --no-cache-dir starlette==0.16.0
 
