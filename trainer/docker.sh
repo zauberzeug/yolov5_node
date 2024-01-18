@@ -2,8 +2,8 @@
 
 # This script is used to build, run, stop, kill, attach, etc. the docker container for the trainer node.
 
-image="zauberzeug/yolov5-trainer:nlv0.8.7"
-#image="zauberzeug/yolov5-trainer:latest"
+#image="zauberzeug/yolov5-trainer:nlv0.8.7"
+image="zauberzeug/yolov5-trainer:latest"
 
 if [ $# -eq 0 ]
 then
