@@ -199,7 +199,7 @@ class TestWithLoop:
             Category(id='some_id', name='Thripse', type=CategoryType.Classification)], resolution=320)
         file = next(os.scandir('/tmp/results'))
         # pylint: disable=protected-access
-        detections = Yolov5TrainerLogic._parse_file_cla(model_info=model_info, filename=file)
+        detections = Yolov5TrainerLogic._parse_file_cla(model_info=model_info, filepath=file.path)
         assert len(detections) > 0
         os.remove('/tmp/results/detection.txt')
 

@@ -33,7 +33,7 @@ fi
 . .env || echo "you should provide an .env file to configure the detector"
 
 
-run_args="-it --rm" 
+run_args="-it --restart_always" 
 run_args+=" -v $HOME/node_data/$DETECTOR_NAME:/data"
 run_args+=" -h $HOSTNAME"
 run_args+=" -e HOST=$LOOP_HOST"
@@ -50,13 +50,11 @@ if [ "$LINKLL" == "TRUE" ]; then
     echo "Linking Learning Loop from $SCRIPT_DIR/../../learning_loop_node"
     if [ -f /etc/nv_tegra_release ]
     then
-        run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.6/dist-packages/learning_loop_node"
+        run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.9/dist-packages/learning_loop_node"
     else
         run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.10/dist-packages/learning_loop_node"
     fi
 fi
-
-RUN mkdir -p $HOME/$DETECTOR_NAME/data
 
 # Check if we are on a Jetson device
 build_args=""
@@ -67,22 +65,28 @@ then
     L4T_RELEASE=$(echo $L4T_VERSION_STRING | cut -f 2 -d ' ' | grep -Po '(?<=R)[^;]+')
     L4T_REVISION=$(echo $L4T_VERSION_STRING | cut -f 2 -d ',' | grep -Po '(?<=REVISION: )[^;]+')
     L4T_VERSION="$L4T_RELEASE.$L4T_REVISION"
-    build_args+=" --build-arg BASE_IMAGE=zauberzeug/l4t-opencv:4.5.2-on-nano-r$L4T_VERSION" # this is python 3.6
-    image="zauberzeug/yolov5-detector:nlv0.8.3-$L4T_VERSION"
+    --build-arg 
+    OPENCV_VERSION=4.6.0
+    MAKEFLAGS=-j6
+    build_args+=" --build-arg BASE_IMAGE=zauberzeug/l4t-python38-pytorch-trt:$L4T_VERSION" # this is python 3.9
+    # build_args+=" --build-arg JETSON_BASE=nvcr.io/nvidia/l4t-base:r$L4T_VERSION"
+    build_args+=" --build-arg MAKEFLAGS=$MAKEFLAGS --build-arg OPENCV_VERSION=$OPENCV_VERSION"
+    image="zauberzeug/yolov5-detector:nlv0.8.7-$L4T_VERSION"
     dockerfile="jetson.dockerfile"
 else
     build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
-    image="zauberzeug/yolov5-detector:nlv0.8.3-cloud"
+    image="zauberzeug/yolov5-detector:nlv0.8.7-cloud"
     dockerfile="cloud.dockerfile"
 fi
+
 
 cmd=$1
 cmd_args=${@:2}
 set -x
 case $cmd in
     b | build)
-        docker build . -f $dockerfile --target release -t $image $build_args $cmd_args
-        docker build . -f $dockerfile -t ${image}-dev $build_args $cmd_args
+        DOCKER_BUILDKIT=0 docker build . -f $dockerfile --target release -t $image $build_args $cmd_args
+        DOCKER_BUILDKIT=0 docker build . -f $dockerfile -t ${image}-dev $build_args $cmd_args
         ;;
     bnc | build-no-cache)
         docker build --no-cache . -f $dockerfile --target release -t $image $build_args $cmd_args

@@ -15,13 +15,17 @@ New images can bbe pulled with `docker pull zauberzeug/yolov5-trainer:lnvX.Y.Z`,
 Legacy image can be pulled with `docker pull zauberzeug/yolov5-trainer:latest`.
 
 During development, i.e. when building the container from code it is recommended to use the script `docker.sh` in the folder `training` to build/start/interact with the image.
-When using the script it is required to setup a .env file in the training folder that contains the loop-related configuration. Besides the variables described in [Zauberzeug Learning Loop Node Library](https://github.com/zauberzeug/learning_loop_node) the following variables should be set:
+When using the script it is required to setup a .env file in the training folder that contains the loop-related configuration. The following variables should be set (note that some are inherited from the [Zauberzeug Learning Loop Node Library](https://github.com/zauberzeug/learning_loop_node) ):
 
-| Name         | Purpose                                   | Value                       | Required only with ./docker.sh |
-| ------------ | ----------------------------------------- | --------------------------- | ------------------------------ |
-| YOLOV5_MODE  | Mode of the trainer                       | CLASSIFICATION or DETECTION | No                             |
-| LINKLL       | Link the node library into the container? | TRUE or FALSE               | Yes                            |
-| TRAINER_NAME | Will be the name of the container         | String                      | Yes                            |
+| Name                   | Purpose                                               | Value                       | Deault | Requi. only with ./docker.sh |
+| ---------------------- | ----------------------------------------------------- | --------------------------- | ------ | ---------------------------- |
+| YOLOV5_MODE            | Mode of the trainer                                   | CLASSIFICATION or DETECTION | -      | No                           |
+| TRAINER_NAME           | Will be the name of the container                     | String                      | -      | Yes                          |
+| LINKLL                 | Link the node library into the container?             | TRUE/FALSE                  | FALSE  | Yes                          |
+| UVICORN_RELOAD         | Enable hot-reload                                     | TRUE/FALSE/0/1              | FALSE  | No                           |
+| RESTART_AFTER_TRAINING | Auto-restart after training                           | TRUE/FALSE/0/1              | FALSE  | No                           |
+| KEEP_OLD_TRAININGS     | Do not remove old trainings, when starting a new one | TRUE/FALSE/0/1              | FALSE  | No                           |
+| RESET_POINTS           | Reset the with/height of points after augmentation    | TRUE/FALSE/0/1              | TRUE   | No                           |
 
 # Detector (Object detection)
 
@@ -43,10 +47,11 @@ Local builds can be run with `./docker.sh run`.
 If the container does not use the GPU, try `./docker.sh d`.
 Mandatory parameters are those described in [Zauberzeug Learning Loop Node Library](https://github.com/zauberzeug/learning_loop_node). Besides, the following parameters may bbe set
 
-| Name          | Purpose                                   | Value         | Required only with ./docker.sh |
-| ------------- | ----------------------------------------- | ------------- | ------------------------------ |
-| LINKLL        | Link the node library into the container? | TRUE or FALSE | Yes                            |
-| DETECTOR_NAME | Will be the name of the container         | String        | Yes                            |
+| Name          | Purpose                                   | Value                     | Required only with ./docker.sh |
+| ------------- | ----------------------------------------- | ------------------------- | ------------------------------ |
+| LINKLL        | Link the node library into the container? | TRUE or FALSE             | Yes                            |
+| DETECTOR_NAME | Will be the name of the container         | String                    | Yes                            |
+| WEIGHT_TYPE   | Data type to convert weights to           | String [FP32, FP16, INT8] | Yes                            |
 
 ### L4T-Detector
 
@@ -95,6 +100,7 @@ The wts formats may be used by a detector wunning on a NVIDIA jetson device to c
 # License
 
 This code is licensed under the [AGPL-3.0 License](https://opensource.org/license/agpl-v3/). The code in
+
 - `trainer/app_code/yolov5`
 - `trainer/app_code/train_cla.py`
 - `trainer/app_code/train_det.py`
@@ -110,6 +116,3 @@ Ultralytics offers two licensing options to accommodate diverse use cases:
 
 - **AGPL-3.0 License**: This [OSI-approved](https://opensource.org/licenses/) open-source license is ideal for students and enthusiasts, promoting open collaboration and knowledge sharing. See the [LICENSE](https://github.com/ultralytics/yolov5/blob/master/LICENSE) file for more details.
 - **Enterprise License**: Designed for commercial use, this license permits seamless integration of Ultralytics software and AI models into commercial goods and services, bypassing the open-source requirements of AGPL-3.0. If your scenario involves embedding our solutions into a commercial offering, reach out through [Ultralytics Licensing](https://ultralytics.com/license).
-
-
-

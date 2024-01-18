@@ -17,6 +17,7 @@ from itertools import repeat
 from multiprocessing.pool import Pool, ThreadPool
 from pathlib import Path
 from threading import Thread
+from typing import List
 from urllib.parse import urlparse
 
 import numpy as np
@@ -118,7 +119,8 @@ def create_dataloader(path,
                       image_weights=False,
                       quad=False,
                       prefix='',
-                      shuffle=False):
+                      shuffle=False,
+                      point_sizes_by_id: dict[int, int] = dict()):
     if rect and shuffle:
         LOGGER.warning('WARNING ⚠️ --rect is incompatible with DataLoader shuffle, setting shuffle=False')
         shuffle = False
@@ -135,7 +137,8 @@ def create_dataloader(path,
             stride=int(stride),
             pad=pad,
             image_weights=image_weights,
-            prefix=prefix)
+            prefix=prefix,
+            point_sizes_by_id=point_sizes_by_id)
 
     batch_size = min(batch_size, len(dataset))
     nd = torch.cuda.device_count()  # number of CUDA devices
@@ -462,7 +465,9 @@ class LoadImagesAndLabels(Dataset):
                  stride=32,
                  pad=0.0,
                  min_items=0,
-                 prefix=''):
+                 prefix='',
+                 point_sizes_by_id: dict[int, int] = dict()):
+
         self.img_size = img_size
         self.augment = augment
         self.hyp = hyp
@@ -473,6 +478,8 @@ class LoadImagesAndLabels(Dataset):
         self.stride = stride
         self.path = path
         self.albumentations = Albumentations(size=img_size) if augment else None
+        self.point_sizes_by_id = point_sizes_by_id
+        self.prefix = prefix
 
         try:
             f = []  # image files
@@ -703,9 +710,11 @@ class LoadImagesAndLabels(Dataset):
         if nl:
             labels[:, 1:5] = xyxy2xywhn(labels[:, 1:5], w=img.shape[1], h=img.shape[0], clip=True, eps=1E-3)
 
+        # print('label info. image shape (before augmentation):', self.prefix, img.shape)
         if self.augment:
             # Albumentations
-            img, labels = self.albumentations(img, labels)
+            assert self.albumentations is not None
+            img, labels = self.albumentations(img, labels)  # albumentations does a random-resized crop
             nl = len(labels)  # update after albumentations
 
             # HSV color-space
@@ -726,6 +735,31 @@ class LoadImagesAndLabels(Dataset):
             # Cutouts
             # labels = cutout(img, labels, p=0.5)
             # nl = len(labels)  # update after cutout
+
+        # print('label info. image shape in:', self.prefix, img.shape)
+        # print('Reset points is set to:', os.getenv('RESET_POINTS', 'TRUE').lower() in ['true', '1'])
+        # for label in labels:
+        #     if label[0] in self.point_sizes_by_id:
+        #         target_point_size_px = self.point_sizes_by_id[label[0]]
+        #         # target_point_size_px = 10
+        #         print('point:', label[0], label[1], label[2], label[3], label[4], '->',
+        #               target_point_size_px / self.img_size, target_point_size_px / self.img_size)
+        #     else:
+        #         print('box:', label[0], label[1], label[2], label[3], label[4])
+
+        # Modification by Zauberzeug: Reset height and width of points
+        # at this point, boxes are already in xywhn format, where x is right and y is down
+        # all coorinates are normalized to the image size, i.e. xywh are in [0, 1]
+        # Note that img.size may be larger than self.img_size, e.g. when using mosaic augmentation
+
+        reset_points = os.getenv('RESET_POINTS', 'FALSE').lower() in ['true', '1']
+        if reset_points and len(self.point_sizes_by_id) > 0:
+            for label in labels:
+                if label[0] in self.point_sizes_by_id:
+                    target_point_size_px = self.point_sizes_by_id[label[0]]
+                    # target_point_size_px = 10
+                    label[3] = target_point_size_px / self.img_size
+                    label[4] = target_point_size_px / self.img_size
 
         labels_out = torch.zeros((nl, 6))
         if nl:

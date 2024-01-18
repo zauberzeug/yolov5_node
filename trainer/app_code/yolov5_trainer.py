@@ -4,7 +4,6 @@ import logging
 import os
 import re
 import shutil
-import subprocess
 from asyncio import sleep
 from dataclasses import asdict
 from pathlib import Path
@@ -230,13 +229,23 @@ class Yolov5TrainerLogic(TrainerLogic):
         self.load_hyps_set_epochs(hyperparameter_path)
 
         if self.is_cla:
-            cmd = f'python /app/train_cla.py --exist-ok --img {resolution} --data {self.training.training_folder} --model {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --optimizer SGD {additional_parameters}'
+            cmd = f'python /app/train_cla.py --exist-ok --img {resolution} \
+                --data {self.training.training_folder} --model {model} \
+                --project {self.training.training_folder} --name result \
+                --hyp {hyperparameter_path} --optimizer SGD {additional_parameters}'
         else:
+            p_ids, p_sizes = yolov5_format.get_ids_and_sizes_of_point_classes(self.training)
             self.try_replace_optimized_hyperparameter()
-            batch_size = await batch_size_calculation.calc(self.training.training_folder, model, hyperparameter_path, f'{self.training.training_folder}/dataset.yaml', resolution)
-            cmd = f'WANDB_MODE=disabled python /app/train_det.py --exist-ok --patience {self.patience} --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} --project {self.training.training_folder} --name result --hyp {hyperparameter_path} --epochs {self.epochs} {additional_parameters}'
+            batch_size = await batch_size_calculation.calc(self.training.training_folder, model, hyperparameter_path,
+                                                           f'{self.training.training_folder}/dataset.yaml', resolution)
+            cmd = f'WANDB_MODE=disabled python /app/train_det.py --exist-ok --patience {self.patience} \
+                --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} \
+                --project {self.training.training_folder} --name result --hyp {hyperparameter_path} \
+                --epochs {self.epochs} {additional_parameters} --point_ids {",".join(p_ids)} --point_sizes {",".join(p_sizes)}'
+
             with open(hyperparameter_path) as f:
                 logging.info(f'running training with command :\n {cmd} \nand hyperparameter\n{f.read()}')
+
         logging.info(f'running training with command :\n {cmd}')
         self.executor.start(cmd)
 
@@ -254,7 +263,7 @@ class Yolov5TrainerLogic(TrainerLogic):
             for filename in os.scandir(labels_path):
                 uuid = os.path.splitext(os.path.basename(filename.path))[0]
                 if self.is_cla:
-                    classification_detections = self._parse_file_cla(model_information, filename)
+                    classification_detections = self._parse_file_cla(model_information, filename.path)
                     detections.append(Detections(classification_detections=classification_detections, image_id=uuid))
                 else:
                     box_detections, point_detections = self._parse_file(model_information, images_folder, filename.path)
@@ -294,18 +303,18 @@ class Yolov5TrainerLogic(TrainerLogic):
     # ---------------------------------------- HELPER METHODS ----------------------------------------
 
     @staticmethod
-    def _parse_file_cla(model_info, filename) -> List[ClassificationDetection]:
-        with open(filename.path, 'r') as f:
+    def _parse_file_cla(model_info: ModelInformation, filepath: str) -> List[ClassificationDetection]:
+        with open(filepath, 'r') as f:
             content = f.readlines()
         classification_detections = []
 
         for line in content:
-            probability, c = line.split(' ', maxsplit=1)
-            probability = float(probability) * 100
+            probability_str, c = line.split(' ', maxsplit=1)
+            probability = float(probability_str) * 100
             c = c.strip()
-            category = [category for category in model_info.categories if category.name == c]
-            if category:
-                category = category[0]
+            categories = [category for category in model_info.categories if category.name == c]
+            if categories:
+                category = categories[0]
                 classification_detection = ClassificationDetection(
                     category_name=category.name, model_name=model_info.version, confidence=probability,
                     category_id=category.id)
