@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+# This script is used to build, run, stop, kill, attach, etc. the docker container for the trainer node.
+
+#image="zauberzeug/yolov5-trainer:nlv0.8.7"
+image="zauberzeug/yolov5-trainer:latest"
+
 if [ $# -eq 0 ]
 then
     echo "Usage:"
@@ -38,37 +43,40 @@ fi
 
 # sourcing .env file to get configuration (see README.md)
 . .env || echo "you should provide an .env file for the Learning Loop"
+# .env may contain (for details see readme.md):
+# USERNAME=<loop username>
+# PASSWORD=<loop password>
+# HOST=<host ip or url>
+# YOLOV5_MODE=<yolo mode / DETECTION or CLASSIFICATION>
+# TRAINER_NAME=dennis_test_trainer
+# LINKLL=<FALSE/TRUE> (default: FALSE)
+# UVICORN_RELOAD=<FALSE/TRUE/0/1> (default: FALSE)
+# RESTART_AFTER_TRAINING=<FALSE/TRUE/0/1> (default: FALSE)
+# KEEP_OLD_TRAININGS=<FALSE/TRUE/0/1> (default: FALSE)
+# RESET_POINTS=<FALSE/TRUE/0/1> (default: TRUE)
 
-# if [ "$YOLOV5_MODE" == "CLASSIFICATION" ]; then
-#     echo "Mode is set to CLASSIFICATION"
-#     name="yolov5_cla_trainer_node"
-# else
-#     echo "Mode is not set to CLASSIFICATION"
-#     name="yolov5_trainer_node"
-# fi
+echo "Starting docker container for trainer node $TRAINER_NAME with image $image"
+echo "  HOST=$HOST USERNAME=$USERNAME BATCH_SIZE=$BATCH_SIZE YOLOV5_MODE=$YOLOV5_MODE"
 
-
-run_args="-it --rm" 
+run_args="-it --restart always" 
 run_args+=" -v $(pwd)/../:/yolov5_node/"
 run_args+=" -v $HOME/trainer_nodes_data:/data"
 run_args+=" -h ${HOSTNAME}_DEV"
 run_args+=" -e HOST=$HOST -e USERNAME=$USERNAME -e PASSWORD=$PASSWORD"
-run_args+=" -e BATCH_SIZE=$BATCH_SIZE -e UVICORN_RELOAD=$UVICORN_RELOAD"
-run_args+=" -e NODE_TYPE=trainer -e YOLOV5_MODE=$YOLOV5_MODE"
+run_args+=" -e BATCH_SIZE=$BATCH_SIZE -e UVICORN_RELOAD=$UVICORN_RELOAD -e RESET_POINTS=$RESET_POINTS -e KEEP_OLD_TRAININGS=$KEEP_OLD_TRAININGS"
+run_args+=" -e NODE_TYPE=trainer -e YOLOV5_MODE=$YOLOV5_MODE -e RESTART_AFTER_TRAINING=$RESTART_AFTER_TRAINING"
 run_args+=" --name $TRAINER_NAME"
 run_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all"
 run_args+=" --gpus all"
 run_args+=" --ipc host"
 run_args+=" -p 7442:80"
 
-# Get the directory of this script
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+# Link Learning Loop Node library if requested
 if [ "$LINKLL" == "TRUE" ]; then
-    echo "Linking Learning Loop from $SCRIPT_DIR/../../learning_loop_node"
+    SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
     run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.10/dist-packages/learning_loop_node"
+    echo "Linked Learning Loop from $SCRIPT_DIR/../../learning_loop_node"
 fi
-
-image="zauberzeug/yolov5-trainer:nlv0.8.4"
 
 build_args=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
 

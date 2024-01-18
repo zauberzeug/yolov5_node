@@ -4,3 +4,4 @@ __pycache__/
 *.engine
 *.pt
 trainer/runs
+trainer/app_code/yolov5/runs

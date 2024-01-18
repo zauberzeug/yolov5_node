@@ -24,4 +24,4 @@ if __name__ == "__main__":
     logging.info(f'using multiprocessing start method {multiprocessing.get_start_method()}')
 
     uvicorn.run("main:node", host="0.0.0.0", port=80, lifespan='on',
-                reload=os.getenv('UVICORN_RELOAD', 'FALSE').lower() == 'true')
+                reload=os.getenv('UVICORN_RELOAD', 'FALSE').lower() in ['true', '1'])

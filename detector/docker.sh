@@ -33,7 +33,7 @@ fi
 . .env || echo "you should provide an .env file to configure the detector"
 
 
-run_args="-it --rm" 
+run_args="-it --restart_always" 
 run_args+=" -v $HOME/node_data/$DETECTOR_NAME:/data"
 run_args+=" -h $HOSTNAME"
 run_args+=" -e HOST=$LOOP_HOST"
@@ -50,7 +50,7 @@ if [ "$LINKLL" == "TRUE" ]; then
     echo "Linking Learning Loop from $SCRIPT_DIR/../../learning_loop_node"
     if [ -f /etc/nv_tegra_release ]
     then
-        run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.6/dist-packages/learning_loop_node"
+        run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.9/dist-packages/learning_loop_node"
     else
         run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.10/dist-packages/learning_loop_node"
     fi
