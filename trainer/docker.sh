@@ -56,6 +56,7 @@ fi
 # RESET_POINTS=<FALSE/TRUE/0/1> (default: TRUE)
 
 echo "Starting docker container for trainer node $TRAINER_NAME with image $image"
+echo "  HOST=$HOST USERNAME=$USERNAME BATCH_SIZE=$BATCH_SIZE YOLOV5_MODE=$YOLOV5_MODE"
 
 run_args="-it --restart always" 
 run_args+=" -v $(pwd)/../:/yolov5_node/"
