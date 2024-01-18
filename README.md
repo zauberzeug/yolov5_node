@@ -24,7 +24,7 @@ When using the script it is required to setup a .env file in the training folder
 | LINKLL                 | Link the node library into the container?             | TRUE/FALSE                  | FALSE  | Yes                          |
 | UVICORN_RELOAD         | Enable hot-reload                                     | TRUE/FALSE/0/1              | FALSE  | No                           |
 | RESTART_AFTER_TRAINING | Auto-restart after training                           | TRUE/FALSE/0/1              | FALSE  | No                           |
-| KEEP_OLD_TRAININGS     | Do not rremove old trainings, when starting a new one | TRUE/FALSE/0/1              | FALSE  | No                           |
+| KEEP_OLD_TRAININGS     | Do not remove old trainings, when starting a new one | TRUE/FALSE/0/1              | FALSE  | No                           |
 | RESET_POINTS           | Reset the with/height of points after augmentation    | TRUE/FALSE/0/1              | TRUE   | No                           |
 
 # Detector (Object detection)
