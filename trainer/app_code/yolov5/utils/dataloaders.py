@@ -120,8 +120,7 @@ def create_dataloader(path,
                       quad=False,
                       prefix='',
                       shuffle=False,
-                      point_ids: List[int] = [],
-                      point_sizes: List[int] = []):
+                      point_sizes_by_id: dict[int, int] = dict()):
     if rect and shuffle:
         LOGGER.warning('WARNING ⚠️ --rect is incompatible with DataLoader shuffle, setting shuffle=False')
         shuffle = False
@@ -139,8 +138,7 @@ def create_dataloader(path,
             pad=pad,
             image_weights=image_weights,
             prefix=prefix,
-            point_ids=point_ids,
-            point_sizes=point_sizes)
+            point_sizes_by_id=point_sizes_by_id)
 
     batch_size = min(batch_size, len(dataset))
     nd = torch.cuda.device_count()  # number of CUDA devices
@@ -468,8 +466,8 @@ class LoadImagesAndLabels(Dataset):
                  pad=0.0,
                  min_items=0,
                  prefix='',
-                 point_ids: List[int] = [],
-                 point_sizes: List[int] = []):
+                 point_sizes_by_id: dict[int, int] = dict()):
+
         self.img_size = img_size
         self.augment = augment
         self.hyp = hyp
@@ -480,8 +478,7 @@ class LoadImagesAndLabels(Dataset):
         self.stride = stride
         self.path = path
         self.albumentations = Albumentations(size=img_size) if augment else None
-        self.point_ids = point_ids
-        self.point_sizes = point_sizes
+        self.point_sizes_by_id = point_sizes_by_id
         self.prefix = prefix
 
         try:
@@ -742,8 +739,8 @@ class LoadImagesAndLabels(Dataset):
         # print('label info. image shape in:', self.prefix, img.shape)
         # print('Reset points is set to:', os.getenv('RESET_POINTS', 'TRUE').lower() in ['true', '1'])
         for label in labels:
-            if label[0] in self.point_ids:
-                target_point_size_px = self.point_sizes[self.point_ids.index(label[0])]
+            if label[0] in self.point_sizes_by_id:
+                target_point_size_px = self.point_sizes_by_id[label[0]]
                 # target_point_size_px = 10
                 print('point:', label[0], label[1], label[2], label[3], label[4], '->',
                       target_point_size_px / self.img_size, target_point_size_px / self.img_size)
@@ -756,10 +753,10 @@ class LoadImagesAndLabels(Dataset):
         # Note that img.size may be larger than self.img_size, e.g. when using mosaic augmentation
 
         reset_points = os.getenv('RESET_POINTS', 'FALSE').lower() in ['true', '1']
-        if reset_points and len(self.point_ids) > 0:
+        if reset_points and len(self.point_sizes_by_id) > 0:
             for label in labels:
-                if label[0] in self.point_ids:
-                    target_point_size_px = self.point_sizes[self.point_ids.index(label[0])]
+                if label[0] in self.point_sizes_by_id:
+                    target_point_size_px = self.point_sizes_by_id[label[0]]
                     # target_point_size_px = 10
                     label[3] = target_point_size_px / self.img_size
                     label[4] = target_point_size_px / self.img_size

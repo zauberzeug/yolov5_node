@@ -89,6 +89,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     point_ids: List[int] = [int(x) for x in opt.point_ids.split(',')]  # type: ignore
     point_sizes: List[int] = [int(x) for x in opt.point_sizes.split(',')]  # type: ignore
 
+    point_sizes_by_id = dict(zip(point_ids, point_sizes))
+
     # Directories
     w = save_dir / 'weights'  # weights dir
     (w.parent if evolve else w).mkdir(parents=True, exist_ok=True)  # make dir
@@ -231,8 +233,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                               quad=opt.quad,
                                               prefix=colorstr('train: '),
                                               shuffle=True,
-                                              point_ids=point_ids,
-                                              point_sizes=point_sizes)
+                                              point_sizes_by_id=point_sizes_by_id)
+
     labels = np.concatenate(dataset.labels, 0)
     mlc = int(labels[:, 0].max())  # max label class
     assert mlc < nc, f'Label class {mlc} exceeds nc={nc} in {data}. Possible class labels are 0-{nc - 1}'
