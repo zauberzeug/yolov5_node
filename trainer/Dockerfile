@@ -27,7 +27,7 @@ RUN pip install --no-cache -U torch torchvision numpy Pillow
 RUN pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof
 RUN python3 -m pip install autopep8 debugpy gunicorn pyyaml uvloop pytest-asyncio ruamel.yaml
 # LL_NODE-Library can be overwritten by local version if environment variable LINKLL is set to TRUE
-RUN python3 -m pip install "learning_loop_node==v0.8.4"
+RUN python3 -m pip install "learning_loop_node==v0.8.7"
 
 WORKDIR /
 # fetch trainer code
