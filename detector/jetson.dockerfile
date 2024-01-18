@@ -34,9 +34,7 @@ RUN apt-get update && \
     && apt-get clean
 
 RUN pip3 install --no-cache-dir async_generator aiofiles psutil pillow multidict attrs yarl async_timeout idna_ssl cchardet aiosignal
-# NOTE: currently we can not use newer version of learning_loop_node because it requires a higher python version
-ARG NODE_LIB_VERSION
-RUN pip3 install --no-cache-dir "learning_loop_node==${NODE_LIB_VERSION}" 
+
 RUN pip3 install --no-cache-dir gdown==4.6.3
 RUN pip3 install --no-cache-dir starlette==0.16.0
 
@@ -56,6 +54,9 @@ ENV PYTHONPATH=$PYTHONPATH:/tensorrtx/yolov5/
 
 ADD ./ /yolov5_node/detector/
 RUN ln -sf /yolov5_node/detector /app
+
+ARG NODE_LIB_VERSION
+RUN pip3 install --no-cache-dir "learning_loop_node==${NODE_LIB_VERSION}" 
 
 WORKDIR /app
 
