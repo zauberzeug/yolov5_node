@@ -86,8 +86,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     callbacks.run('on_pretrain_routine_start')
 
     # Modification by Zauberzeug
-    point_ids: List[int] = [int(x) for x in opt.point_ids.split(',')]  # type: ignore
-    point_sizes: List[int] = [int(x) for x in opt.point_sizes.split(',')]  # type: ignore
+    point_ids: List[int] = [int(x) for x in opt.point_ids.split(',')] if opt.point_ids else []  # type: ignore
+    point_sizes: List[int] = [int(x) for x in opt.point_sizes.split(',')] if opt.point_sizes else []  # type: ignore
 
     point_sizes_by_id = dict(zip(point_ids, point_sizes))
 
@@ -253,8 +253,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                        workers=workers * 2,
                                        pad=0.5,
                                        prefix=colorstr('val: '),
-                                       point_ids=point_ids,
-                                       point_sizes=point_sizes)[0]
+                                       point_sizes_by_id=point_sizes_by_id)[0]
 
         if not resume:
             if not opt.noautoanchor:
