@@ -2,6 +2,8 @@
 
 # This script is used to build, run, stop, kill, attach, etc. the docker container for the trainer node.
 
+# nlv should only be used, to build the corresponding version and deploy to docker
+# make sure the remote always uses the 'latest' tag (otherwise the tests will fail)
 #image="zauberzeug/yolov5-trainer:nlv0.8.7"
 image="zauberzeug/yolov5-trainer:latest"
 
@@ -53,7 +55,7 @@ fi
 # UVICORN_RELOAD=<FALSE/TRUE/0/1> (default: FALSE)
 # RESTART_AFTER_TRAINING=<FALSE/TRUE/0/1> (default: FALSE)
 # KEEP_OLD_TRAININGS=<FALSE/TRUE/0/1> (default: FALSE)
-# RESET_POINTS=<FALSE/TRUE/0/1> (default: TRUE)
+# RESET_POINTS=<FALSE/TRUE/0/1> (default: FALSE)
 
 echo "Starting docker container for trainer node $TRAINER_NAME with image $image"
 echo "  HOST=$HOST USERNAME=$USERNAME BATCH_SIZE=$BATCH_SIZE YOLOV5_MODE=$YOLOV5_MODE"
