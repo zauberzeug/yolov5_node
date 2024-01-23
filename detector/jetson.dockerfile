@@ -18,8 +18,6 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-ENV PYTHONPATH "${PYTHONPATH}:/usr/local/lib/python3.6/dist-packages/"
-
 RUN pip3 install --no-cache-dir wheel
 RUN pip3 install --no-cache-dir pycuda
 RUN pip3 install --no-cache-dir "uvicorn"
@@ -36,7 +34,6 @@ RUN apt-get update && \
 RUN pip3 install --no-cache-dir async_generator aiofiles psutil pillow multidict attrs yarl async_timeout idna_ssl cchardet aiosignal
 
 RUN pip3 install --no-cache-dir gdown==4.6.3
-RUN pip3 install --no-cache-dir starlette==0.16.0
 
 WORKDIR /data/models
 RUN gdown --fuzzy https://drive.google.com/file/d/1KGZe7OUX9QWZm-dnkssSV9lSXxCn7nD_/view?usp=sharing  -O coco.zip && unzip coco.zip && rm coco.zip
