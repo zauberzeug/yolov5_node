@@ -56,7 +56,7 @@ if [ "$LINKLL" == "TRUE" ]; then
     fi
 fi
 
-NODE_LIB_VERSION=0.8.7
+NODE_LIB_VERSION=0.8.8
 
 # Check if we are on a Jetson device
 build_args=""
