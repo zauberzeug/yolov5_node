@@ -68,8 +68,13 @@ then
     L4T_RELEASE=$(echo $L4T_VERSION_STRING | cut -f 2 -d ' ' | grep -Po '(?<=R)[^;]+')
     L4T_REVISION=$(echo $L4T_VERSION_STRING | cut -f 2 -d ',' | grep -Po '(?<=REVISION: )[^;]+')
     L4T_VERSION="$L4T_RELEASE.$L4T_REVISION"
-    --build-arg 
-    build_args+=" --build-arg BASE_IMAGE=zauberzeug/l4t-nn-inference-base:OCV4.6.0-L4T$L4T_VERSION-PY3.9"
+    
+    if [ "$L4T_VERSION" == "32.6.2" ]; then
+        build_args+=" --build-arg BASE_IMAGE=zauberzeug/l4t-nn-inference-base:OCV4.6.0-L4T$L4T_VERSION-PY3.9"
+    else
+        build_args+=" --build-arg BASE_IMAGE=dustynv/opencv:r$L4T_VERSION"
+    fi
+
     image="zauberzeug/yolov5-detector:nlv$NODE_LIB_VERSION-$L4T_VERSION"
     dockerfile="jetson.dockerfile"
 else
