@@ -59,6 +59,9 @@ class YoLov5TRT():
         # Deserialize the engine from file
         with open(engine_file_path, "rb") as f:
             engine = runtime.deserialize_cuda_engine(f.read())
+        if not engine:
+            raise RuntimeError(
+                f'Could not load engine from file ({engine_file_path}). Try to delete the link & model folder and restart the machine.')
         context = engine.create_execution_context()
 
         host_inputs = []
