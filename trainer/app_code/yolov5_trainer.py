@@ -55,7 +55,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
     @property
     def progress(self) -> Optional[float]:
-        if not self.is_initialized:
+        if self._executor is None:
             return None
         if self.is_cla:
             return self.get_progress_from_log_cla()
