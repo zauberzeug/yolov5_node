@@ -12,8 +12,8 @@ from typing import Dict, List, Optional, Tuple, Union
 import cv2
 import yaml  # type: ignore
 from fastapi.encoders import jsonable_encoder
-from learning_loop_node.data_classes import (BasicModel,  # type: ignore
-                                             BoxDetection, CategoryType,
+from learning_loop_node.data_classes import BasicModel  # type: ignore
+from learning_loop_node.data_classes import (BoxDetection, CategoryType,
                                              ClassificationDetection,
                                              Detections, Hyperparameter,
                                              ModelInformation, PointDetection,
@@ -133,7 +133,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             for category_name in list(matrix.keys()):
                 matrix[categories[category_name]] = matrix.pop(category_name)
 
-        return BasicModel(confusion_matrix=matrix, meta_information={'weightfile': weightfile})
+        return BasicModel(confusion_matrix=matrix, meta_information={'weightfile': weightfile_str})
 
     def on_model_published(self, basic_model: BasicModel) -> None:
         path = (self.training_folder / 'result/weights/published').absolute()
