@@ -10,22 +10,22 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
 import cv2
-import yaml
+import yaml  # type: ignore
 from fastapi.encoders import jsonable_encoder
-from learning_loop_node.data_classes import (BasicModel, BoxDetection,
-                                             CategoryType,
+from learning_loop_node.data_classes import (BasicModel,  # type: ignore
+                                             BoxDetection, CategoryType,
                                              ClassificationDetection,
                                              Detections, Hyperparameter,
                                              ModelInformation, PointDetection,
                                              PretrainedModel)
-from learning_loop_node.trainer.executor import Executor
-from learning_loop_node.trainer.trainer_logic import TrainerLogic
+from learning_loop_node.trainer import trainer_logic  # type: ignore
+from learning_loop_node.trainer.executor import Executor  # type: ignore
 
 from . import batch_size_calculation, model_files, yolov5_format
 from .yolov5 import gen_wts
 
 
-class Yolov5TrainerLogic(TrainerLogic):
+class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
     def __init__(self) -> None:
         self.is_cla = os.getenv('YOLOV5_MODE') == 'CLASSIFICATION'
@@ -55,7 +55,7 @@ class Yolov5TrainerLogic(TrainerLogic):
 
     @property
     def progress(self) -> Optional[float]:
-        if self._executor is None:
+        if not self.is_initialized:
             return None
         if self.is_cla:
             return self.get_progress_from_log_cla()
@@ -124,10 +124,10 @@ class Yolov5TrainerLogic(TrainerLogic):
             weightfile = model_files.get_new(self.training_folder)
         if not weightfile:
             return None
-        weightfile = str(weightfile.absolute())
-        logging.info(f'found new model at {weightfile}')
+        weightfile_str = str(weightfile.absolute())
+        logging.info(f'found new model at {weightfile_str}')
         # NOTE /yolov5 is patched to create confusion matrix json files
-        with open(str(weightfile)[:-3] + '.json') as f:
+        with open(str(weightfile_str)[:-3] + '.json') as f:
             matrix = json.load(f)
             categories = yolov5_format.category_lookup_from_training(self.training)
             for category_name in list(matrix.keys()):
@@ -335,14 +335,14 @@ class Yolov5TrainerLogic(TrainerLogic):
         point_detections = []
 
         for line in content:
-            c, x, y, w, h, probability = line.split(' ')
+            c, x, y, w, h, probability_str = line.split(' ')
 
             category = model_info.categories[int(c)]
             x = float(x) * img_width
             y = float(y) * img_height
             width = float(w) * img_width
             height = float(h) * img_height
-            probability = float(probability) * 100
+            probability = float(probability_str) * 100
 
             if (category.type == CategoryType.Box):
                 box_detections.append(
