@@ -54,7 +54,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     # ---------------------------------------- IMPLEMENTED ABSTRACT METHODS ----------------------------------------
 
     @property
-    def progress(self) -> Optional[float]:
+    def training_progress(self) -> Optional[float]:
         if self._executor is None:
             return None
         if self.is_cla:
@@ -241,7 +241,9 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             cmd = f'WANDB_MODE=disabled python /app/train_det.py --exist-ok --patience {self.patience} \
                 --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} \
                 --project {self.training.training_folder} --name result --hyp {hyperparameter_path} \
-                --epochs {self.epochs} {additional_parameters} --point_ids {",".join(p_ids)} --point_sizes {",".join(p_sizes)}'
+                --epochs {self.epochs} {additional_parameters}'
+            if p_ids:
+                cmd += f' --point_ids {",".join(p_ids)} --point_sizes {",".join(p_sizes)}'
 
             with open(hyperparameter_path) as f:
                 logging.info(f'running training with command :\n {cmd} \nand hyperparameter\n{f.read()}')
