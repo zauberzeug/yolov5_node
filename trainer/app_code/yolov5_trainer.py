@@ -313,7 +313,8 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         for line in content:
             probability_str, c = line.split(' ', maxsplit=1)
             probability = float(probability_str) * 100
-            c = c.strip()
+            if probability < 20:
+                continue
             categories = [category for category in model_info.categories if category.name == c]
             if categories:
                 category = categories[0]
