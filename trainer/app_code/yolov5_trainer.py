@@ -312,7 +312,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
         for line in content:
             probability_str, c = line.split(' ', maxsplit=1)
-            c = c.replace('\n', '')
+            c = c.strip()
             probability = float(probability_str) * 100
             if probability < 20:
                 continue
