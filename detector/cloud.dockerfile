@@ -1,9 +1,6 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE} as release
 
-# RUN pkg-config --cflags --libs opencv
-
-
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
     apt-get install -y --no-install-recommends \
@@ -18,27 +15,12 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# ENV PYTHONPATH "${PYTHONPATH}:/usr/local/lib/python3.10/dist-packages/"
-
-# RUN apt-get update && \
-#     DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
-#     apt-get install -y --no-install-recommends \
-#     libjpeg8-dev zlib1g-dev \
-#     ca-certificates \
-#     openssh-client \
-#     && rm -rf /var/lib/apt/lists/* \
-#     && apt-get clean
-
 RUN pip3 install --upgrade pip
 RUN pip3 install --no-cache-dir wheel
 RUN pip3 install --no-cache-dir pycuda==2022.2.2
 RUN pip3 install --no-cache-dir "uvicorn" 
 RUN pip3 install --no-cache-dir async_generator aiofiles psutil pillow multidict attrs yarl async_timeout idna_ssl cchardet aiosignal
-# LL_NODE-Library can be overwritten by local version if environment variable LINKLL is set to TRUE
-ARG NODE_LIB_VERSION
-RUN pip3 install --no-cache-dir "learning_loop_node==${NODE_LIB_VERSION}"
-RUN pip3 install --no-cache-dir "gdown"
-RUN pip3 install --no-cache-dir starlette==0.16.0
+RUN pip3 install --no-cache-dir gdown==4.6.3
 
 # Download the coco model. 
 WORKDIR /data/models
@@ -60,6 +42,10 @@ RUN sed -i '74s/^/\/\//' calibrator.cpp
 WORKDIR /tensorrtx/yolov5/build
 RUN cmake .. && make -j6
 ENV PYTHONPATH=$PYTHONPATH:/tensorrtx/yolov5/
+
+# LL_NODE-Library can be overwritten by local version if environment variable LINKLL is set to TRUE
+ARG NODE_LIB_VERSION
+RUN pip3 install --no-cache-dir "learning_loop_node==${NODE_LIB_VERSION}"
 
 ADD ./ /yolov5_node/detector/
 RUN ln -sf /yolov5_node/detector /app

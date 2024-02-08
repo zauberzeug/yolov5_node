@@ -89,7 +89,7 @@ class TestWithLoop:
 
         logging.info(trainer.executor.get_log())
         assert f'{trainer.epochs}/{trainer.epochs}' in trainer.executor.get_log()
-        assert trainer.progress == 1.0
+        assert trainer.training_progress == 1.0
 
     def test_cla_new_model_discovery(self, use_training_dir):
         """The trainer should find new models"""

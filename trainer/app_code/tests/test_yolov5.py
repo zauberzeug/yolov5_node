@@ -84,7 +84,7 @@ class TestWithLoop:
 
         logging.info(trainer.executor.get_log())
         assert f'{trainer.epochs} epochs completed' in trainer.executor.get_log()
-        assert trainer.progress == 1.0
+        assert trainer.training_progress == 1.0
 
     @pytest.mark.skip(reason="This test needs to be updated to newever version of learning-loop. Functionality is tested in learning_loop_node")
     # TODO: Fix this test (results in file not found on server)

@@ -37,7 +37,7 @@ class Yolov5Detector(DetectorLogic):
             warmup.join()
 
     def evaluate(self, image: List[np.uint8]) -> Detections:
-        assert self.yolov5 is not None, 'init() must be called first'
+        assert self.yolov5 is not None, 'init() must be executed first. Maybe loading the engine failed?!'
         detections = Detections()
         try:
             t = time.time()
