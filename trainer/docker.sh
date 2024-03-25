@@ -80,7 +80,8 @@ if [ "$LINKLL" == "TRUE" ]; then
     echo "Linked Learning Loop from $SCRIPT_DIR/../../learning_loop_node"
 fi
 
-build_args=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
+# this is python 3.10 with pytorch 2.1.0 (https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel-23-07.html)
+build_args=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" 
 
 cmd=$1
 cmd_args=${@:2}

@@ -12,17 +12,16 @@ import pytest
 from learning_loop_node.data_classes import (Category, Context, Hyperparameter,
                                              Training, TrainingData)
 from learning_loop_node.data_exchanger import DataExchanger
-from learning_loop_node.helpers.gdrive_downloader import g_download
 from learning_loop_node.loop_communication import LoopCommunicator
-from learning_loop_node.tests import test_helper
 from learning_loop_node.trainer.downloader import TrainingsDownloader
 from learning_loop_node.trainer.executor import Executor
-from learning_loop_node.trainer.trainer_logic import TrainerLogic
 from ruamel.yaml import YAML
 
 from .. import model_files, yolov5_format
 from ..yolov5_format import update_hyp
 from ..yolov5_trainer import Yolov5TrainerLogic
+
+# pylint: disable=protected-access,unused-argument
 
 logging.basicConfig(level=logging.DEBUG)
 yaml = YAML()
@@ -64,7 +63,7 @@ class TestWithLoop:
         """Test if progress is parsed correctly from log"""
         trainer = Yolov5TrainerLogic()
         trainer.epochs = 2
-        trainer._training = Training(  # pylint: disable=protected-access
+        trainer._training = Training(
             id=str(uuid4()),
             project_folder=os.getcwd(),
             training_folder=os.getcwd() + '/training',
@@ -86,36 +85,6 @@ class TestWithLoop:
         assert f'{trainer.epochs} epochs completed' in trainer.executor.get_log()
         assert trainer.training_progress == 1.0
 
-    @pytest.mark.skip(reason="This test needs to be updated to newever version of learning-loop. Functionality is tested in learning_loop_node")
-    # TODO: Fix this test (results in file not found on server)
-    async def test_detecting(self, create_project, glc: LoopCommunicator):
-        # from learning_loop_node.loop import Loop
-        # loop = Loop()
-        logging.info('downloading model from gdrive')
-
-        file_id = '1sZWa053fWT9PodrujDX90psmjhFVLyBV'
-        destination = '/tmp/model.zip'
-        g_download(file_id, destination)
-
-        test_helper.unzip(destination, '/tmp/model')
-
-        logging.info('uploading model')
-        data = ['/tmp/model/model.pt', '/tmp/model/model.json']
-        response = await glc.put('zauberzeug/projects/demo/1/models/latest/yolov5_pytorch/file', files=data)
-        if response.status_code != 200:
-            msg = f'unexpected status code {response.status_code} while putting model'
-            logging.error(msg)
-            raise (Exception(msg))
-        model = await response.json()
-
-        trainer = Yolov5TrainerLogic()
-        context = Context(organization='zauberzeug', project='demo')
-        trainer._training = TrainerLogic.generate_training(context)  # pylint: disable=protected-access
-        trainer.training.model_id_for_detecting = model['id']
-        detections = await trainer._do_detections()  # pylint: disable=protected-access
-        assert detections is not None
-        assert len(detections) > 0
-
 # =======================================================================================================================
 # ----------------- The following tests do not need a loop project as they are not using the loop -----------------------
 # =======================================================================================================================
@@ -131,7 +100,7 @@ class TestWithDetection:
                        'point_annotations': [{'category_id': 'uuid_of_class_1', 'x': 50, 'y': 60},
                                              {'category_id': 'uuid_of_class_2', 'x': 60, 'y': 70}]}]
         trainer = Yolov5TrainerLogic()
-        trainer._training = Training(id='someid', context=Context(organization='o', project='p'),  # pylint: disable=protected-access
+        trainer._training = Training(id='someid', context=Context(organization='o', project='p'),
                                      project_folder='./', images_folder='./', training_folder='./')
         trainer.training.data = TrainingData(image_data=image_data, categories=categories)
         yolov5_format.create_file_structure(trainer.training)
@@ -145,45 +114,45 @@ class TestWithDetection:
     async def test_new_model_discovery(self, use_training_dir):
         """This test also triggers the creation of a wts file"""
         trainer = Yolov5TrainerLogic()
-        trainer._training = Training(id='someid', context=Context(organization='o', project='p'),  # pylint: disable=protected-access
+        trainer._training = Training(id='someid', context=Context(organization='o', project='p'),
                                      project_folder='./',  images_folder='./', training_folder='./')
         trainer.training.data = TrainingData(image_data=[], categories=[
             Category(name='class_a', id='uuid_of_class_a', type='box')])
-        assert trainer.get_new_model() is None, 'should not find any models'
+        assert trainer._get_new_best_model() is None, 'should not find any models'
 
         model_path = 'result/weights/published/latest.pt'
 
         mock_epoch(1, {'class_a': {'fp': 0, 'tp': 1, 'fn': 0}})
-        model = trainer.get_new_model()
+        model = trainer._get_new_best_model()
         assert model is not None and model.confusion_matrix is not None
         assert model.confusion_matrix['uuid_of_class_a']['tp'] == 1
-        trainer.on_model_published(model)
+        trainer._on_metrics_published(model)
         assert os.path.isfile(model_path)
         modification_date = os.path.getmtime(model_path)
 
         mock_epoch(2, {'class_a': {'fp': 1, 'tp': 2, 'fn': 1}})
-        model = trainer.get_new_model()
+        model = trainer._get_new_best_model()
         assert model is not None and model.confusion_matrix is not None
         assert model.confusion_matrix['uuid_of_class_a']['tp'] == 2
-        trainer.on_model_published(model)
-        assert trainer.get_new_model() is None, 'again we should not find any new models'
+        trainer._on_metrics_published(model)
+        assert trainer._get_new_best_model() is None, 'again we should not find any new models'
 
         await asyncio.sleep(0.1)  # To have a later modification date
         mock_epoch(3, {'class_a': {'fp': 0, 'tp': 3, 'fn': 1}})
-        model = trainer.get_new_model()
+        model = trainer._get_new_best_model()
         assert model is not None and model.confusion_matrix is not None
         assert model.confusion_matrix['uuid_of_class_a']['tp'] == 3
-        trainer.on_model_published(model)
+        trainer._on_metrics_published(model)
         assert os.path.getmtime(model_path) > modification_date
 
-        files = trainer.get_latest_model_files()  # get_latest_model_file
+        files = trainer._get_latest_model_files()  # get_latest_model_file
         assert files == {
             'yolov5_pytorch': ['/tmp/model.pt', '/tmp/test_training/hyp.yaml'],
             'yolov5_wts': ['/tmp/model.wts']}
 
     def test_newest_model_is_used(self, use_training_dir):
         trainer = Yolov5TrainerLogic()
-        trainer._training = Training(id='someid', context=Context(organization='o', project='p'),  # pylint: disable=protected-access
+        trainer._training = Training(id='someid', context=Context(organization='o', project='p'),
                                      project_folder='./', images_folder='./', training_folder='./')
         trainer.training.data = TrainingData(image_data=[], categories=[
             Category(name='class_a', id='uuid_of_class_a', type='box')])
@@ -192,21 +161,21 @@ class TestWithDetection:
         mock_epoch(10, {})
         mock_epoch(200, {})
 
-        new_model = trainer.get_new_model()
+        new_model = trainer._get_new_best_model()
         assert new_model is not None and new_model.meta_information is not None
         assert 'epoch10.pt' not in new_model.meta_information['weightfile']
         assert 'epoch200.pt' in new_model.meta_information['weightfile']
 
     def test_old_model_files_are_deleted_on_publish(self, use_training_dir):
         trainer = Yolov5TrainerLogic()
-        trainer._training = Training(id='someid', context=Context(organization='o', project='p'),  # pylint: disable=protected-access
+        trainer._training = Training(id='someid', context=Context(organization='o', project='p'),
                                      project_folder='./', images_folder='./', training_folder='./')
         trainer.training.data = TrainingData(image_data=[], categories=[
             Category(name='class_a', id='uuid_of_class_a', type='box')])
-        assert trainer.get_new_model() is None, 'should not find any models'
+        assert trainer._get_new_best_model() is None, 'should not find any models'
 
         mock_epoch(1, {'class_a': {'fp': 0, 'tp': 1, 'fn': 0}})
-        new_model = trainer.get_new_model()
+        new_model = trainer._get_new_best_model()
 
         assert new_model is not None and new_model.confusion_matrix is not None
         assert new_model.confusion_matrix['uuid_of_class_a']['tp'] == 1
@@ -215,9 +184,9 @@ class TestWithDetection:
         _, _, files = next(os.walk("result/weights"))
         assert len(files) == 4
 
-        new_model = trainer.get_new_model()
+        new_model = trainer._get_new_best_model()
         assert new_model is not None
-        trainer.on_model_published(new_model)
+        trainer._on_metrics_published(new_model)
         _, _, files = next(os.walk("result/weights/published"))
         assert len(files) == 1
         assert os.path.isfile('result/weights/published/latest.pt')
@@ -227,7 +196,7 @@ class TestWithDetection:
 
     def test_newer_model_files_are_kept_during_deleting(self, use_training_dir):
         trainer = Yolov5TrainerLogic()
-        trainer._training = Training(id='someid', context=Context(organization='o', project='p'),  # pylint: disable=protected-access
+        trainer._training = Training(id='someid', context=Context(organization='o', project='p'),
                                      project_folder='./',  images_folder='./', training_folder='./')
         trainer.training.data = TrainingData(image_data=[], categories=[
             Category(name='class_a', id='uuid_of_class_a', type='box')])
@@ -235,12 +204,12 @@ class TestWithDetection:
         # create some models.
         mock_epoch(10, {})
         mock_epoch(200, {})
-        new_model = trainer.get_new_model()
+        new_model = trainer._get_new_best_model()
         assert new_model is not None and new_model.meta_information is not None
         assert 'epoch200.pt' in new_model.meta_information['weightfile']
         mock_epoch(201, {})  # An epoch is finished after during communication with the LearningLoop
 
-        trainer.on_model_published(new_model)
+        trainer._on_metrics_published(new_model)
 
         all_model_files = model_files.get_all_weightfiles(Path(trainer.training.training_folder))
         assert len(all_model_files) == 1
@@ -248,7 +217,7 @@ class TestWithDetection:
 
     async def test_clear_training_data(self, use_training_dir):
         trainer = Yolov5TrainerLogic()
-        trainer._training = Training(id='someid', context=Context(organization='o', project='p'),  # pylint: disable=protected-access
+        trainer._training = Training(id='someid', context=Context(organization='o', project='p'),
                                      project_folder='./', images_folder='./', training_folder='./')
         os.makedirs(f'{trainer.training.training_folder}/result/weights/', exist_ok=True)
         os.makedirs(f'{trainer.training.training_folder}/result/weights/published/', exist_ok=True)
@@ -268,7 +237,7 @@ class TestWithDetection:
         files = [f for f in data if os.path.isfile(f)]
         assert len(files) == 5
 
-        await trainer.clear_training_data(trainer.training.training_folder)
+        await trainer._clear_training_data(trainer.training.training_folder)
         data = glob.glob(trainer.training.training_folder + '/**', recursive=True)
         assert len(data) == 5
         files = [f for f in data if os.path.isfile(f)]

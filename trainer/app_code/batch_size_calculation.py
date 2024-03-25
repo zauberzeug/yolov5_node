@@ -49,12 +49,12 @@ async def calc(training_path: str, model_file: str, hyp_path: str, dataset_path:
             logging.error(f'Got RuntimeError for batch_size {batch_size} and image_size {img_size}: {str(e)}')
             continue
         estimated_total_size = str(stats).split('Estimated Total Size (MB): ')[1]
-        estimated_total_size = float(estimated_total_size.split('\n')[0])
+        estimated_total_size_f = float(estimated_total_size.split('\n')[0])
 
         logging.info(
             f'estimated_total_size for batch_size {batch_size} and image_size {img_size} is {estimated_total_size}')
 
-        if estimated_total_size < free_mem:
+        if estimated_total_size_f < free_mem:
             logging.info(f'batch_size {batch_size} and image_size {img_size} is good')
             best_batch_size = batch_size
             break
@@ -77,9 +77,8 @@ async def calc(training_path: str, model_file: str, hyp_path: str, dataset_path:
 
 # -------------------------------- BELOW IMPLEMENTATION RESULTS IN  RuntimeError: Cannot re-initialize CUDA in forked subprocess. To use CUDA with multiprocessing, you must use the 'spawn' start method
 
-
 async def calc_on_thread(training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int) -> int:
-    queue = Queue()
+    queue = Queue()  # type: Queue[int]
     p = Process(target=_calc_batch_size, args=(queue, training_path, model_file, hyp_path, dataset_path, img_size))
     p.start()
 
@@ -143,12 +142,12 @@ def _calc_batch_size(
             logging.error(f'Got RuntimeError for batch_size {batch_size} and image_size {img_size}: {str(e)}')
             continue
         estimated_total_size = str(stats).split('Estimated Total Size (MB): ')[1]
-        estimated_total_size = float(estimated_total_size.split('\n')[0])
+        estimated_total_size_f = float(estimated_total_size.split('\n')[0])
 
         logging.info(
             f'estimated_total_size for batch_size {batch_size} and image_size {img_size} is {estimated_total_size}')
 
-        if estimated_total_size < free_mem:
+        if estimated_total_size_f < free_mem:
             logging.info(f'batch_size {batch_size} and image_size {img_size} is good')
             best_batch_size = batch_size
             break

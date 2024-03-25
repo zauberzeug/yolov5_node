@@ -10,16 +10,15 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
 import cv2
-import yaml  # type: ignore
+import yaml
 from fastapi.encoders import jsonable_encoder
-from learning_loop_node.data_classes import BasicModel  # type: ignore
 from learning_loop_node.data_classes import (BoxDetection, CategoryType,
                                              ClassificationDetection,
-                                             Detections, Hyperparameter,
-                                             ModelInformation, PointDetection,
-                                             PretrainedModel)
-from learning_loop_node.trainer import trainer_logic  # type: ignore
-from learning_loop_node.trainer.executor import Executor  # type: ignore
+                                             Detections, ModelInformation,
+                                             PointDetection, PretrainedModel,
+                                             TrainingStateData)
+from learning_loop_node.trainer import trainer_logic
+from learning_loop_node.trainer.executor import Executor
 
 from . import batch_size_calculation, model_files, yolov5_format
 from .yolov5 import gen_wts
@@ -37,13 +36,6 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         self.latest_epoch = 0
         self.epochs = 0  # will be overwritten by hyp.yaml
         self.patience = 300
-
-    @property
-    def hyperparameter(self) -> Hyperparameter:
-        assert self.is_initialized, 'Trainer is not initialized'
-        assert self.training.data is not None, 'Training should have data'
-        assert self.training.data.hyperparameter is not None, 'Training.data should have hyperparameter'
-        return self.training.data.hyperparameter
 
     @property
     def training_folder(self) -> Path:
@@ -96,8 +88,8 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             yolov5_format.update_hyp(parameter_destination_path, self.hyperparameter)
             await self._start(model, " --clear")
 
-    async def start_training_from_scratch(self, base_model_id: str) -> None:
-        await self.start_training(model=f'yolov5{base_model_id}.pt')
+    async def start_training_from_scratch(self) -> None:
+        await self.start_training(model=f'yolov5{self.training.base_model_id}.pt')
 
     def can_resume(self) -> bool:
         path = self.training_folder / 'result/weights/published/latest.pt'
@@ -117,7 +109,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
                 return 'graphics card not found'
         return None
 
-    def get_new_model(self) -> Optional[BasicModel]:
+    def _get_new_best_model(self) -> Optional[TrainingStateData]:
         if self.is_cla:
             weightfile = model_files.get_best(self.training_folder)
         else:
@@ -133,14 +125,14 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             for category_name in list(matrix.keys()):
                 matrix[categories[category_name]] = matrix.pop(category_name)
 
-        return BasicModel(confusion_matrix=matrix, meta_information={'weightfile': weightfile_str})
+        return TrainingStateData(confusion_matrix=matrix, meta_information={'weightfile': weightfile_str})
 
-    def on_model_published(self, basic_model: BasicModel) -> None:
+    def _on_metrics_published(self, training_state_data: TrainingStateData) -> None:
         path = (self.training_folder / 'result/weights/published').absolute()
         path.mkdir(parents=True, exist_ok=True)
 
-        assert basic_model.meta_information is not None, 'meta_information should be set'
-        weightfile = basic_model.meta_information['weightfile']
+        assert training_state_data.meta_information is not None, 'meta_information should be set'
+        weightfile = training_state_data.meta_information['weightfile']
 
         target = path / 'latest.pt'
         shutil.move(weightfile, target)
@@ -148,7 +140,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         # TODO why are the older epochs not deleted for cla model? .. ignored atm
         model_files.delete_older_epochs(Path(self.training.training_folder), Path(weightfile))
 
-    def get_latest_model_files(self) -> Optional[Union[List[str], Dict[str, List[str]]]]:
+    def _get_latest_model_files(self) -> Optional[Union[List[str], Dict[str, List[str]]]]:
         path = (self.training_folder / 'result/weights/published').absolute()
         weightfile = f'{path}/latest.pt'
         if not os.path.isfile(weightfile):
@@ -199,7 +191,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
         return detections
 
-    async def clear_training_data(self, training_folder: str) -> None:
+    async def _clear_training_data(self, training_folder: str) -> None:
         # Note: Keep best.pt in case uploaded model was not best.
         if self.is_cla:
             keep_files = ['last_training.log', 'last.pt']
@@ -339,23 +331,22 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         point_detections = []
 
         for line in content:
-            c, x, y, w, h, probability_str = line.split(' ')
+            c, x_, y_, w_, h_, probability_str = line.split(' ')
 
             category = model_info.categories[int(c)]
-            x = float(x) * img_width
-            y = float(y) * img_height
-            width = float(w) * img_width
-            height = float(h) * img_height
+            x = float(x_) * img_width
+            y = float(y_) * img_height
+            width = float(w_) * img_width
+            height = float(h_) * img_height
             probability = float(probability_str) * 100
 
             if (category.type == CategoryType.Box):
                 box_detections.append(
-                    BoxDetection(
-                        category_name=category.name, x=int(x - 0.5 * width),
-                        y=int(y - 0.5 * height),
-                        width=int(width),
-                        height=int(height),
-                        model_name=model_info.version, confidence=probability, category_id=category.id))
+                    BoxDetection(category_name=category.name, x=int(x - 0.5 * width),
+                                 y=int(y - 0.5 * height),
+                                 width=int(width),
+                                 height=int(height),
+                                 model_name=model_info.version, confidence=probability, category_id=category.id))
             elif (category.type == CategoryType.Point):
                 point_detections.append(
                     PointDetection(category_name=category.name, x=x, y=y, model_name=model_info.version,
