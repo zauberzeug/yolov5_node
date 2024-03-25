@@ -52,7 +52,7 @@ class TestWithLoop:
         ROOT = Path(__file__).resolve().parents[2]
         cmd = f'WANDB_MODE=disabled python {ROOT/"train_det.py"} --project training --name result --batch 4 --img 416 --data training/dataset.yaml --weights model.pt --epochs 1'
         executor.start(cmd)
-        while executor.is_process_running():
+        while executor.is_running():
             await asyncio.sleep(1)
         assert '1 epochs completed' in executor.get_log()
         assert 'best.pt' in executor.get_log()
@@ -78,7 +78,7 @@ class TestWithLoop:
         ROOT = Path(__file__).resolve().parents[2]
         cmd = f'WANDB_MODE=disabled python {ROOT/"train_det.py"} --project training --name result --batch 4 --img 416 --data training/dataset.yaml --weights model.pt --epochs {trainer.epochs}'
         trainer.executor.start(cmd)
-        while trainer.executor.is_process_running():
+        while trainer.executor.is_running():
             await asyncio.sleep(1)
 
         logging.info(trainer.executor.get_log())

@@ -1,18 +1,18 @@
 import asyncio
 import logging
 import os
-from multiprocessing import Process, Queue
 
 import torch
-import yaml
+import yaml  # type: ignore
 from learning_loop_node.helpers.misc import get_free_memory_mb
+from torch.multiprocessing import Process, Queue, set_start_method
 from torchinfo import Verbosity, summary
 
 from .yolov5.models.yolo import Model
 from .yolov5.utils.downloads import attempt_download
 
 
-async def calc(training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int) -> int:
+async def calc(training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int, init_clear_cuda: bool = True) -> int:
 
     os.chdir('/tmp')
 
@@ -21,22 +21,20 @@ async def calc(training_path: str, model_file: str, hyp_path: str, dataset_path:
     with open(dataset_path) as f:
         dataset = yaml.safe_load(f)
 
-    # Try to download pretrained model. Its ok when its a 'Continued' training.
-    attempt_download(model_file)
+    attempt_download(model_file)  # Download pretrained yolov5 model from ultralytics to .pt
 
-    torch.cuda.init()
-    free_mem = get_free_memory_mb()
-    fraction = 0.95
-    free_mem *= fraction
-    # logging.info(f'{fraction:.0%} of free memory ({free_mem}) in use')
-
+    if init_clear_cuda:
+        torch.cuda.init()
+        torch.cuda.empty_cache()
     device = torch.device('cuda', 0)
-    torch.cuda.empty_cache()
+
+    free_mem_mb = get_free_memory_mb()
+    fraction = 0.95
+    free_mem_mb *= fraction
 
     try:
         ckpt = torch.load(model_file, map_location=device)
     except FileNotFoundError:
-        # Continue Training
         ckpt = torch.load(f'{training_path}/{model_file}', map_location=device)
 
     model = Model(ckpt['model'].yaml, ch=3, nc=dataset.get('nc'), anchors=hyp.get('anchors')).to(device)  # create
@@ -48,36 +46,33 @@ async def calc(training_path: str, model_file: str, hyp_path: str, dataset_path:
         except RuntimeError as e:
             logging.error(f'Got RuntimeError for batch_size {batch_size} and image_size {img_size}: {str(e)}')
             continue
-        estimated_total_size = str(stats).split('Estimated Total Size (MB): ')[1]
-        estimated_total_size_f = float(estimated_total_size.split('\n')[0])
 
-        logging.info(
-            f'estimated_total_size for batch_size {batch_size} and image_size {img_size} is {estimated_total_size}')
+        estimated_model_size_mb = float(str(stats).split('Estimated Total Size (MB): ')[1].split('\n')[0])
+        logging.info(f'Model size for batch size {batch_size} and image size {img_size}: {estimated_model_size_mb} mb')
 
-        if estimated_total_size_f < free_mem:
-            logging.info(f'batch_size {batch_size} and image_size {img_size} is good')
+        if estimated_model_size_mb < free_mem_mb:
+            logging.info(f'batch size {batch_size} and image size {img_size} fits to {free_mem_mb} mb')
             best_batch_size = batch_size
             break
-        else:
-            logging.info(
-                f'batch_size {batch_size} and image_size {img_size} is too big to fit in available memory {free_mem} ')
 
-    model = model.cpu()
-    del model
-    del ckpt
-    torch.cuda.empty_cache()
+    model = model.cpu()  # TODO WTF??
+    del model, ckpt
 
-    if best_batch_size:
-        logging.info(f'found best matching batch size:  {best_batch_size}')
-        return best_batch_size
-    else:
+    if init_clear_cuda:
+        torch.cuda.empty_cache()
+
+    if not best_batch_size:
         logging.error('Did not find best matching batch size')
         raise Exception('Did not find best matching batch size')
+    return best_batch_size
 
 
 # -------------------------------- BELOW IMPLEMENTATION RESULTS IN  RuntimeError: Cannot re-initialize CUDA in forked subprocess. To use CUDA with multiprocessing, you must use the 'spawn' start method
 
 async def calc_on_thread(training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int) -> int:
+    logging.info('Calculating best batch size on thread.....')
+    set_start_method('spawn')
+
     queue = Queue()  # type: Queue[int]
     p = Process(target=_calc_batch_size, args=(queue, training_path, model_file, hyp_path, dataset_path, img_size))
     p.start()
@@ -85,9 +80,9 @@ async def calc_on_thread(training_path: str, model_file: str, hyp_path: str, dat
     try:
         while p.is_alive():
             await asyncio.sleep(1)
-            logging.warning('still calculating best batch size')
+            logging.warning('Still calculating best batch size')
     except asyncio.CancelledError:
-        logging.warning('the training was cancelled during batch size calculation')
+        logging.warning('Training cancelled during batch size calculation')
         p.kill()
         raise
 
@@ -102,67 +97,5 @@ async def calc_on_thread(training_path: str, model_file: str, hyp_path: str, dat
 
 def _calc_batch_size(
         queue: Queue, training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int) -> None:
-    logging.info('calc_batch_size.....')
-
-    os.chdir('/tmp')
-
-    with open(hyp_path) as f:
-        hyp = yaml.safe_load(f)
-    with open(dataset_path) as f:
-        dataset = yaml.safe_load(f)
-
-    # Try to download pretrained model. Its ok when its a 'Continued' training.
-    attempt_download(model_file)
-
-    # torch.cuda.init()
-    # t = torch.cuda.get_device_properties(0).total_memory
-    # r = torch.cuda.memory_reserved(0)
-    # a = torch.cuda.memory_allocated(0)
-    # logging.error(f'{t}, {r}, {a}')
-    free_mem = get_free_memory_mb()
-    fraction = 0.95
-    free_mem *= fraction
-    # logging.info(f'{fraction:.0%} of free memory ({free_mem}) in use')
-
-    device = torch.device('cuda', 0)
-    # torch.cuda.empty_cache()
-    try:
-        ckpt = torch.load(model_file, map_location=device)
-    except FileNotFoundError:
-        # Continue Training
-        ckpt = torch.load(f'{training_path}/{model_file}', map_location=device)
-
-    model = Model(ckpt['model'].yaml, ch=3, nc=dataset.get('nc'), anchors=hyp.get('anchors')).to(device)  # create
-
-    best_batch_size = None
-    for batch_size in [128, 96, 64, 48, 32, 24, 16, 12, 8, 6, 4, 2, 1]:
-        try:
-            stats = summary(model, input_size=(batch_size, 3, img_size, img_size), verbose=Verbosity.QUIET)
-        except RuntimeError as e:
-            logging.error(f'Got RuntimeError for batch_size {batch_size} and image_size {img_size}: {str(e)}')
-            continue
-        estimated_total_size = str(stats).split('Estimated Total Size (MB): ')[1]
-        estimated_total_size_f = float(estimated_total_size.split('\n')[0])
-
-        logging.info(
-            f'estimated_total_size for batch_size {batch_size} and image_size {img_size} is {estimated_total_size}')
-
-        if estimated_total_size_f < free_mem:
-            logging.info(f'batch_size {batch_size} and image_size {img_size} is good')
-            best_batch_size = batch_size
-            break
-        else:
-            logging.info(
-                f'batch_size {batch_size} and image_size {img_size} is too big to fit in available memory {free_mem} ')
-
-    model = model.cpu()
-    del model
-    del ckpt
-    # torch.cuda.empty_cache()
-
-    if best_batch_size:
-        queue.put(best_batch_size)
-        logging.info(f'found best matching batch size:  {best_batch_size}')
-    else:
-        logging.error('Did not find best matching batch size')
-        raise Exception('Did not find best matching batch size')
+    best_batch_size = calc(training_path, model_file, hyp_path, dataset_path, img_size, init_clear_cuda=False)
+    queue.put(best_batch_size)

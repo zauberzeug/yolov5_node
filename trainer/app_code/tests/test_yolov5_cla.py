@@ -54,7 +54,7 @@ class TestWithLoop:
         hyp_path = ROOT / 'app_code' / 'tests' / 'test_data' / 'hyp_cla.yaml'
         cmd = f'WANDB_MODE=disabled python {ROOT/"train_cla.py"} --project training --name result --hyp {hyp_path} --img 416 --data {training.training_folder} --model yolov5s-cls.pt --epochs 1'
         executor.start(cmd)
-        while executor.is_process_running():
+        while executor.is_running():
             sleep(1)
             logging.debug(executor.get_log())
 
@@ -86,7 +86,7 @@ class TestWithLoop:
         hyp_path = ROOT / 'app_code' / 'tests' / 'test_data' / 'hyp_cla.yaml'
         cmd = f'WANDB_MODE=disabled python {ROOT/"train_cla.py"} --project training --name result --hyp {hyp_path} --img 416 --data {trainer.training.training_folder} --model yolov5s-cls.pt --epochs {trainer.epochs}'
         trainer.executor.start(cmd)
-        while trainer.executor.is_process_running():
+        while trainer.executor.is_running():
             sleep(1)
 
         logging.info(trainer.executor.get_log())
