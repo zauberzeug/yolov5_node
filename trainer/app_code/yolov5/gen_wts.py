@@ -33,7 +33,7 @@ def parse_args():
     return args.weights, args.output, args.type
 
 
-def gen_wts(pt_file_path: str, wts_file_path: str, model_type: str='detect'):
+def generate_wts(pt_file_path: str, wts_file_path: str, model_type: str = 'detect'):
     print(f'Generating .wts for {model_type} model')
 
     # Load model
@@ -64,6 +64,7 @@ def gen_wts(pt_file_path: str, wts_file_path: str, model_type: str='detect'):
                 f.write(struct.pack('>f', float(vv)).hex())
             f.write('\n')
 
+
 if __name__ == '__main__':
     pt_file, wts_file, m_type = parse_args()
-    gen_wts(pt_file, wts_file, m_type)
+    generate_wts(pt_file, wts_file, m_type)

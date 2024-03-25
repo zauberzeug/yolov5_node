@@ -153,7 +153,7 @@ def create_file_structure(training: Training):
     logging.info(f'Prepared file structure with {num_train_imgs} training images and {num_test_imgs} test images')
 
 
-def update_hyp(yaml_path: str, hyperparameter: Hyperparameter):
+def update_hyps(yaml_path: str, hyperparameter: Hyperparameter):
     yaml_ = YAML()
 
     with open(yaml_path) as f:

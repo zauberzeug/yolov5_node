@@ -21,7 +21,7 @@ from learning_loop_node.trainer import trainer_logic
 from learning_loop_node.trainer.executor import Executor
 
 from . import batch_size_calculation, model_files, yolov5_format
-from .yolov5 import gen_wts
+from .yolov5 import generate_wts
 
 
 class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
@@ -66,25 +66,6 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
     async def _start_training_from_scratch(self) -> None:
         await self._start_training_from_model(model=f'yolov5{self.training.base_model_id}.pt')
-
-    async def _start_training_from_model(self, model: str) -> None:
-        def move_and_update_hyps(source: Path, target: str) -> None:
-            assert (source).exists(), 'Hyperparameter file not found at "{hyperparameter_source_path}"'
-            shutil.copy(source, target)
-            yolov5_format.update_hyp(target, self.hyperparameter)
-
-        hyp_path = Path(__file__).resolve().parents[1] / ('hyp_cla.yaml' if self.is_cla else 'hyp_det.yaml')
-
-        if self.is_cla:
-            yolov5_format.create_file_structure_cla(self.training)
-            if model == 'model.pt':
-                model = f'{self.training.training_folder}/model.pt'
-            move_and_update_hyps(hyp_path, f'{self.training.training_folder}/hyp.yaml')
-            await self._start(model)
-        else:
-            yolov5_format.create_file_structure(self.training)
-            move_and_update_hyps(hyp_path, f'{self.training.training_folder}/hyp.yaml')
-            await self._start(model, " --clear")
 
     def _can_resume(self) -> bool:
         path = self.training.training_folder_path / 'result/weights/published/latest.pt'
@@ -133,33 +114,33 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         model_files.delete_json_for_weightfile(Path(weightfile))
         model_files.delete_older_epochs(Path(self.training.training_folder), Path(weightfile))
 
-    def _get_latest_model_files(self) -> Optional[Union[List[str], Dict[str, List[str]]]]:
-        path = (self.training.training_folder_path / 'result/weights/published').absolute()
-        weightfile = f'{path}/latest.pt'
+    def _get_latest_model_files(self) -> Dict[str, List[str]]:
+        weightfile = self.training.training_folder_path / "result/weights/published/latest.pt"
         if not os.path.isfile(weightfile):
-            logging.error(f'No model found at {weightfile}')
-            return None
+            logging.warning(f'No model found at {weightfile}')
+            return {}
+
         shutil.copy(weightfile, '/tmp/model.pt')
-        training_path = '/'.join(weightfile.split('/')[:-4])
+        training_path = self.training.training_folder_path / "result"
 
         if self.is_cla:
             return {self.model_format: ['/tmp/model.pt', f'{training_path}/result/opt.yaml']}
 
-        gen_wts(pt_file_path=weightfile, wts_file_path='/tmp/model.wts')
-        return {self.model_format: ['/tmp/model.pt', f'{training_path}/hyp.yaml'],
-                'yolov5_wts': ['/tmp/model.wts']}
+        generate_wts(pt_file_path=str(weightfile), wts_file_path='/tmp/model.wts')
+        return {self.model_format: ['/tmp/model.pt', f'{training_path}/hyp.yaml'], 'yolov5_wts': ['/tmp/model.wts']}
 
-    async def _detect(self, model_information: ModelInformation, images:  List[str], model_folder: str) -> List[Detections]:
+    async def _detect(self, model_information: ModelInformation, images: List[str], model_folder: str) -> List[Detections]:
         images_folder = '/tmp/imagelinks_for_detecting'
         shutil.rmtree(images_folder, ignore_errors=True)
         os.makedirs(images_folder)
+
         for img in images:
             image_name = os.path.basename(img)
             os.symlink(img, f'{images_folder}/{image_name}')
 
-        logging.info('start detecting')
         shutil.rmtree('/app/app_code/yolov5/runs', ignore_errors=True)
         os.makedirs('/app/app_code/yolov5/runs')
+
         executor = Executor(images_folder)
         img_size = model_information.resolution
 
@@ -167,7 +148,6 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             cmd = f'python /app/pred_cla.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --save-txt'
         else:
             cmd = f'python /app/pred_det.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --conf-thres 0.2 --save-txt --save-conf --nosave'
-        logging.info(f'running detection with command :\n {cmd}')
 
         executor.start(cmd)
         while executor.is_running():
@@ -177,16 +157,14 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             logging.error(f'Error during detecting: \n {executor.get_log()}')
             raise Exception('Error during detecting')
 
-        detections = []
-        logging.info('start parsing detections')
+        logging.info('Start parsing detections')
         labels_path = '/app/app_code/yolov5/runs/predict-cls/exp/labels' if self.is_cla else '/app/app_code/yolov5/runs/detect/exp/labels'
-        detections = await asyncio.get_event_loop().run_in_executor(None, self._parse, labels_path, images_folder, model_information)
 
-        return detections
+        # NOTE: parse function is blocking by IO operations, so we need to run it in a separate thread (default executor is ThreadPoolExecutor)
+        return await asyncio.get_event_loop().run_in_executor(None, self._parse, labels_path, images_folder, model_information)
 
     async def _clear_training_data(self, training_folder: str) -> None:
-        # Note: Keep best.pt in case uploaded model was not best.
-        if self.is_cla:
+        if self.is_cla:        # Note: Keep best.pt in case uploaded model was not best.
             keep_files = ['last_training.log', 'last.pt']
         else:
             keep_files = ['last_training.log', 'hyp.yaml', 'dataset.yaml', 'best.pt']
@@ -200,6 +178,25 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
                     shutil.rmtree(os.path.join(root, dir_))
 
     # ---------------------------------------- ADDITIONAL METHODS ----------------------------------------
+
+    async def _start_training_from_model(self, model: str) -> None:
+        def move_and_update_hyps(source: Path, target: str) -> None:
+            assert (source).exists(), 'Hyperparameter file not found at "{hyperparameter_source_path}"'
+            shutil.copy(source, target)
+            yolov5_format.update_hyps(target, self.hyperparameter)
+
+        hyp_path = Path(__file__).resolve().parents[1] / ('hyp_cla.yaml' if self.is_cla else 'hyp_det.yaml')
+
+        if self.is_cla:
+            yolov5_format.create_file_structure_cla(self.training)
+            if model == 'model.pt':
+                model = f'{self.training.training_folder}/model.pt'
+            move_and_update_hyps(hyp_path, f'{self.training.training_folder}/hyp.yaml')
+            await self._start(model)
+        else:
+            yolov5_format.create_file_structure(self.training)
+            move_and_update_hyps(hyp_path, f'{self.training.training_folder}/hyp.yaml')
+            await self._start(model, " --clear")
 
     async def _start(self, model: str, additional_parameters: str = ''):
         resolution = self.hyperparameter.resolution
@@ -223,10 +220,6 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             if p_ids:
                 cmd += f' --point_ids {",".join(p_ids)} --point_sizes {",".join(p_sizes)}'
 
-            with open(hyperparameter_path) as f:
-                logging.info(f'running training with command :\n {cmd} \nand hyperparameter\n{f.read()}')
-
-        logging.info(f'running training with command :\n {cmd}')
         self.executor.start(cmd)
 
     def _load_hyps_set_epochs(self, hyp_path: str) -> None:
