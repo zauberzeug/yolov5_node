@@ -3,7 +3,7 @@
 # This script is used to build, run, stop, kill, attach, etc. the docker container for the trainer node.
 
 # nlv should only be used, to build the corresponding version and deploy to docker
-# make sure the remote always uses the 'latest' tag (otherwise the tests will fail)
+# make sure the remote repository always has the 'latest' tag (otherwise the CI tests will fail)
 #image="zauberzeug/yolov5-trainer:nlv0.9.2"
 image="zauberzeug/yolov5-trainer:latest"
 

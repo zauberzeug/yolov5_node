@@ -7,7 +7,7 @@ import shutil
 from asyncio import sleep
 from dataclasses import asdict
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple
 
 import cv2
 import yaml  # type: ignore
@@ -65,15 +65,14 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         await self._start_training_from_model(f'{self.training.training_folder}/model.pt')
 
     async def _start_training_from_scratch(self) -> None:
-        await self._start_training_from_model(model=f'yolov5{self.training.base_model_id}.pt')
+        await self._start_training_from_model(model=f'yolov5{self.training.base_model_uuid_or_name}.pt')
 
     def _can_resume(self) -> bool:
         path = self.training.training_folder_path / 'result/weights/published/latest.pt'
         return path.exists()
 
     async def _resume(self) -> None:
-        logging.info('resume called')
-        await self._start(str(self.training.training_folder_path / 'result/weights/published/latest.pt'))
+        await self._start(model=str(self.training.training_folder_path / 'result/weights/published/latest.pt'))
 
     def _get_executor_error_from_log(self) -> Optional[str]:
         if self._executor is None:
