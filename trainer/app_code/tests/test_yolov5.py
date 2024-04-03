@@ -43,7 +43,7 @@ class TestWithLoop:
                             project_folder=os.getcwd(),
                             training_folder=os.getcwd() + '/training',
                             images_folder=os.getcwd() + '/images',
-                            base_model_id='model.pt',
+                            base_model_uuid_or_name='model.pt',
                             context=Context(project='pytest_yolo5det', organization='zauberzeug'))
         training.data = await create_training_data(training, data_exchanger, glc)
         yolov5_format.create_file_structure(training)
@@ -51,7 +51,7 @@ class TestWithLoop:
         # from https://github.com/WongKinYiu/yolor#training
         ROOT = Path(__file__).resolve().parents[2]
         cmd = f'WANDB_MODE=disabled python {ROOT/"train_det.py"} --project training --name result --batch 4 --img 416 --data training/dataset.yaml --weights model.pt --epochs 1'
-        executor.start(cmd)
+        await executor.start(cmd)
         while executor.is_running():
             await asyncio.sleep(1)
         assert '1 epochs completed' in executor.get_log()
@@ -68,7 +68,7 @@ class TestWithLoop:
             project_folder=os.getcwd(),
             training_folder=os.getcwd() + '/training',
             images_folder=os.getcwd() + '/images',
-            base_model_id='model.pt',
+            base_model_uuid_or_name='model.pt',
             context=Context(project='pytest_yolo5det', organization='zauberzeug'),
         )
         trainer.training.data = await create_training_data(trainer.training, data_exchanger, glc)
@@ -118,12 +118,12 @@ class TestWithDetection:
                                      project_folder='./',  images_folder='./', training_folder='./')
         trainer.training.data = TrainingData(image_data=[], categories=[
             Category(name='class_a', id='uuid_of_class_a', type='box')])
-        assert trainer._get_new_best_model() is None, 'should not find any models'
+        assert trainer._get_new_best_training_state() is None, 'should not find any models'
 
         model_path = 'result/weights/published/latest.pt'
 
         mock_epoch(1, {'class_a': {'fp': 0, 'tp': 1, 'fn': 0}})
-        model = trainer._get_new_best_model()
+        model = trainer._get_new_best_training_state()
         assert model is not None and model.confusion_matrix is not None
         assert model.confusion_matrix['uuid_of_class_a']['tp'] == 1
         trainer._on_metrics_published(model)
@@ -131,21 +131,21 @@ class TestWithDetection:
         modification_date = os.path.getmtime(model_path)
 
         mock_epoch(2, {'class_a': {'fp': 1, 'tp': 2, 'fn': 1}})
-        model = trainer._get_new_best_model()
+        model = trainer._get_new_best_training_state()
         assert model is not None and model.confusion_matrix is not None
         assert model.confusion_matrix['uuid_of_class_a']['tp'] == 2
         trainer._on_metrics_published(model)
-        assert trainer._get_new_best_model() is None, 'again we should not find any new models'
+        assert trainer._get_new_best_training_state() is None, 'again we should not find any new models'
 
         await asyncio.sleep(0.1)  # To have a later modification date
         mock_epoch(3, {'class_a': {'fp': 0, 'tp': 3, 'fn': 1}})
-        model = trainer._get_new_best_model()
+        model = trainer._get_new_best_training_state()
         assert model is not None and model.confusion_matrix is not None
         assert model.confusion_matrix['uuid_of_class_a']['tp'] == 3
         trainer._on_metrics_published(model)
         assert os.path.getmtime(model_path) > modification_date
 
-        files = trainer._get_latest_model_files()  # get_latest_model_file
+        files = await trainer._get_latest_model_files()  # get_latest_model_file
         assert files == {
             'yolov5_pytorch': ['/tmp/model.pt', '/tmp/test_training/hyp.yaml'],
             'yolov5_wts': ['/tmp/model.wts']}
@@ -161,7 +161,7 @@ class TestWithDetection:
         mock_epoch(10, {})
         mock_epoch(200, {})
 
-        new_model = trainer._get_new_best_model()
+        new_model = trainer._get_new_best_training_state()
         assert new_model is not None and new_model.meta_information is not None
         assert 'epoch10.pt' not in new_model.meta_information['weightfile']
         assert 'epoch200.pt' in new_model.meta_information['weightfile']
@@ -172,10 +172,10 @@ class TestWithDetection:
                                      project_folder='./', images_folder='./', training_folder='./')
         trainer.training.data = TrainingData(image_data=[], categories=[
             Category(name='class_a', id='uuid_of_class_a', type='box')])
-        assert trainer._get_new_best_model() is None, 'should not find any models'
+        assert trainer._get_new_best_training_state() is None, 'should not find any models'
 
         mock_epoch(1, {'class_a': {'fp': 0, 'tp': 1, 'fn': 0}})
-        new_model = trainer._get_new_best_model()
+        new_model = trainer._get_new_best_training_state()
 
         assert new_model is not None and new_model.confusion_matrix is not None
         assert new_model.confusion_matrix['uuid_of_class_a']['tp'] == 1
@@ -184,7 +184,7 @@ class TestWithDetection:
         _, _, files = next(os.walk("result/weights"))
         assert len(files) == 4
 
-        new_model = trainer._get_new_best_model()
+        new_model = trainer._get_new_best_training_state()
         assert new_model is not None
         trainer._on_metrics_published(new_model)
         _, _, files = next(os.walk("result/weights/published"))
@@ -204,7 +204,7 @@ class TestWithDetection:
         # create some models.
         mock_epoch(10, {})
         mock_epoch(200, {})
-        new_model = trainer._get_new_best_model()
+        new_model = trainer._get_new_best_training_state()
         assert new_model is not None and new_model.meta_information is not None
         assert 'epoch200.pt' in new_model.meta_information['weightfile']
         mock_epoch(201, {})  # An epoch is finished after during communication with the LearningLoop

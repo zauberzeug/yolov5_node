@@ -40,7 +40,7 @@ class TestWithLoop:
         training = Training(id=str(uuid4()),
                             project_folder=os.getcwd(),
                             training_folder=os.getcwd() + '/training', images_folder=os.getcwd() + '/images',
-                            base_model_id='model.pt',
+                            model_uuid_for_detecting='model.pt',
                             context=Context(project=os.environ['LOOP_PROJECT'],
                                             organization=os.environ['LOOP_ORGANIZATION']))
         training.data = await download_training_data(training, data_exchanger, glc)
@@ -53,7 +53,7 @@ class TestWithLoop:
         ROOT = Path(__file__).resolve().parents[2]
         hyp_path = ROOT / 'app_code' / 'tests' / 'test_data' / 'hyp_cla.yaml'
         cmd = f'WANDB_MODE=disabled python {ROOT/"train_cla.py"} --project training --name result --hyp {hyp_path} --img 416 --data {training.training_folder} --model yolov5s-cls.pt --epochs 1'
-        executor.start(cmd)
+        await executor.start(cmd)
         while executor.is_running():
             sleep(1)
             logging.debug(executor.get_log())
@@ -74,7 +74,7 @@ class TestWithLoop:
                                      project_folder=os.getcwd(),
                                      training_folder=os.getcwd() + '/training',
                                      images_folder=os.getcwd() + '/images',
-                                     base_model_id='model.pt',
+                                     model_uuid_for_detecting='model.pt',
                                      context=Context(project='demo', organization='zauberzeug'))
         trainer.training.data = await download_training_data(trainer.training, data_exchanger, glc)
         yolov5_format.create_file_structure_cla(trainer.training)
@@ -85,7 +85,7 @@ class TestWithLoop:
         ROOT = Path(__file__).resolve().parents[2]
         hyp_path = ROOT / 'app_code' / 'tests' / 'test_data' / 'hyp_cla.yaml'
         cmd = f'WANDB_MODE=disabled python {ROOT/"train_cla.py"} --project training --name result --hyp {hyp_path} --img 416 --data {trainer.training.training_folder} --model yolov5s-cls.pt --epochs {trainer.epochs}'
-        trainer.executor.start(cmd)
+        await trainer.executor.start(cmd)
         while trainer.executor.is_running():
             sleep(1)
 
@@ -93,18 +93,18 @@ class TestWithLoop:
         assert f'{trainer.epochs}/{trainer.epochs}' in trainer.executor.get_log()
         assert trainer.training_progress == 1.0
 
-    def test_cla_new_model_discovery(self, use_training_dir):
+    async def test_cla_new_model_discovery(self, use_training_dir):
         """The trainer should find new models"""
         trainer = Yolov5TrainerLogic()
         trainer._training = Training(id='someid', context=Context(organization='o', project='p'),   # pylint: disable=protected-access
                                      project_folder='./',  images_folder='./', training_folder='./')
         trainer.training.data = TrainingData(image_data=[], categories=[
             Category(name='class_a', id='uuid_of_class_a', type='classification')])
-        assert trainer._get_new_best_model() is None, 'should not find any models'
+        assert trainer._get_new_best_training_state() is None, 'should not find any models'
 
         model_path = 'result/weights/published/latest.pt'
         mock_epoch({'class_a': {'fp': 0, 'tp': 1, 'fn': 0}})
-        model = trainer._get_new_best_model()
+        model = trainer._get_new_best_training_state()
         assert model is not None and model.confusion_matrix is not None and model.confusion_matrix[
             'uuid_of_class_a']['tp'] == 1
         trainer._on_metrics_published(model)
@@ -112,17 +112,17 @@ class TestWithLoop:
         modification_date = os.path.getmtime(model_path)
 
         mock_epoch({'class_a': {'fp': 1, 'tp': 2, 'fn': 1}})
-        model = trainer._get_new_best_model()
+        model = trainer._get_new_best_training_state()
         assert model is not None and model.confusion_matrix is not None and model.confusion_matrix[
             'uuid_of_class_a']['tp'] == 2
         trainer._on_metrics_published(model)
 
-        assert trainer._get_new_best_model() is None, 'again we should not find any new models'
+        assert trainer._get_new_best_training_state() is None, 'again we should not find any new models'
 
         time.sleep(0.1)
 
         mock_epoch({'class_a': {'fp': 0, 'tp': 3, 'fn': 1}})
-        model = trainer._get_new_best_model()
+        model = trainer._get_new_best_training_state()
         assert model is not None and model.confusion_matrix is not None and model.confusion_matrix[
             'uuid_of_class_a']['tp'] == 3
         trainer._on_metrics_published(model)
@@ -131,9 +131,10 @@ class TestWithLoop:
         assert new_modification_date > modification_date
 
         # get_latest_model_file
-        files = trainer._get_latest_model_files()
+        files = await trainer._get_latest_model_files()
         assert files == {'yolov5_cla_pytorch': ['/tmp/model.pt', '/tmp/test_training/result/opt.yaml']}
 
+    @pytest.mark.asyncio()
     def test_cla_old_model_files_are_deleted_on_publish(self, use_training_dir):
         """When a model is published, the old model files should be deleted"""
         trainer = Yolov5TrainerLogic()
@@ -141,10 +142,10 @@ class TestWithLoop:
                                      project_folder='./', images_folder='./', training_folder='./')
         trainer.training.data = TrainingData(image_data=[], categories=[
             Category(name='class_a', id='uuid_of_class_a', type='classification')])
-        assert trainer._get_new_best_model() is None, 'should not find any models'
+        assert trainer._get_new_best_training_state() is None, 'should not find any models'
 
         mock_epoch({'class_a': {'fp': 0, 'tp': 1, 'fn': 0}})
-        model = trainer._get_new_best_model()
+        model = trainer._get_new_best_training_state()
         assert model is not None and model.confusion_matrix is not None and model.confusion_matrix[
             'uuid_of_class_a']['tp'] == 1
         mock_epoch({'class_a': {'fp': 1, 'tp': 2, 'fn': 1}})
@@ -152,7 +153,7 @@ class TestWithLoop:
         _, _, files = next(os.walk("result/weights"))
         assert len(files) == 2
 
-        model = trainer._get_new_best_model()
+        model = trainer._get_new_best_training_state()
         assert model is not None
         trainer._on_metrics_published(model)
         _, _, files = next(os.walk("result/weights/published"))
