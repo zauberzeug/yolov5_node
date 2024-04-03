@@ -124,7 +124,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             return {self.model_format: ['/tmp/model.pt', f'{training_path}/result/opt.yaml']}
 
         executor = Executor(self.training.training_folder, 'wts-converter.log')
-        await executor.start('python /app/gen_wts.py -w /tmp/model.pt -o /tmp/model.wts')
+        await executor.start('python /app/generate_wts.py -w /tmp/model.pt -o /tmp/model.wts')
         if await executor.wait() != 0:
             logging.error(f'Error during generating wts file: \n {executor.get_log()}')
             raise Exception('Error during generating wts file')
