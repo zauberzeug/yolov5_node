@@ -4,7 +4,6 @@ import logging
 import os
 import re
 import shutil
-from asyncio import sleep
 from dataclasses import asdict
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -21,7 +20,6 @@ from learning_loop_node.trainer import trainer_logic
 from learning_loop_node.trainer.executor import Executor
 
 from . import batch_size_calculation, model_files, yolov5_format
-from .yolov5 import generate_wts
 
 
 class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
@@ -77,7 +75,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     def _get_executor_error_from_log(self) -> Optional[str]:
         if self._executor is None:
             return None
-        for line in self._executor.get_log_by_lines(since_last_start=True):
+        for line in self._executor.get_log_by_lines(tail=50):
             if 'CUDA out of memory' in line:
                 return 'graphics card is out of memory'
             if 'CUDA error: invalid device ordinal' in line:
@@ -113,7 +111,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         model_files.delete_json_for_weightfile(Path(weightfile))
         model_files.delete_older_epochs(Path(self.training.training_folder), Path(weightfile))
 
-    def _get_latest_model_files(self) -> Dict[str, List[str]]:
+    async def _get_latest_model_files(self) -> Dict[str, List[str]]:
         weightfile = self.training.training_folder_path / "result/weights/published/latest.pt"
         if not os.path.isfile(weightfile):
             logging.warning(f'No model found at {weightfile}')
@@ -125,7 +123,12 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         if self.is_cla:
             return {self.model_format: ['/tmp/model.pt', f'{training_path}/result/opt.yaml']}
 
-        generate_wts(pt_file_path=str(weightfile), wts_file_path='/tmp/model.wts')
+        executor = Executor(self.training.training_folder, 'wts-converter.log')
+        await executor.start('python /app/gen_wts.py -w /tmp/model.pt -o /tmp/model.wts')
+        if await executor.wait() != 0:
+            logging.error(f'Error during generating wts file: \n {executor.get_log()}')
+            raise Exception('Error during generating wts file')
+
         return {self.model_format: ['/tmp/model.pt', f'{training_path}/hyp.yaml'], 'yolov5_wts': ['/tmp/model.wts']}
 
     async def _detect(self, model_information: ModelInformation, images: List[str], model_folder: str) -> List[Detections]:
@@ -140,7 +143,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         shutil.rmtree('/app/app_code/yolov5/runs', ignore_errors=True)
         os.makedirs('/app/app_code/yolov5/runs')
 
-        executor = Executor(images_folder)
+        executor = Executor(self.training.training_folder, 'detect.log')
         img_size = model_information.resolution
 
         if self.is_cla:
@@ -148,11 +151,8 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         else:
             cmd = f'python /app/pred_det.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --conf-thres 0.2 --save-txt --save-conf --nosave'
 
-        executor.start(cmd)
-        while executor.is_running():
-            await sleep(1)
-
-        if executor.return_code == 1:
+        await executor.start(cmd)
+        if await executor.wait() != 0:
             logging.error(f'Error during detecting: \n {executor.get_log()}')
             raise Exception('Error during detecting')
 
@@ -164,13 +164,13 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
     async def _clear_training_data(self, training_folder: str) -> None:
         if self.is_cla:        # Note: Keep best.pt in case uploaded model was not best.
-            keep_files = ['last_training.log', 'last.pt']
+            keep_files = ['last.pt']
         else:
-            keep_files = ['last_training.log', 'hyp.yaml', 'dataset.yaml', 'best.pt']
+            keep_files = ['hyp.yaml', 'dataset.yaml', 'best.pt']
         keep_dirs = ['result', 'weights']
         for root, dirs, files in os.walk(training_folder, topdown=False):
             for file in files:
-                if file not in keep_files:
+                if file not in keep_files and not file.endswith('.log'):
                     os.remove(os.path.join(root, file))
             for dir_ in dirs:
                 if dir_ not in keep_dirs:
@@ -212,14 +212,14 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             self._try_replace_optimized_hyperparameter()
             batch_size = await batch_size_calculation.calc(self.training.training_folder, model, hyperparameter_path,
                                                            f'{self.training.training_folder}/dataset.yaml', resolution)
-            cmd = f'WANDB_MODE=disabled python /app/train_det.py --exist-ok --patience {self.patience} \
+            cmd = f'python /app/train_det.py --exist-ok --patience {self.patience} \
                 --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} \
                 --project {self.training.training_folder} --name result --hyp {hyperparameter_path} \
                 --epochs {self.epochs} {additional_parameters}'
             if p_ids:
                 cmd += f' --point_ids {",".join(p_ids)} --point_sizes {",".join(p_sizes)}'
 
-        self.executor.start(cmd)
+        await self.executor.start(cmd, env={'WANDB_MODE': 'disabled'})
 
     def _load_hyps_set_epochs(self, hyp_path: str) -> None:
         with open(hyp_path, errors='ignore') as f:
