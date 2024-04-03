@@ -81,7 +81,13 @@ if [ "$LINKLL" == "TRUE" ]; then
 fi
 
 # this is python 3.10 with pytorch 2.1.0 (https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel-23-07.html)
+# Requires Driver 530+
 build_args=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" 
+
+# this is python 3.10 with pytorch 2.3.0
+# Requires Driver 545+
+# build_args=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:24.02-py3" 
+# (cf. https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html#framework-matrix-2023)
 
 cmd=$1
 cmd_args=${@:2}
