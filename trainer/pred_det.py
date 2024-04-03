@@ -31,6 +31,7 @@ Usage - formats:
 import argparse
 import os
 import platform
+import signal
 import sys
 from pathlib import Path
 
@@ -55,6 +56,15 @@ ROOT = FILE.parents[0]/'app_code/yolov5'  # yolov5 root directory
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
+
+
+# Register the signal handler for SIGTERM
+def signal_handler(sig, frame):
+    print('\n\nSignal received:', sig, flush=True)
+    sys.exit(0)
+
+
+signal.signal(signal.SIGTERM, signal_handler)
 
 
 @smart_inference_mode()
@@ -261,5 +271,8 @@ def main(opt):
 
 
 if __name__ == "__main__":
+    torch.cuda.init()
+    torch.cuda.empty_cache()
     opt = parse_opt()
     main(opt)
+    torch.cuda.empty_cache()

@@ -28,6 +28,7 @@ Usage - formats:
                                            yolov5s-cls_paddle_model       # PaddlePaddle
 """
 
+import signal
 import argparse
 import os
 import platform
@@ -56,6 +57,15 @@ ROOT = FILE.parents[0]/'app_code/yolov5'  # yolov5 root directory
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
+
+
+# Register the signal handler for SIGTERM
+def signal_handler(sig, frame):
+    print('\n\nSignal received:', sig, flush=True)
+    sys.exit(0)
+
+
+signal.signal(signal.SIGTERM, signal_handler)
 
 
 @smart_inference_mode()
