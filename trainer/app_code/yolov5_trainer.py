@@ -112,13 +112,13 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         model_files.delete_older_epochs(Path(self.training.training_folder), Path(weightfile))
 
     async def _get_latest_model_files(self) -> Dict[str, List[str]]:
-        weightfile = self.training.training_folder_path / "result/weights/published/latest.pt"
+        weightfile = (self.training.training_folder_path / "result/weights/published/latest.pt").absolute()
         if not os.path.isfile(weightfile):
             logging.warning(f'No model found at {weightfile}')
             return {}
 
         shutil.copy(weightfile, '/tmp/model.pt')
-        training_path = self.training.training_folder_path / "result"
+        training_path = '/'.join(str(weightfile).split('/')[:-4])
 
         if self.is_cla:
             return {self.model_format: ['/tmp/model.pt', f'{training_path}/result/opt.yaml']}

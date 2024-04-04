@@ -3,9 +3,7 @@ import glob
 import json
 import logging
 import os
-import time
 from pathlib import Path
-from time import sleep
 from typing import Dict
 from uuid import uuid4
 
@@ -52,11 +50,9 @@ class TestWithLoop:
         # from https://github.com/WongKinYiu/yolor#training
         ROOT = Path(__file__).resolve().parents[2]
         hyp_path = ROOT / 'app_code' / 'tests' / 'test_data' / 'hyp_cla.yaml'
-        cmd = f'WANDB_MODE=disabled python {ROOT/"train_cla.py"} --project training --name result --hyp {hyp_path} --img 416 --data {training.training_folder} --model yolov5s-cls.pt --epochs 1'
-        await executor.start(cmd)
-        while executor.is_running():
-            sleep(1)
-            logging.debug(executor.get_log())
+        cmd = f'python {ROOT/"train_cla.py"} --project training --name result --hyp {hyp_path} --img 416 --data {training.training_folder} --model yolov5s-cls.pt --epochs 1'
+        await executor.start(cmd, env={'WANDB_MODE': 'disabled'})
+        assert (await executor.wait()) == 0
 
         logging.info(executor.get_log())
         assert 'Training complete' in executor.get_log()
@@ -70,7 +66,7 @@ class TestWithLoop:
         trainer = Yolov5TrainerLogic()
         trainer.epochs = 3  # NOTE: must correspond to the value set in test_data/hyp_cla.yaml
         os.remove('/tmp/model.pt')
-        trainer._training = Training(id=str(uuid4()),  # pylint: disable=protected-access
+        trainer._training = Training(id=str(uuid4()),
                                      project_folder=os.getcwd(),
                                      training_folder=os.getcwd() + '/training',
                                      images_folder=os.getcwd() + '/images',
@@ -81,13 +77,12 @@ class TestWithLoop:
 
         await asyncio.sleep(1)
 
-        trainer._executor = Executor(os.getcwd())  # pylint: disable=protected-access
+        trainer._executor = Executor(os.getcwd())
         ROOT = Path(__file__).resolve().parents[2]
         hyp_path = ROOT / 'app_code' / 'tests' / 'test_data' / 'hyp_cla.yaml'
-        cmd = f'WANDB_MODE=disabled python {ROOT/"train_cla.py"} --project training --name result --hyp {hyp_path} --img 416 --data {trainer.training.training_folder} --model yolov5s-cls.pt --epochs {trainer.epochs}'
-        await trainer.executor.start(cmd)
-        while trainer.executor.is_running():
-            sleep(1)
+        cmd = f'python {ROOT/"train_cla.py"} --project training --name result --hyp {hyp_path} --img 416 --data {trainer.training.training_folder} --model yolov5s-cls.pt --epochs {trainer.epochs}'
+        await trainer.executor.start(cmd, env={'WANDB_MODE': 'disabled'})
+        assert (await trainer.executor.wait()) == 0
 
         logging.info(trainer.executor.get_log())
         assert f'{trainer.epochs}/{trainer.epochs}' in trainer.executor.get_log()
@@ -96,7 +91,7 @@ class TestWithLoop:
     async def test_cla_new_model_discovery(self, use_training_dir):
         """The trainer should find new models"""
         trainer = Yolov5TrainerLogic()
-        trainer._training = Training(id='someid', context=Context(organization='o', project='p'),   # pylint: disable=protected-access
+        trainer._training = Training(id='someid', context=Context(organization='o', project='p'),
                                      project_folder='./',  images_folder='./', training_folder='./')
         trainer.training.data = TrainingData(image_data=[], categories=[
             Category(name='class_a', id='uuid_of_class_a', type='classification')])
@@ -119,7 +114,7 @@ class TestWithLoop:
 
         assert trainer._get_new_best_training_state() is None, 'again we should not find any new models'
 
-        time.sleep(0.1)
+        await asyncio.sleep(0.1)
 
         mock_epoch({'class_a': {'fp': 0, 'tp': 3, 'fn': 1}})
         model = trainer._get_new_best_training_state()
@@ -138,7 +133,7 @@ class TestWithLoop:
     def test_cla_old_model_files_are_deleted_on_publish(self, use_training_dir):
         """When a model is published, the old model files should be deleted"""
         trainer = Yolov5TrainerLogic()
-        trainer._training = Training(id='someid', context=Context(organization='o', project='p'),  # pylint: disable=protected-access
+        trainer._training = Training(id='someid', context=Context(organization='o', project='p'),
                                      project_folder='./', images_folder='./', training_folder='./')
         trainer.training.data = TrainingData(image_data=[], categories=[
             Category(name='class_a', id='uuid_of_class_a', type='classification')])
@@ -201,7 +196,7 @@ class TestWithLoop:
         model_info = ModelInformation(id='someid', organization='o', project='p', host='h', version='1.1', categories=[
             Category(id='some_id', name='Thripse', type=CategoryType.Classification)], resolution=320)
         file = next(os.scandir('/tmp/results'))
-        # pylint: disable=protected-access
+
         detections = Yolov5TrainerLogic._parse_file_cla(model_info=model_info, filepath=file.path)
         assert len(detections) > 0
         os.remove('/tmp/results/detection.txt')
@@ -227,7 +222,7 @@ class TestWithLoop:
                        'classification_annotation': {
                            'category_id': 'uuid_of_class_2', }}]
         trainer = Yolov5TrainerLogic()
-        trainer._training = Training(id='someid', context=Context(organization='o', project='p'),  # pylint: disable=protected-access
+        trainer._training = Training(id='someid', context=Context(organization='o', project='p'),
                                      project_folder='./',  images_folder='./', training_folder='./')
         trainer.training.data = TrainingData(image_data=image_data, categories=categories)
 
