@@ -63,7 +63,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         await self._start_training_from_model(f'{self.training.training_folder}/model.pt')
 
     async def _start_training_from_scratch(self) -> None:
-        await self._start_training_from_model(model=f'yolov5{self.training.base_model_uuid_or_name}.pt')
+        await self._start_training_from_model(f'yolov5{self.training.base_model_uuid_or_name}.pt')
 
     def _can_resume(self) -> bool:
         path = self.training.training_folder_path / 'result/weights/published/latest.pt'
