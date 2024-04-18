@@ -34,6 +34,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         self.latest_epoch = 0
         self.epochs = 0  # will be overwritten by hyp.yaml
         self.patience = 300
+        self.inference_batch_size = 100  # yolo processes images one by one
 
     # ---------------------------------------- IMPLEMENTED ABSTRACT PROPERTIES ----------------------------------------
 
@@ -251,7 +252,6 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
                     box_detections, point_detections = self._parse_file(model_information, images_folder, filename.path)
                     detections.append(Detections(box_detections=box_detections,
                                       point_detections=point_detections, image_id=uuid))
-                logging.info('Parsed file: %s. Total number of detections: %s', filename.path, len(detections))
         return detections
 
     def _get_progress_from_log_cla(self) -> float:
