@@ -4,7 +4,7 @@ import os
 import re
 import subprocess
 import time
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -36,12 +36,39 @@ class Yolov5Detector(DetectorLogic):
             warmup.start()
             warmup.join()
 
+    @staticmethod
+    def clip_box(
+            x: float, y: float, width: float, height: float, img_width: int, img_height: int) -> Tuple[
+            float, float, float, float]:
+        '''make sure the box is within the image
+            x,y is the center of the box
+        '''
+        left = max(0, x - 0.5 * width)
+        top = max(0, y - 0.5 * height)
+        right = min(img_width, x + 0.5 * width)
+        bottom = min(img_height, y + 0.5 * height)
+
+        x = 0.5 * (left + right)
+        y = 0.5 * (top + bottom)
+        width = right - left
+        height = bottom - top
+
+        return x, y, width, height
+
+    @staticmethod
+    def clip_point(x: float, y: float, img_width: int, img_height: int) -> Tuple[float, float]:
+        x = min(max(0, x), img_width)
+        y = min(max(0, y), img_height)
+        return x, y
+
     def evaluate(self, image: List[np.uint8]) -> Detections:
         assert self.yolov5 is not None, 'init() must be executed first. Maybe loading the engine failed?!'
         detections = Detections()
         try:
             t = time.time()
-            results, inference_ms = self.yolov5.infer(cv2.imdecode(image, cv2.IMREAD_COLOR))
+            cv_image = cv2.imdecode(image, cv2.IMREAD_COLOR)
+            im_height, im_width, _ = cv_image.shape
+            results, inference_ms = self.yolov5.infer(cv_image)
             skipped_detections = []
             logging.info(f'took {inference_ms} s, overall {time.time() -t} s')
             for detection in results:
@@ -51,11 +78,13 @@ class Yolov5Detector(DetectorLogic):
                     skipped_detections.append((category.name, detection))
                     continue
                 if category.type == CategoryType.Box:
+                    x, y, w, h = self.clip_box(x, y, w, h, im_width, im_height)
                     detections.box_detections.append(
                         BoxDetection(category_name=category.name, x=x, y=y, width=w, height=h, category_id=category.id,
                                      model_name=self.model_info.version, confidence=probability))
                 elif category.type == CategoryType.Point:
                     cx, cy = (np.average([x, x + w]), np.average([y, y + h]))
+                    cx, cy = self.clip_point(cx, cy, im_width, im_height)
                     detections.point_detections.append(
                         PointDetection(category_name=category.name, x=int(cx), y=int(cy), category_id=category.id,
                                        model_name=self.model_info.version, confidence=probability))
