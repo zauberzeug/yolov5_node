@@ -84,7 +84,6 @@ def parse_opt():
     parser.add_argument('--augment', action='store_true', help='augmented inference')
     parser.add_argument('--project', default=ROOT / 'runs/detect', help='save results to project/name')
     parser.add_argument('--name', default='exp', help='save results to project/name')
-    parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args(vars(opt))
@@ -106,12 +105,11 @@ def run(
         augment=False,  # augmented inference
         project=ROOT / 'runs/detect',  # save results to project/name
         name='exp',  # save results to project/name
-        exist_ok=False,  # existing project/name ok, do not increment
 ):
     source = str(source)
 
     # Directories
-    save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
+    save_dir = Path(project) / name  # increment run
     (save_dir / 'labels').mkdir(parents=True, exist_ok=True)  # make dir
 
     # Load model

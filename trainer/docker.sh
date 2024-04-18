@@ -4,7 +4,7 @@
 
 # nlv should only be used, to build the corresponding version and deploy to docker
 # make sure the remote repository always has the 'latest' tag (otherwise the CI tests will fail)
-#image="zauberzeug/yolov5-trainer:nlv0.10.0"
+#image="zauberzeug/yolov5-trainer:nlv0.10.1"
 image="zauberzeug/yolov5-trainer:latest"
 
 if [ $# -eq 0 ]

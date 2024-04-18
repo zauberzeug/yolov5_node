@@ -251,6 +251,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
                     box_detections, point_detections = self._parse_file(model_information, images_folder, filename.path)
                     detections.append(Detections(box_detections=box_detections,
                                       point_detections=point_detections, image_id=uuid))
+                logging.info('Parsed file: %s. Total number of detections: %s', filename.path, len(detections))
         return detections
 
     def _get_progress_from_log_cla(self) -> float:
