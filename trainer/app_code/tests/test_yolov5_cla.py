@@ -67,7 +67,8 @@ class TestWithLoop:
         """The progress should be parsed from the log file"""
         trainer = Yolov5TrainerLogic()
         trainer.epochs = 3  # NOTE: must correspond to the value set in test_data/hyp_cla.yaml
-        os.remove('/tmp/model.pt')
+        if os.path.isfile('/tmp/model.pt'):
+            os.remove('/tmp/model.pt')
         trainer._training = Training(id=str(uuid4()),
                                      project_folder=os.getcwd(),
                                      training_folder=os.getcwd() + '/training',
