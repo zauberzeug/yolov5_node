@@ -13,6 +13,8 @@ from learning_loop_node.data_classes import Context
 from learning_loop_node.data_exchanger import DataExchanger
 from learning_loop_node.loop_communication import LoopCommunicator
 
+# pylint: disable=unused-argument,redefined-outer-name
+
 icecream.install()
 logging.basicConfig(level=logging.INFO)
 
@@ -102,4 +104,4 @@ def use_training_dir(prepare_model, request: SubRequest):
     os.chdir('/tmp/test_training/')
     yield
     shutil.rmtree('/tmp/test_training', ignore_errors=True)
-    os.chdir(request.config.invocation_dir)
+    os.chdir(request.config.invocation_dir)  # type: ignore

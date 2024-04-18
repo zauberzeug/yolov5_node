@@ -17,6 +17,9 @@
     "--disable=W0719", // Rraising too general exception
     "--disable=W1203", // Use % formatting in logging functions and pass the % parameters as arguments
     "--disable=W1514", // Using open without explicitly specifying an encoding
+    "--disable=R0801", // Similar lines in multiple files
+    "--disable=R0913", // Too many arguments
+    "--disable=R0914", // Too many local variables
     "--generated-members=numpy.* ,torch.*,cv2.*" // Required because pylint doesn't recognize numpy and torch methods
   ],
   "[python]": {

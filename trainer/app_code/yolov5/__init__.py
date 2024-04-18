@@ -1,1 +1,1 @@
-from .gen_wts import gen_wts 
+from .gen_wts import generate_wts
