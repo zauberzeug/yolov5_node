@@ -4,10 +4,11 @@ import shutil
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-import yaml  # type: ignore
-from learning_loop_node.data_classes import CategoryType  # type: ignore
-from learning_loop_node.data_classes import Hyperparameter, Training
+from learning_loop_node.data_classes import (CategoryType, Hyperparameter,
+                                             Training)
 from ruamel.yaml import YAML
+
+yaml = YAML()
 
 
 def get_ids_and_sizes_of_point_classes(training: Training) -> Tuple[List[str], List[str]]:
@@ -118,7 +119,7 @@ def _create_set_cla(training: Training, set_name: str):
     logging.info(f'Created {count} image links')
 
 
-def create_yaml(training: Training):
+def create_dataset_yaml(training: Training):
     categories = category_lookup_from_training(training)
     path = training.training_folder
     data = {
@@ -148,19 +149,18 @@ def create_file_structure(training: Training):
 
     num_test_imgs = _create_set(training, 'test')
     num_train_imgs = _create_set(training, 'train')
-    create_yaml(training)
+    create_dataset_yaml(training)
 
     logging.info(f'Prepared file structure with {num_train_imgs} training images and {num_test_imgs} test images')
 
 
-def update_hyp(yaml_path: str, hyperparameter: Hyperparameter):
-    yaml_ = YAML()
+def update_hyps(yaml_path: str, hyperparameter: Hyperparameter):
 
     with open(yaml_path) as f:
-        content = yaml_.load(f)
+        content = yaml.load(f)
 
     content['fliplr'] = 0.5 if hyperparameter.flip_rl else 0
     content['flipud'] = 0.5 if hyperparameter.flip_ud else 0
 
     with open(yaml_path, 'w') as f:
-        yaml_.dump(content, f)
+        yaml.dump(content, f)

@@ -16,6 +16,7 @@ Torchvision models: --model resnet50, efficientnet_b0, etc. See https://pytorch.
 import argparse
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -43,13 +44,25 @@ from app_code.yolov5.utils.general import (DATASETS_DIR, LOGGER,
                                            download, increment_path,
                                            init_seeds, print_args, yaml_save)
 from app_code.yolov5.utils.loggers import GenericLogger
-from app_code.yolov5.utils.plots import imshow_cls
 from app_code.yolov5.utils.torch_utils import (ModelEMA, model_info,
                                                reshape_classifier_output,
                                                select_device, smart_DDP,
                                                smart_optimizer,
                                                smartCrossEntropyLoss,
                                                torch_distributed_zero_first)
+
+stop_training = False
+
+# Register the signal handler for SIGTERM
+
+
+def signal_handler(sig, frame):
+    global stop_training
+    print('\n\nSignal received:', sig, flush=True)
+    stop_training = True
+
+
+signal.signal(signal.SIGTERM, signal_handler)
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]/'app_code/yolov5'  # yolov5 root directory
@@ -231,52 +244,51 @@ def train(opt, device):
         scheduler.step()
 
         # Log metrics
-        if RANK in {-1, 0}:
-            # Best fitness
-            if fitness > best_fitness:
-                best_fitness = fitness
+        # Best fitness
+        if fitness > best_fitness:
+            best_fitness = fitness
 
-            # Log
-            metrics = {
-                "train/loss": tloss,
-                f"{val}/loss": vloss,
-                "metrics/accuracy_top1": top1,
-                "metrics/accuracy_top5": top5,
-                "lr/0": optimizer.param_groups[0]['lr']}  # learning rate
-            logger.log_metrics(metrics, epoch)
+        # Log
+        metrics = {
+            "train/loss": tloss,
+            f"{val}/loss": vloss,
+            "metrics/accuracy_top1": top1,
+            "metrics/accuracy_top5": top5,
+            "lr/0": optimizer.param_groups[0]['lr']}  # learning rate
+        logger.log_metrics(metrics, epoch)
 
-            # Save model
-            final_epoch = epoch + 1 == epochs
-            if (not opt.nosave) or final_epoch:
-                ckpt = {
-                    'epoch': epoch,
-                    'best_fitness': best_fitness,
-                    'model': deepcopy(ema.ema).half(),  # deepcopy(de_parallel(model)).half(),
-                    'ema': None,  # deepcopy(ema.ema).half(),
-                    'updates': ema.updates,
-                    'optimizer': None,  # optimizer.state_dict(),
-                    'opt': vars(opt),
-                    'git': GIT_INFO,  # {remote, branch, commit} if a git repo
-                    'date': datetime.now().isoformat()}
+        # Save model
+        final_epoch = (epoch + 1 == epochs or stop_training)
+        if (not opt.nosave) or final_epoch:
+            ckpt = {
+                'epoch': epoch,
+                'best_fitness': best_fitness,
+                'model': deepcopy(ema.ema).half(),  # deepcopy(de_parallel(model)).half(),
+                'ema': None,  # deepcopy(ema.ema).half(),
+                'updates': ema.updates,
+                'optimizer': None,  # optimizer.state_dict(),
+                'opt': vars(opt),
+                'git': GIT_INFO,  # {remote, branch, commit} if a git repo
+                'date': datetime.now().isoformat()}
 
-                # Save last, best and delete
-                torch.save(ckpt, last)
-                confusion_matrices = {}
-                LOGGER.error(model.names)
-                for idx, name in enumerate(model.names):
-                    confusion_matrices[name] = {'tp': int(tp[idx]), 'fp': int(fp[idx]), 'fn': int(fn[idx])}
+            # Save last, best and delete
+            torch.save(ckpt, last)
+            confusion_matrices = {}
+            LOGGER.error(model.names)
+            for idx, name in enumerate(model.names):
+                confusion_matrices[name] = {'tp': int(tp[idx]), 'fp': int(fp[idx]), 'fn': int(fn[idx])}
+            if confusion_matrices:
+                with open(f'{wdir}/last.json', 'w+') as f:
+                    json.dump(confusion_matrices, f)
+            if best_fitness == fitness:
+                torch.save(ckpt, best)
                 if confusion_matrices:
-                    with open(f'{wdir}/last.json', 'w+') as f:
+                    with open(f'{wdir}/best.json', 'w+') as f:
                         json.dump(confusion_matrices, f)
-                if best_fitness == fitness:
-                    torch.save(ckpt, best)
-                    if confusion_matrices:
-                        with open(f'{wdir}/best.json', 'w+') as f:
-                            json.dump(confusion_matrices, f)
-                del ckpt
+            del ckpt
 
     # Train complete
-    if RANK in {-1, 0} and final_epoch:
+    if final_epoch:
         LOGGER.info(f'\nTraining complete ({(time.time() - t0) / 3600:.3f} hours)'
                     f"\nResults saved to {colorstr('bold', save_dir)}"
                     f"\nPredict:         python classify/predict.py --weights {best} --source im.jpg"
@@ -322,10 +334,9 @@ def parse_opt(known=False):
 
 def main(opt):
     # Checks
-    if RANK in {-1, 0}:
-        print_args(vars(opt))
-        check_git_status()
-        check_requirements()
+    print_args(vars(opt))
+    check_git_status()
+    check_requirements()
 
     # DDP mode
     device = select_device(opt.device)

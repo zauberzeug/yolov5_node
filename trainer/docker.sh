@@ -3,8 +3,8 @@
 # This script is used to build, run, stop, kill, attach, etc. the docker container for the trainer node.
 
 # nlv should only be used, to build the corresponding version and deploy to docker
-# make sure the remote always uses the 'latest' tag (otherwise the tests will fail)
-#image="zauberzeug/yolov5-trainer:nlv0.9.2"
+# make sure the remote repository always has the 'latest' tag (otherwise the CI tests will fail)
+#image="zauberzeug/yolov5-trainer:nlv0.10.1"
 image="zauberzeug/yolov5-trainer:latest"
 
 if [ $# -eq 0 ]
@@ -71,7 +71,7 @@ run_args+=" --name $TRAINER_NAME"
 run_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all"
 run_args+=" --gpus all"
 run_args+=" --ipc host"
-run_args+=" -p 7442:80"
+run_args+=" -p 7443:80"
 
 # Link Learning Loop Node library if requested
 if [ "$LINKLL" == "TRUE" ]; then
@@ -80,7 +80,14 @@ if [ "$LINKLL" == "TRUE" ]; then
     echo "Linked Learning Loop from $SCRIPT_DIR/../../learning_loop_node"
 fi
 
-build_args=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
+# this is python 3.10 with pytorch 2.1.0 (https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel-23-07.html)
+# Requires Driver 530+
+build_args=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" 
+
+# this is python 3.10 with pytorch 2.3.0
+# Requires Driver 545+
+# build_args=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:24.02-py3" 
+# (cf. https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html#framework-matrix-2023)
 
 cmd=$1
 cmd_args=${@:2}
