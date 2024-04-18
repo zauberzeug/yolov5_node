@@ -33,7 +33,8 @@ class TestWithLoop:
     """This test environment sets up the environment vars and
         a test project in the loop which is used for testing."""
 
-    async def test_cla_training_creates_model(self, use_training_dir, data_exchanger: DataExchanger, glc: LoopCommunicator):
+    async def test_cla_training_creates_model(
+            self, use_training_dir, data_exchanger: DataExchanger, glc: LoopCommunicator):
         """Training should create a model file (best.pt)"""
         training = Training(id=str(uuid4()),
                             project_folder=os.getcwd(),
@@ -61,7 +62,8 @@ class TestWithLoop:
         assert os.path.isfile(best)
 
     @pytest.mark.asyncio()
-    async def test_cla_parse_progress_from_log(self, use_training_dir, data_exchanger: DataExchanger, glc: LoopCommunicator):
+    async def test_cla_parse_progress_from_log(
+            self, use_training_dir, data_exchanger: DataExchanger, glc: LoopCommunicator):
         """The progress should be parsed from the log file"""
         trainer = Yolov5TrainerLogic()
         trainer.epochs = 3  # NOTE: must correspond to the value set in test_data/hyp_cla.yaml
@@ -129,7 +131,6 @@ class TestWithLoop:
         files = await trainer._get_latest_model_files()
         assert files == {'yolov5_cla_pytorch': ['/tmp/model.pt', '/tmp/test_training/result/opt.yaml']}
 
-    @pytest.mark.asyncio()
     def test_cla_old_model_files_are_deleted_on_publish(self, use_training_dir):
         """When a model is published, the old model files should be deleted"""
         trainer = Yolov5TrainerLogic()
@@ -235,7 +236,8 @@ class TestWithLoop:
 # ---------------------- HELPER FUNCTIONS ----------------------
 
 
-async def download_training_data(training: Training, data_exchanger: DataExchanger, glc: LoopCommunicator) -> TrainingData:
+async def download_training_data(
+        training: Training, data_exchanger: DataExchanger, glc: LoopCommunicator) -> TrainingData:
     training_data = TrainingData()
     response = await glc.get(f"/{os.environ['LOOP_ORGANIZATION']}/projects/{os.environ['LOOP_PROJECT']}/data")
     assert response.status_code == 200
