@@ -38,6 +38,9 @@ def generate_wts(pt_file_path: str, wts_file_path: str, model_type: str = 'detec
 
     # Load model
     print(f'Loading {pt_file_path}')
+
+    original_devices = os.environ.get('CUDA_VISIBLE_DEVICES', 'NOT_SET')
+
     device = select_device('cpu')
     model = torch.load(pt_file_path, map_location=device)  # Load FP32 weights
     model = model['ema' if model.get('ema') else 'model'].float()
@@ -63,6 +66,13 @@ def generate_wts(pt_file_path: str, wts_file_path: str, model_type: str = 'detec
                 f.write(' ')
                 f.write(struct.pack('>f', float(vv)).hex())
             f.write('\n')
+
+    print(f'Finished generating .wts for {model_type} model')
+
+    if original_devices != 'NOT_SET':
+        os.environ['CUDA_VISIBLE_DEVICES'] = original_devices
+    else:
+        os.environ.pop('CUDA_VISIBLE_DEVICES', None)
 
 
 if __name__ == '__main__':
