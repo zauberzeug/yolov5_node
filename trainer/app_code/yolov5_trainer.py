@@ -131,7 +131,9 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
         return {self.model_format: ['/tmp/model.pt', f'{training_path}/hyp.yaml'], 'yolov5_wts': ['/tmp/model.wts']}
 
-    async def _detect(self, model_information: ModelInformation, images: List[str], model_folder: str) -> List[Detections]:
+    async def _detect(
+            self, model_information: ModelInformation, images: List[str],
+            model_folder: str) -> List[Detections]:
         images_folder = '/tmp/imagelinks_for_detecting'
         shutil.rmtree(images_folder, ignore_errors=True)
         os.makedirs(images_folder)
@@ -149,7 +151,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         if self.is_cla:
             cmd = f'python /app/pred_cla.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --save-txt'
         else:
-            cmd = f'python /app/pred_det.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --conf-thres 0.2 --save-txt --save-conf --nosave'
+            cmd = f'python /app/pred_det.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --conf-thres 0.2'
 
         await executor.start(cmd)
         if await executor.wait() != 0:
@@ -305,6 +307,31 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         return classification_detections
 
     @staticmethod
+    def clip_box(
+            x: float, y: float, width: float, height: float, img_width: int, img_height: int) -> Tuple[
+            float, float, float, float]:
+        '''make sure the box is within the image
+            x,y is the center of the box
+        '''
+        left = max(0, x - 0.5 * width)
+        top = max(0, y - 0.5 * height)
+        right = min(img_width, x + 0.5 * width)
+        bottom = min(img_height, y + 0.5 * height)
+
+        x = 0.5 * (left + right)
+        y = 0.5 * (top + bottom)
+        width = right - left
+        height = bottom - top
+
+        return x, y, width, height
+
+    @staticmethod
+    def clip_point(x: float, y: float, img_width: int, img_height: int) -> Tuple[float, float]:
+        x = min(max(0, x), img_width)
+        y = min(max(0, y), img_height)
+        return x, y
+
+    @staticmethod
     def _parse_file(model_info: ModelInformation, images_folder: str, filename: str) -> Tuple[
             List[BoxDetection], List[PointDetection]]:
         uuid = os.path.splitext(os.path.basename(filename))[0]
@@ -328,6 +355,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             probability = float(probability_str) * 100
 
             if category.type == CategoryType.Box:
+                x, y, width, height = Yolov5TrainerLogic.clip_box(x, y, width, height, img_width, img_height)
                 box_detections.append(
                     BoxDetection(category_name=category.name, x=int(x - 0.5 * width),
                                  y=int(y - 0.5 * height),
@@ -335,6 +363,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
                                  height=int(height),
                                  model_name=model_info.version, confidence=probability, category_id=category.id))
             elif category.type == CategoryType.Point:
+                x, y = Yolov5TrainerLogic.clip_point(x, y, img_width, img_height)
                 point_detections.append(
                     PointDetection(category_name=category.name, x=x, y=y, model_name=model_info.version,
                                    confidence=probability, category_id=category.id))

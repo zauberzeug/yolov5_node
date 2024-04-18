@@ -4,7 +4,7 @@
 
 # nlv should only be used, to build the corresponding version and deploy to docker
 # make sure the remote repository always has the 'latest' tag (otherwise the CI tests will fail)
-#image="zauberzeug/yolov5-trainer:nlv0.9.2"
+#image="zauberzeug/yolov5-trainer:nlv0.10.0"
 image="zauberzeug/yolov5-trainer:latest"
 
 if [ $# -eq 0 ]
@@ -71,7 +71,7 @@ run_args+=" --name $TRAINER_NAME"
 run_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all"
 run_args+=" --gpus all"
 run_args+=" --ipc host"
-run_args+=" -p 7442:80"
+run_args+=" -p 7443:80"
 
 # Link Learning Loop Node library if requested
 if [ "$LINKLL" == "TRUE" ]; then
