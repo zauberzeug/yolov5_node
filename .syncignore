@@ -1,0 +1,10 @@
+.git/
+__pycache__/
+.DS_Store
+*.tmp
+.env
+.mypy_cache/
+.pytest_cache/
+detector/.mypy_cache
+trainer/.mypy_cache
+trainer/app_code/yolov5/runs
