@@ -4,8 +4,8 @@
 
 # nlv should only be used, to build the corresponding version and deploy to docker
 # make sure the remote repository always has the 'latest' tag (otherwise the CI tests will fail)
-#image="zauberzeug/yolov5-trainer:nlv0.10.1"
-image="zauberzeug/yolov5-trainer:latest"
+image="zauberzeug/yolov5-trainer:nlv0.10.2"
+#image="zauberzeug/yolov5-trainer:latest"
 
 if [ $# -eq 0 ]
 then
@@ -64,7 +64,7 @@ run_args="-it --restart always"
 run_args+=" -v $(pwd)/../:/yolov5_node/"
 run_args+=" -v $HOME/trainer_nodes_data:/data"
 run_args+=" -h ${HOSTNAME}_DEV"
-run_args+=" -e HOST=$HOST -e USERNAME=$USERNAME -e PASSWORD=$PASSWORD"
+run_args+=" -e HOST=$HOST -e USERNAME=$USERNAME -e PASSWORD=$PASSWORD -e LOOP_SSL_CERT_PATH=$LOOP_SSL_CERT_PATH"
 run_args+=" -e BATCH_SIZE=$BATCH_SIZE -e UVICORN_RELOAD=$UVICORN_RELOAD -e RESET_POINTS=$RESET_POINTS -e KEEP_OLD_TRAININGS=$KEEP_OLD_TRAININGS"
 run_args+=" -e NODE_TYPE=trainer -e YOLOV5_MODE=$YOLOV5_MODE -e RESTART_AFTER_TRAINING=$RESTART_AFTER_TRAINING"
 run_args+=" --name $TRAINER_NAME"
