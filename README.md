@@ -17,15 +17,15 @@ Legacy image can be pulled with `docker pull zauberzeug/yolov5-trainer:latest`.
 During development, i.e. when building the container from code it is recommended to use the script `docker.sh` in the folder `training` to build/start/interact with the image.
 When using the script it is required to setup a .env file in the training folder that contains the loop-related configuration. The following variables should be set (note that some are inherited from the [Zauberzeug Learning Loop Node Library](https://github.com/zauberzeug/learning_loop_node) ):
 
-| Name                   | Purpose                                               | Value                       | Default | Requi. only with ./docker.sh |
-| ---------------------- | ----------------------------------------------------- | --------------------------- | ------ | ---------------------------- |
-| YOLOV5_MODE            | Mode of the trainer                                   | CLASSIFICATION or DETECTION | -      | No                           |
-| TRAINER_NAME           | Will be the name of the container                     | String                      | -      | Yes                          |
-| LINKLL                 | Link the node library into the container?             | TRUE/FALSE                  | FALSE  | Yes                          |
-| UVICORN_RELOAD         | Enable hot-reload                                     | TRUE/FALSE/0/1              | FALSE  | No                           |
-| RESTART_AFTER_TRAINING | Auto-restart after training                           | TRUE/FALSE/0/1              | FALSE  | No                           |
-| KEEP_OLD_TRAININGS     | Do not remove old trainings, when starting a new one | TRUE/FALSE/0/1              | FALSE  | No                           |
-| RESET_POINTS           | Reset the with/height of points after augmentation    | TRUE/FALSE/0/1              | TRUE   | No                           |
+| Name                   | Purpose                                              | Value                       | Default | Requi. only with ./docker.sh |
+| ---------------------- | ---------------------------------------------------- | --------------------------- | ------- | ---------------------------- |
+| YOLOV5_MODE            | Mode of the trainer                                  | CLASSIFICATION or DETECTION | -       | No                           |
+| TRAINER_NAME           | Will be the name of the container                    | String                      | -       | Yes                          |
+| LINKLL                 | Link the node library into the container?            | TRUE/FALSE                  | FALSE   | Yes                          |
+| UVICORN_RELOAD         | Enable hot-reload                                    | TRUE/FALSE/0/1              | FALSE   | No                           |
+| RESTART_AFTER_TRAINING | Auto-restart after training                          | TRUE/FALSE/0/1              | FALSE   | No                           |
+| KEEP_OLD_TRAININGS     | Do not remove old trainings, when starting a new one | TRUE/FALSE/0/1              | FALSE   | No                           |
+| RESET_POINTS           | Reset the with/height of points after augmentation   | TRUE/FALSE/0/1              | TRUE    | No                           |
 
 # Detector (Object detection)
 
@@ -47,11 +47,11 @@ Local builds can be run with `./docker.sh run`.
 If the container does not use the GPU, try `./docker.sh d`.
 Mandatory parameters are those described in [Zauberzeug Learning Loop Node Library](https://github.com/zauberzeug/learning_loop_node). Besides, the following parameters may bbe set
 
-| Name          | Purpose                                   | Value                     | Required only with ./docker.sh |
-| ------------- | ----------------------------------------- | ------------------------- | ------------------------------ |
-| LINKLL        | Link the node library into the container? | TRUE or FALSE             | Yes                            |
-| DETECTOR_NAME | Will be the name of the container         | String                    | Yes                            |
-| WEIGHT_TYPE   | Data type to convert weights to           | String [FP32, FP16, INT8] | Yes                            |
+| Name          | Purpose                                   | Value                     | Default | Required only with ./docker.sh |
+| ------------- | ----------------------------------------- | ------------------------- | ------- | ------------------------------ |
+| LINKLL        | Link the node library into the container? | TRUE or FALSE             | FALSE   | Yes                            |
+| DETECTOR_NAME | Will be the name of the container         | String                    | -       | Yes                            |
+| WEIGHT_TYPE   | Data type to convert weights to           | String [FP32, FP16, INT8] | FP16    | NO                             |
 
 ### L4T-Detector
 
