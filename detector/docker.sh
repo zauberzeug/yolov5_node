@@ -56,7 +56,7 @@ if [ "$LINKLL" == "TRUE" ]; then
     fi
 fi
 
-NODE_LIB_VERSION=0.10.1
+NODE_LIB_VERSION=0.10.3
 
 # Check if we are on a Jetson device
 build_args=""
@@ -69,16 +69,16 @@ then
     L4T_REVISION=$(echo $L4T_VERSION_STRING | cut -f 2 -d ',' | grep -Po '(?<=REVISION: )[^;]+')
     L4T_VERSION="$L4T_RELEASE.$L4T_REVISION"
     
-    if [ "$L4T_VERSION" == "32.6.2" ]; then
+    if [ "$L4T_VERSION" == "32.6.1" ]; then # -------------------------------- This is jetson nano (python 3.9)
         build_args+=" --build-arg BASE_IMAGE=zauberzeug/l4t-nn-inference-base:OCV4.6.0-L4T$L4T_VERSION-PY3.9"
-    else
+    else # ------------------------------------------------------------------- This is jetson orin (python 3.8??)
         build_args+=" --build-arg BASE_IMAGE=dustynv/opencv:r$L4T_VERSION"
     fi
 
     image="zauberzeug/yolov5-detector:nlv$NODE_LIB_VERSION-$L4T_VERSION"
     dockerfile="jetson.dockerfile"
-else
-    build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" # this is python 3.10
+else # ----------------------------------------------------------------------- This is cloud (linux) (python 3.10)
+    build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3"
     image="zauberzeug/yolov5-detector:nlv$NODE_LIB_VERSION-cloud"
     dockerfile="cloud.dockerfile"
 fi

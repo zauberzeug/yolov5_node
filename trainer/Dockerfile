@@ -27,7 +27,7 @@ RUN pip install --upgrade pip
 RUN pip install opencv-python==4.5.5.64
 RUN pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof
 RUN pip install --no-cache -r yolov5_node/trainer/requirements.txt
-RUN pip install "learning_loop_node==v0.10.1"
+RUN pip install "learning_loop_node==v0.10.3"
 
 # Install yolov5 requirements
 RUN pip install --no-cache -r /yolov5_node/trainer/app_code/yolov5/requirements.txt

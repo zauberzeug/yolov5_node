@@ -3,5 +3,7 @@ __pycache__/
 *.wts
 *.engine
 *.pt
+detecttor/.mypy_cache
+trainer/.mypy_cache
 trainer/runs
 trainer/app_code/yolov5/runs
