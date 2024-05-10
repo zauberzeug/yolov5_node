@@ -2,49 +2,6 @@
 
 # This script is used to build, run, stop, kill, attach, etc. the docker container for the trainer node.
 
-# nlv should only be used, to build the corresponding version and deploy to docker
-# make sure the remote repository always has the 'latest' tag (otherwise the CI tests will fail)
-image="zauberzeug/yolov5-trainer:nlv0.10.3"
-#image="zauberzeug/yolov5-trainer:latest"
-
-if [ $# -eq 0 ]
-then
-    echo "Usage:"
-    echo
-    echo "  `basename $0` (a | attach)  [<containers>]      Exec bash"
-    echo "  `basename $0` (b | build)   [<containers>]      Build or rebuild"
-    echo "  `basename $0` (bnc | build-no-cache) [<c>]      Build or rebuild without cache"
-    echo "  `basename $0` (d | debug)   [<containers>]      Start in debug mode"
-    echo "  `basename $0` (e | exec)    [<containers>]      Exec cmd"
-    echo "  `basename $0` (k | kill)    [<containers>]      Kill"
-    echo "  `basename $0` (l | log)     [<containers>]      Attach to log"
-    echo "  `basename $0` (p | push)    [<containers>]      Push image"
-    echo "  `basename $0` (r | run)     [<containers>]      Run"
-    echo "  `basename $0` (rm)          [<containers>]      Kill and remove"
-    echo "  `basename $0` (s | stop)    [<containers>]      Stop"
-    echo "  `basename $0` (u | up)      [<containers>]      Start detached"
-    echo "  `basename $0` ps            [<containers>]      List"
-    echo "  `basename $0` rm            [<containers>]      Remove"
-    echo "  `basename $0` stats                             Show statistics"
-    echo
-    echo "  `basename $0` (l | log)    <container>            Show log tail (last 100 lines)"
-    echo "  `basename $0` (e | exec)   <container> <command>  Execute command"
-    echo "  `basename $0` (a | attach) <container>            Attach to container with shell"
-    echo
-    echo "  `basename $0` prune      Remove all unused containers, networks and images"
-    echo "  `basename $0` stopall    Stop all running containers (system-wide!)"
-    echo "  `basename $0` killall    Kill all running containers (system-wide!)"
-    echo
-    echo "Arguments:"
-    echo
-    echo "  containers    One or more containers (omit to affect all containers)"
-    echo "  container     Excactly one container to be affected"
-    echo "  command       Command to be executed inside a container"
-    exit
-fi
-
-# sourcing .env file to get configuration (see README.md)
-. .env || echo "you should provide an .env file for the Learning Loop"
 # .env may contain (for details see readme.md):
 # USERNAME=<loop username>
 # PASSWORD=<loop password>
@@ -57,10 +14,58 @@ fi
 # KEEP_OLD_TRAININGS=<FALSE/TRUE/0/1> (default: FALSE)
 # RESET_POINTS=<FALSE/TRUE/0/1> (default: FALSE)
 
-echo "Starting docker container for trainer node $TRAINER_NAME with image $image"
-echo "  HOST=$HOST USERNAME=$USERNAME BATCH_SIZE=$BATCH_SIZE YOLOV5_MODE=$YOLOV5_MODE"
 
-run_args="-it --restart always" 
+if [ $# -eq 0 ]
+then
+    echo "Usage:"
+    echo
+    echo "  `basename $0` (b | build)            Build or rebuild"
+    echo "  `basename $0` (bnc | build-no-cache) Build or rebuild without cache"
+    echo "  `basename $0` (p | push)             Push image"
+    echo "  ------------------------------"
+    echo "  `basename $0` (d | debug)            Start in debug mode"
+    echo "  `basename $0` (r | run)              Run"
+    echo "  `basename $0` (u | up)               Start detached"
+    echo "  `basename $0` (s | stop)             Stop"
+    echo "  `basename $0` (k | kill)             Kill"
+    echo "  `basename $0` (rm)                   Kill and remove"
+    echo
+    echo "  `basename $0` (l | log)              Show log tail (last 100 lines)"
+    echo "  `basename $0` (e | exec) <command>   Execute command"
+    echo "  `basename $0` (a | attach)           Attach to container with shell"
+    echo
+    echo "Arguments:"
+    echo "  command       Command to be executed inside a container"
+    exit
+fi
+
+# ========================== BUILD CONFIGURATION / IMAGE SELECTION =======================
+
+# NODE_LIB_VERSION should only be used, to build the corresponding version and deploy to docker
+# make sure the remote repository always has the 'latest' tag (otherwise the CI tests will fail)
+
+NODE_LIB_VERSION=0.10.4
+image="zauberzeug/yolov5-trainer:nlv$NODE_LIB_VERSION-$L4T_VERSION"
+#image="zauberzeug/yolov5-trainer:latest"
+
+build_args=" --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION"
+
+# this is python 3.10 with pytorch 2.1.0 (https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel-23-07.html)
+# Requires Driver 530+
+build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" 
+
+# this is python 3.10 with pytorch 2.3.0
+# Requires Driver 545+
+# build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:24.02-py3" 
+# (cf. https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html#framework-matrix-2023)
+
+
+# ========================== RUN CONFIGURATION =========================================
+
+# sourcing .env file to get configuration (see README.md)
+. .env || echo "you should provide an .env file for the trainer"
+
+run_args="-it" 
 run_args+=" -v $(pwd)/../:/yolov5_node/"
 run_args+=" -v $HOME/trainer_nodes_data:/data"
 run_args+=" -h ${HOSTNAME}_DEV"
@@ -68,8 +73,7 @@ run_args+=" -e HOST=$HOST -e USERNAME=$USERNAME -e PASSWORD=$PASSWORD -e LOOP_SS
 run_args+=" -e BATCH_SIZE=$BATCH_SIZE -e UVICORN_RELOAD=$UVICORN_RELOAD -e RESET_POINTS=$RESET_POINTS -e KEEP_OLD_TRAININGS=$KEEP_OLD_TRAININGS"
 run_args+=" -e NODE_TYPE=trainer -e YOLOV5_MODE=$YOLOV5_MODE -e RESTART_AFTER_TRAINING=$RESTART_AFTER_TRAINING"
 run_args+=" --name $TRAINER_NAME"
-run_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all"
-run_args+=" --gpus all"
+run_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all --gpus all"
 run_args+=" --ipc host"
 run_args+=" -p 7443:80"
 
@@ -80,14 +84,7 @@ if [ "$LINKLL" == "TRUE" ]; then
     echo "Linked Learning Loop from $SCRIPT_DIR/../../learning_loop_node"
 fi
 
-# this is python 3.10 with pytorch 2.1.0 (https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel-23-07.html)
-# Requires Driver 530+
-build_args=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" 
-
-# this is python 3.10 with pytorch 2.3.0
-# Requires Driver 545+
-# build_args=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:24.02-py3" 
-# (cf. https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html#framework-matrix-2023)
+# ========================== COMMAND EXECUTION =========================================
 
 cmd=$1
 cmd_args=${@:2}
@@ -105,13 +102,13 @@ case $cmd in
         docker push $image
         ;;
     r | run)
-        docker run -it $run_args $image $cmd_args # WARNING: in this mode the GPU may not be available
+        docker run -it $run_args $image $cmd_args
+        ;;
+    u | up)
+        docker run -d  --restart always $run_args $image $cmd_args
         ;;
     s | stop)
         docker stop $TRAINER_NAME $cmd_args
-        ;;
-    u | up)
-        docker run -d $run_args $image $cmd_args
         ;;
     k | kill)
         docker kill $TRAINER_NAME $cmd_args

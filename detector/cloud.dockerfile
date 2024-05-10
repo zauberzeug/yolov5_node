@@ -20,18 +20,18 @@ RUN pip3 install --no-cache-dir wheel
 RUN pip3 install --no-cache-dir pycuda==2022.2.2
 RUN pip3 install --no-cache-dir "uvicorn" 
 RUN pip3 install --no-cache-dir async_generator aiofiles psutil pillow multidict attrs yarl async_timeout idna_ssl cchardet aiosignal
-RUN pip3 install --no-cache-dir gdown==4.6.3
 
 # Download the coco model. 
-WORKDIR /data/models
-RUN gdown --fuzzy https://drive.google.com/file/d/1KGZe7OUX9QWZm-dnkssSV9lSXxCn7nD_/view?usp=sharing  -O coco.zip && unzip coco.zip && rm coco.zip
-WORKDIR /data/
-RUN ln -s models/coco model
+# RUN pip3 install --no-cache-dir gdown==4.6.3
+# WORKDIR /data/models
+# RUN gdown --fuzzy https://drive.google.com/file/d/1KGZe7OUX9QWZm-dnkssSV9lSXxCn7nD_/view?usp=sharing  -O coco.zip && unzip coco.zip && rm coco.zip
+# WORKDIR /data/
+# RUN ln -s models/coco model
 
 # Install TensorRT and use it as working directory
 WORKDIR /
 RUN git clone https://github.com/wang-xinyu/tensorrtx.git
-WORKDIR /tensorrtx/yolov5/src
+WORKDIR /tensorrtx
 RUN git checkout c997e35710ff0230ae6361d9ba3b9ae82ed3a7d8
 
 # Edit calibrator.cpp to make it compile (comment out some lines)
@@ -54,6 +54,5 @@ WORKDIR /app
 
 EXPOSE 80
 
-ENV HOST=learning-loop.ai
 ENV TZ=Europe/Amsterdam
 CMD /app/start.sh
