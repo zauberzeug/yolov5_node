@@ -61,13 +61,13 @@ fi
 . .env || echo "you should provide an .env file to configure the detector"
 
 run_args="-it" 
+# run_args+=" -v $(pwd)/../:/yolov5_node"
 run_args+=" -v $HOME/node_data/$DETECTOR_NAME:/data"
 run_args+=" -h ${HOSTNAME}_DEV"
 run_args+=" -e HOST=$LOOP_HOST -e ORGANIZATION=$LOOP_ORGANIZATION -e PROJECT=$LOOP_PROJECT"
 run_args+=" --name $DETECTOR_NAME"
 run_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all"
 run_args+=" -p 8004:80"
-# run_args+=" -v $(pwd)/../:/yolov5_node"
 
 # Link Learning Loop Node library if requested
 if [ "$LINKLL" == "TRUE" ]; then
@@ -95,15 +95,16 @@ case $cmd in
         ;;
     U | update)
 	    docker pull ${image}
-	;;
+	    ;;
     p | push)
         docker push $image
         ;;
     r | run)
         docker run $run_args $image $cmd_args
-	;;
+	    ;;
     u | up)
         docker run -d --restart always $run_args $image $cmd_args
+	    ;;
     s | stop)
         docker stop $DETECTOR_NAME $cmd_args
         ;;
