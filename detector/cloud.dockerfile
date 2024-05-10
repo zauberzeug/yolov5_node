@@ -57,11 +57,3 @@ EXPOSE 80
 ENV HOST=learning-loop.ai
 ENV TZ=Europe/Amsterdam
 CMD /app/start.sh
-
-FROM release
-
-RUN python3 -m pip install --no-cache-dir retry debugpy pytest-asyncio icecream pytest autopep8
-
-ENV PYTHONFAULTHANDLER=1
-
-RUN apt-get update && apt-get install gnupg2 -y
