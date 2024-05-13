@@ -31,10 +31,11 @@ RUN pip3 install --no-cache-dir async_generator aiofiles psutil pillow multidict
 # Install TensorRT and use it as working directory
 WORKDIR /
 RUN git clone https://github.com/wang-xinyu/tensorrtx.git
-WORKDIR /tensorrtx/yolov5/src
+WORKDIR /tensorrtx
 RUN git checkout c997e35710ff0230ae6361d9ba3b9ae82ed3a7d8
 
 # Edit calibrator.cpp to make it compile (comment out some lines)
+WORKDIR /tensorrtx/yolov5/src
 RUN sed -i 's|^#include <opencv2/dnn/dnn.hpp>|\/\/&|' calibrator.cpp
 RUN sed -i '72s/^/\/\//' calibrator.cpp
 RUN sed -i '74s/^/\/\//' calibrator.cpp

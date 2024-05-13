@@ -38,7 +38,13 @@ RUN pip3 install --no-cache-dir --ignore-installed pyyaml numpy==1.22.4
 WORKDIR /
 RUN git clone https://github.com/wang-xinyu/tensorrtx.git
 WORKDIR /tensorrtx
-RUN git checkout 9243edf59e527bb25e5b966c2d1ae4d1b0c78d5f
+RUN git checkout c997e35710ff0230ae6361d9ba3b9ae82ed3a7d8
+
+# Edit calibrator.cpp to make it compile (comment out some lines)
+WORKDIR /tensorrtx/yolov5/src
+RUN sed -i 's|^#include <opencv2/dnn/dnn.hpp>|\/\/&|' calibrator.cpp
+RUN sed -i '72s/^/\/\//' calibrator.cpp
+RUN sed -i '74s/^/\/\//' calibrator.cpp
 
 WORKDIR /tensorrtx/yolov5/build
 RUN cmake .. && make -j6
