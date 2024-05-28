@@ -43,8 +43,14 @@ then
     
     if [ "$L4T_VERSION" == "32.6.1" ]; then # -------------------------------- This is jetson nano (python 3.9)
         build_args+=" --build-arg BASE_IMAGE=zauberzeug/l4t-nn-inference-base:OCV4.6.0-L4T$L4T_VERSION-PY3.9"
-    else # ------------------------------------------------------------------- This is jetson orin (python 3.8??)
+    elif [ "$L4T_RELEASE" == "35" ]; then # ------------------------------------------------------------------- This is jetson orin (python 3.8??)
+        # available versions of the dusty images: 32.7.1, 35.2.1, 35.3.1, 35.4.1
+        # L4T R35.x containers can run on other versions of L4T R35.x (JetPack 5.1+)
+        L4T_VERSION="35.4.1"
         build_args+=" --build-arg BASE_IMAGE=dustynv/opencv:r$L4T_VERSION"
+    else
+        echo "Unsupported L4T version: $L4T_VERSION"
+        exit 1
     fi
 
     image="zauberzeug/yolov5-detector:nlv$NODE_LIB_VERSION-$L4T_VERSION"
