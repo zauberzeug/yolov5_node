@@ -1,5 +1,7 @@
 {
   "files.watcherExclude": {
+    "**/.mypy_cache/**": true,
+    "**/.pytest_cache/**": true,
     "**/.git/objects/**": true,
     "**/.git/subtree-cache/**": true
   },
