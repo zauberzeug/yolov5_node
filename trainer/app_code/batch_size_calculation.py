@@ -5,6 +5,7 @@ import os
 import torch
 import yaml  # type: ignore
 from learning_loop_node.helpers.misc import get_free_memory_mb
+from learning_loop_node.trainer.exceptions import CriticalError
 from torch.multiprocessing import Process, Queue, set_start_method
 from torchinfo import Verbosity, summary
 
@@ -12,7 +13,8 @@ from .yolov5.models.yolo import Model
 from .yolov5.utils.downloads import attempt_download
 
 
-async def calc(training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int, init_clear_cuda: bool = True) -> int:
+async def calc(training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int,
+               init_clear_cuda: bool = True) -> int:
 
     os.chdir('/tmp')
 
@@ -63,7 +65,7 @@ async def calc(training_path: str, model_file: str, hyp_path: str, dataset_path:
 
     if not best_batch_size:
         logging.error('Did not find best matching batch size')
-        raise Exception('Did not find best matching batch size')
+        raise CriticalError('Did not find best matching batch size')
     return best_batch_size
 
 
