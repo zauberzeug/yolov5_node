@@ -45,7 +45,7 @@ then
     if [ "$L4T_VERSION" == "32.6.1" ]; then
         # do nothing
         echo "Using exact L4T version 32.6.1"
-    if [ "$L4T_RELEASE" == "35" ]; then 
+    elif [ "$L4T_RELEASE" == "35" ]; then 
         # available versions of the dusty images: 32.7.1, 35.2.1, 35.3.1, 35.4.1
         # L4T R35.x containers can run on other versions of L4T R35.x (JetPack 5.1+)
         L4T_VERSION="35.4.1"
