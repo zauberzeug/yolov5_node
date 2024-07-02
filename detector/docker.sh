@@ -28,6 +28,7 @@ fi
 
 # ========================== BUILD CONFIGURATION / IMAGE SELECTION =======================
 
+SEMANTIC_VERSION=0.1.0
 NODE_LIB_VERSION=0.10.8
 build_args=" --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION"
 
@@ -56,12 +57,12 @@ then
 
     build_args+=" --build-arg BASE_IMAGE=zauberzeug/l4t-nn-inference-base:OCV4.6.0-L4T$L4T_VERSION-PY3.9"
 
-    image="zauberzeug/yolov5-detector:nlv$NODE_LIB_VERSION-$L4T_VERSION"
+    image="zauberzeug/yolov5-detector:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION-$L4T_VERSION"
 else # ----------------------------------------------------------------------- This is cloud (linux) (python 3.10)
     dockerfile="cloud.dockerfile"
 
     build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3"
-    image="zauberzeug/yolov5-detector:nlv$NODE_LIB_VERSION-cloud"
+    image="zauberzeug/yolov5-detector:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION-cloud"
 fi
 
 # ========================== RUN CONFIGURATION =========================================
