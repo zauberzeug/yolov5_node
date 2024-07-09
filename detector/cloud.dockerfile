@@ -1,5 +1,5 @@
 ARG BASE_IMAGE
-FROM ${BASE_IMAGE} as release
+FROM ${BASE_IMAGE} AS release
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
@@ -42,7 +42,7 @@ RUN sed -i '74s/^/\/\//' calibrator.cpp
 
 WORKDIR /tensorrtx/yolov5/build
 RUN cmake .. && make -j6
-ENV PYTHONPATH=$PYTHONPATH:/tensorrtx/yolov5/
+ENV PYTHONPATH="${PYTHONPATH:-}:/tensorrtx/yolov5/"
 
 # LL_NODE-Library can be overwritten by local version if environment variable LINKLL is set to TRUE
 ARG NODE_LIB_VERSION
@@ -56,4 +56,4 @@ WORKDIR /app
 EXPOSE 80
 
 ENV TZ=Europe/Amsterdam
-CMD /app/start.sh
+CMD ["/app/start.sh"]
