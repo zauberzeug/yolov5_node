@@ -44,8 +44,8 @@ fi
 # NODE_LIB_VERSION should only be used, to build the corresponding version and deploy to docker
 # make sure the remote repository always has the 'latest' tag (otherwise the CI tests will fail)
 
-SEMANTIC_VERSION=0.1.0
-NODE_LIB_VERSION=0.10.8
+SEMANTIC_VERSION=0.1.1
+NODE_LIB_VERSION=0.10.9
 
 image="zauberzeug/yolov5-trainer:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION"
 #image="zauberzeug/yolov5-trainer:latest"
