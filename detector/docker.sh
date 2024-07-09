@@ -28,8 +28,8 @@ fi
 
 # ========================== BUILD CONFIGURATION / IMAGE SELECTION =======================
 
-SEMANTIC_VERSION=0.1.0
-NODE_LIB_VERSION=0.10.8
+SEMANTIC_VERSION=0.1.1
+NODE_LIB_VERSION=0.10.9
 build_args=" --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION"
 
 if [ -f /etc/nv_tegra_release ] # Check if we are on a Jetson device
