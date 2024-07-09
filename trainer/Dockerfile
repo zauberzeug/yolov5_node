@@ -1,5 +1,5 @@
 ARG BASE_IMAGE
-FROM $BASE_IMAGE as release
+FROM $BASE_IMAGE AS release
 
 ENV DEBIAN_FRONTEND=noninteractive
 ARG MAKEFLAGS=-j$(nproc)
@@ -43,9 +43,7 @@ WORKDIR /app
 
 EXPOSE 80
 
-#ENV PYTHONPATH="$PYTHONPATH:/yolov5"
-ENV PYTHONPATH="$PYTHONPATH:/"
-# TODO CHECK
-#ENV PYTHONPATH="$PYTHONPATH:/opt/conda/lib/python3.10/site-packages" 
+ENV PYTHONPATH="${PYTHONPATH:-}:/"
+
 ENV TZ=Europe/Amsterdam
-CMD /app/start.sh
+CMD ["/app/start.sh"]
