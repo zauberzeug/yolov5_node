@@ -22,7 +22,7 @@ RUN apt-get update && \
 
 RUN pip3 install --upgrade pip
 RUN pip3 install --no-cache-dir wheel
-RUN pip3 install --no-cache-dir pycuda
+RUN pip3 install --no-cache-dir pycuda==2024.1
 RUN pip3 install --no-cache-dir "uvicorn"
 RUN pip3 install --no-cache-dir async_generator aiofiles psutil pillow multidict attrs yarl async_timeout idna_ssl cchardet aiosignal
 RUN pip3 install --no-cache-dir --ignore-installed pyyaml numpy==1.22.4
