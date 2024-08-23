@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import cv2
+import torch
 import yaml  # type: ignore
 from fastapi.encoders import jsonable_encoder
 from learning_loop_node.data_classes import (BoxDetection, CategoryType,
@@ -213,8 +214,16 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         else:
             p_ids, p_sizes = yolov5_format.get_ids_and_sizes_of_point_classes(self.training)
             self._try_replace_optimized_hyperparameter()
-            batch_size = await batch_size_calculation.calc(self.training.training_folder, model, hyperparameter_path,
-                                                           f'{self.training.training_folder}/dataset.yaml', resolution)
+            try:
+                if torch.cuda.is_available():
+                    batch_size = await batch_size_calculation.calc(self.training.training_folder, model, hyperparameter_path,
+                                                                   f'{self.training.training_folder}/dataset.yaml', resolution)
+                else:
+                    batch_size = await batch_size_calculation.calc_cpu(self.training.training_folder, model, hyperparameter_path,
+                                                                       f'{self.training.training_folder}/dataset.yaml', resolution)
+            except Exception as e:
+                logging.error(f'Error during batch size calculation: {e}')
+                batch_size = 16
             cmd = f'python /app/train_det.py --exist-ok --patience {self.patience} \
                 --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} \
                 --project {self.training.training_folder} --name result --hyp {hyperparameter_path} \

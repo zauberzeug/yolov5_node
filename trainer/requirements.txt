@@ -8,8 +8,8 @@ python-engineio==4.8.0
 python-multipart==0.0.6
 python-socketio==5.10.0
 
-torch==2.1.2
-torchvision==0.16.2
+# torch==2.1.2
+# torchvision==0.16.2
 numpy==1.26.3
 Pillow==10.2.0
 

@@ -42,19 +42,27 @@ fi
 # ========================== BUILD CONFIGURATION / IMAGE SELECTION =======================
 
 # NODE_LIB_VERSION should only be used, to build the corresponding version and deploy to docker
-# make sure the remote repository always has the 'latest' tag (otherwise the CI tests will fail)
 
 SEMANTIC_VERSION=0.1.1
 NODE_LIB_VERSION=0.10.9
 
-image="zauberzeug/yolov5-trainer:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION"
-#image="zauberzeug/yolov5-trainer:latest"
-
 build_args=" --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION"
 
-# this is python 3.10 with pytorch 2.1.0 (https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel-23-07.html)
-# Requires Driver 530+
-build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" 
+if [ $# -eq 2 ] && [ $2 == "cpu" ]; then
+    echo "CPU build/run requested"
+    build_args+=" --build-arg BASE_IMAGE=python:3.10"
+    build_args+=" --build-arg CUDA=cpu"
+    image="zauberzeug/yolov5-trainer:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION-cpu"
+else
+    # this is python 3.10 with pytorch 2.1.0 (https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel-23-07.html)
+    # Requires Driver 530+
+    build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" 
+    build_args+=" --build-arg CUDA=cuda"
+    image="zauberzeug/yolov5-trainer:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION"
+fi
+
+# !!! make sure the remote repository always has the 'latest' tag (otherwise the CI tests will fail) !!!
+# image="zauberzeug/yolov5-trainer:latest"
 
 # this is python 3.10 with pytorch 2.3.0
 # Requires Driver 545+
@@ -75,9 +83,13 @@ run_args+=" -e HOST=$HOST -e USERNAME=$USERNAME -e PASSWORD=$PASSWORD -e LOOP_SS
 run_args+=" -e BATCH_SIZE=$BATCH_SIZE -e UVICORN_RELOAD=$UVICORN_RELOAD -e RESET_POINTS=$RESET_POINTS -e KEEP_OLD_TRAININGS=$KEEP_OLD_TRAININGS"
 run_args+=" -e NODE_TYPE=trainer -e YOLOV5_MODE=$YOLOV5_MODE -e RESTART_AFTER_TRAINING=$RESTART_AFTER_TRAINING"
 run_args+=" --name $TRAINER_NAME"
-run_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all --gpus all"
+
 run_args+=" --ipc host"
 run_args+=" -p 7443:80"
+
+if [ $# -eq 1 ] || [ $2 != "cpu" ]; then
+    run_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all --gpus all"
+fi
 
 # Link Learning Loop Node library if requested
 if [ "$LINKLL" == "TRUE" ]; then
@@ -89,13 +101,12 @@ fi
 # ========================== COMMAND EXECUTION =========================================
 
 cmd=$1
-cmd_args=${@:2}
 case $cmd in
     b | build)
-        docker build . -t $image $build_args $cmd_args
+        docker build . -t $image $build_args --progress plain
         ;;
     bnc | build-no-cache)
-        docker build --no-cache . -t $image $build_args $cmd_args
+        docker build --no-cache . -t $image $build_args 
         ;;
     d | debug)
         docker run $run_args $image /app/start.sh debug
@@ -104,29 +115,29 @@ case $cmd in
         docker push $image
         ;;
     r | run)
-        docker run -it $run_args $image $cmd_args
+        docker run -it $run_args $image
         ;;
     u | up)
-        docker run -d  --restart always $run_args $image $cmd_args
+        docker run -d  --restart always $run_args $image
         ;;
     s | stop)
-        docker stop $TRAINER_NAME $cmd_args
+        docker stop $TRAINER_NAME
         ;;
     k | kill)
-        docker kill $TRAINER_NAME $cmd_args
+        docker kill $TRAINER_NAME
         ;;
     rm)
         docker kill $TRAINER_NAME
-        docker rm $TRAINER_NAME $cmd_args
+        docker rm $TRAINER_NAME
         ;;
     l | log | logs)
-        docker logs -f -n 100 $cmd_args $TRAINER_NAME
+        docker logs -f -n 100 $TRAINER_NAME
         ;;
     e | exec)
-        docker exec $TRAINER_NAME $cmd_args 
+        docker exec $TRAINER_NAME 
         ;;
     a | attach)
-        docker exec -it $cmd_args $TRAINER_NAME /bin/bash
+        docker exec -it $TRAINER_NAME /bin/bash
         ;;
     *)
         echo "Unsupported command \"$cmd\""

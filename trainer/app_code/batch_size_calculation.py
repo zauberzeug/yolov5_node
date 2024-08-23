@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 
+import psutil
 import torch
 import yaml  # type: ignore
 from learning_loop_node.helpers.misc import get_free_memory_mb
@@ -62,6 +63,56 @@ async def calc(training_path: str, model_file: str, hyp_path: str, dataset_path:
 
     if init_clear_cuda:
         torch.cuda.empty_cache()
+
+    if not best_batch_size:
+        logging.error('Did not find best matching batch size')
+        raise CriticalError('Did not find best matching batch size')
+    return best_batch_size
+
+
+async def calc_cpu(training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int) -> int:
+    """Calculate best batch size on CPU"""
+
+    os.chdir('/tmp')
+
+    with open(hyp_path) as f:
+        hyp = yaml.safe_load(f)
+    with open(dataset_path) as f:
+        dataset = yaml.safe_load(f)
+
+    attempt_download(model_file)  # Download pretrained yolov5 model from ultralytics to .pt
+
+    def get_free_ram_mb():
+        return psutil.virtual_memory().available / 1024 / 1024
+
+    try:
+        ckpt = torch.load(model_file)
+    except FileNotFoundError:
+        ckpt = torch.load(f'{training_path}/{model_file}')
+
+    free_mem_mb = get_free_ram_mb()
+    fraction = 0.8
+    free_mem_mb *= fraction
+
+    model = Model(ckpt['model'].yaml, ch=3, nc=dataset.get('nc'), anchors=hyp.get('anchors'))  # create
+
+    best_batch_size = None
+    for batch_size in [128, 96, 64, 48, 32, 24, 16, 12, 8, 6, 4, 2, 1]:
+        try:
+            stats = summary(model, input_size=(batch_size, 3, img_size, img_size), verbose=Verbosity.QUIET)
+        except RuntimeError as e:
+            logging.error(f'Got RuntimeError for batch_size {batch_size} and image_size {img_size}: {str(e)}')
+            continue
+
+        estimated_model_size_mb = float(str(stats).split('Estimated Total Size (MB): ')[1].split('\n')[0])
+        logging.info(f'Model size for batch size {batch_size} and image size {img_size}: {estimated_model_size_mb} mb')
+
+        if estimated_model_size_mb < free_mem_mb:
+            logging.info(f'batch size {batch_size} and image size {img_size} fits to {free_mem_mb} mb')
+            best_batch_size = batch_size
+            break
+
+    del model, ckpt
 
     if not best_batch_size:
         logging.error('Did not find best matching batch size')

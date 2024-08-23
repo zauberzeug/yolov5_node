@@ -641,9 +641,11 @@ def run(**kwargs):
 
 if __name__ == "__main__":
     print('START: YOLOv5 - train det', flush=True)
-    torch.cuda.init()
-    torch.cuda.empty_cache()
+    if torch.cuda.is_available():
+        torch.cuda.init()
+        torch.cuda.empty_cache()
     opt = parse_opt()
     main(opt)
-    torch.cuda.empty_cache()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     print('END: YOLOv5 - train det', flush=True)

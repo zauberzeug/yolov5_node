@@ -182,8 +182,11 @@ def main(opt):
 
 
 if __name__ == "__main__":
-    torch.cuda.init()
-    torch.cuda.empty_cache()
+
+    if torch.cuda.is_available():
+        torch.cuda.init()
+        torch.cuda.empty_cache()
     opt = parse_opt()
     main(opt)
-    torch.cuda.empty_cache()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
