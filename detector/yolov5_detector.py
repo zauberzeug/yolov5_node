@@ -22,6 +22,8 @@ class Yolov5Detector(DetectorLogic):
         self.yolov5: Optional[yolov5.YoLov5TRT] = None
         self.weight_type = os.getenv('WEIGHT_TYPE', 'FP16')
         assert self.weight_type in ['FP16', 'FP32', 'INT8'], 'WEIGHT_TYPE must be one of FP16, FP32, INT8'
+        self.log = logging.getLogger('Yolov5Detector')
+        self.log.setLevel(logging.INFO)
 
     def init(self) -> None:
         resolution = self.model_info.resolution
@@ -70,7 +72,7 @@ class Yolov5Detector(DetectorLogic):
             im_height, im_width, _ = cv_image.shape
             results, inference_ms = self.yolov5.infer(cv_image)
             skipped_detections = []
-            logging.debug('took %f s, overall %f s', inference_ms, time.time() - t)
+            self.log.debug('took %f s, overall %f s', inference_ms, time.time() - t)
             for detection in results:
                 x, y, w, h, category_idx, probability = detection
                 category = self.model_info.categories[category_idx]
