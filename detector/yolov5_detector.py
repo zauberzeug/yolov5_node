@@ -140,7 +140,7 @@ class Yolov5Detector(DetectorLogic):
 
         subprocess.run('make -j6 -Wno-deprecated-declarations',
                        shell=True, check=True)
-        self.logself.log.warning('currently we assume a Yolov5 s6 model;\
+        self.log.warning('currently we assume a Yolov5 s6 model;\
             parameterization of the variant (s, s6, m, m6, ...) still needs to be done')
         # TODO parameterize variant "s6"
         subprocess.run(
