@@ -105,7 +105,7 @@ class Yolov5Detector(DetectorLogic):
                 logging.warning(
                     f'Removed {len(skipped_detections)} small detections from result: \n{log_msg}')
         except Exception:
-            logging.exception('inference failed')
+            self.log.exception('inference failed')
         return detections
 
     def _create_engine(self, resolution: int, cat_count: int, wts_file: str) -> str:
@@ -122,13 +122,13 @@ class Yolov5Detector(DetectorLogic):
         with open('../src/config.h', 'r+') as f:
             content = f.read()
             if self.weight_type == 'INT8':
-                logging.info('using INT8')
+                self.log.info('using INT8')
                 content = content.replace('#define USE_FP16', '#define USE_INT8')
             elif self.weight_type == 'FP32':
-                logging.info('using FP32')
+                self.log.info('using FP32')
                 content = content.replace('#define USE_FP16', '#define USE_FP32')
             else:
-                logging.info('using FP16')
+                self.log.info('using FP16')
 
             content = re.sub('(kNumClass =) \d*', r'\1 ' +
                              str(cat_count), content)
@@ -140,7 +140,7 @@ class Yolov5Detector(DetectorLogic):
 
         subprocess.run('make -j6 -Wno-deprecated-declarations',
                        shell=True, check=True)
-        logging.warning('currently we assume a Yolov5 s6 model;\
+        self.logself.log.warning('currently we assume a Yolov5 s6 model;\
             parameterization of the variant (s, s6, m, m6, ...) still needs to be done')
         # TODO parameterize variant "s6"
         subprocess.run(
