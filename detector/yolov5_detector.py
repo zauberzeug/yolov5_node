@@ -4,7 +4,7 @@ import os
 import re
 import subprocess
 import time
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 import cv2
 import numpy as np
@@ -61,7 +61,7 @@ class Yolov5Detector(DetectorLogic):
         y = min(max(0, y), img_height)
         return x, y
 
-    def evaluate(self, image: List[np.uint8]) -> Detections:
+    def evaluate(self, image: np.ndarray) -> Detections:
         assert self.yolov5 is not None, 'init() must be executed first. Maybe loading the engine failed?!'
         detections = Detections()
         try:
@@ -70,7 +70,7 @@ class Yolov5Detector(DetectorLogic):
             im_height, im_width, _ = cv_image.shape
             results, inference_ms = self.yolov5.infer(cv_image)
             skipped_detections = []
-            logging.info(f'took {inference_ms} s, overall {time.time() -t} s')
+            logging.debug('took %f s, overall %f s', inference_ms, time.time() - t)
             for detection in results:
                 x, y, w, h, category_idx, probability = detection
                 category = self.model_info.categories[category_idx]
@@ -80,14 +80,24 @@ class Yolov5Detector(DetectorLogic):
                 if category.type == CategoryType.Box:
                     x, y, w, h = self.clip_box(x, y, w, h, im_width, im_height)
                     detections.box_detections.append(
-                        BoxDetection(category_name=category.name, x=x, y=y, width=w, height=h, category_id=category.id,
-                                     model_name=self.model_info.version, confidence=probability))
+                        BoxDetection(category_name=category.name,
+                                     x=round(x),
+                                     y=round(y),
+                                     width=round(w),
+                                     height=round(h),
+                                     category_id=category.id,
+                                     model_name=self.model_info.version,
+                                     confidence=probability))
                 elif category.type == CategoryType.Point:
-                    cx, cy = (np.average([x, x + w]), np.average([y, y + h]))
+                    cx, cy = x + w/2, y + h/2
                     cx, cy = self.clip_point(cx, cy, im_width, im_height)
                     detections.point_detections.append(
-                        PointDetection(category_name=category.name, x=int(cx), y=int(cy), category_id=category.id,
-                                       model_name=self.model_info.version, confidence=probability))
+                        PointDetection(category_name=category.name,
+                                       x=cx,
+                                       y=cy,
+                                       category_id=category.id,
+                                       model_name=self.model_info.version,
+                                       confidence=probability))
             if skipped_detections:
                 log_msg = '\n'.join([str(d) for d in skipped_detections])
                 logging.warning(
