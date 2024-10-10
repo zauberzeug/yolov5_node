@@ -85,8 +85,8 @@ class Yolov5Detector(DetectorLogic):
                         BoxDetection(category_name=category.name,
                                      x=round(x),
                                      y=round(y),
-                                     width=round(w),
-                                     height=round(h),
+                                     width=round(x+w)-round(x),
+                                     height=round(y+h)-round(y),
                                      category_id=category.id,
                                      model_name=self.model_info.version,
                                      confidence=probability))
