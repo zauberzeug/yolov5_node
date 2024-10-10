@@ -28,8 +28,8 @@ fi
 
 # ========================== BUILD CONFIGURATION / IMAGE SELECTION =======================
 
-SEMANTIC_VERSION=0.1.3
-NODE_LIB_VERSION=0.10.12
+SEMANTIC_VERSION=0.1.4
+NODE_LIB_VERSION=0.10.13
 build_args=" --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION"
 
 if [ -f /etc/nv_tegra_release ] # Check if we are on a Jetson device
@@ -75,6 +75,7 @@ run_args="-it"
 run_args+=" -v $HOME/node_data/$DETECTOR_NAME:/data"
 run_args+=" -h ${HOSTNAME}_DEV"
 run_args+=" -e HOST=$LOOP_HOST -e ORGANIZATION=$LOOP_ORGANIZATION -e PROJECT=$LOOP_PROJECT"
+run_args+=" -e USE_BACKDOOR_CONTROLS=$USE_BACKDOOR_CONTROLS"
 run_args+=" --name $DETECTOR_NAME"
 run_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all"
 run_args+=" -p 8004:80"

@@ -4,7 +4,7 @@ import os
 import re
 import subprocess
 import time
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 import cv2
 import numpy as np
@@ -22,6 +22,8 @@ class Yolov5Detector(DetectorLogic):
         self.yolov5: Optional[yolov5.YoLov5TRT] = None
         self.weight_type = os.getenv('WEIGHT_TYPE', 'FP16')
         assert self.weight_type in ['FP16', 'FP32', 'INT8'], 'WEIGHT_TYPE must be one of FP16, FP32, INT8'
+        self.log = logging.getLogger('Yolov5Detector')
+        self.log.setLevel(logging.INFO)
 
     def init(self) -> None:
         resolution = self.model_info.resolution
@@ -61,7 +63,7 @@ class Yolov5Detector(DetectorLogic):
         y = min(max(0, y), img_height)
         return x, y
 
-    def evaluate(self, image: List[np.uint8]) -> Detections:
+    def evaluate(self, image: np.ndarray) -> Detections:
         assert self.yolov5 is not None, 'init() must be executed first. Maybe loading the engine failed?!'
         detections = Detections()
         try:
@@ -70,7 +72,7 @@ class Yolov5Detector(DetectorLogic):
             im_height, im_width, _ = cv_image.shape
             results, inference_ms = self.yolov5.infer(cv_image)
             skipped_detections = []
-            logging.info(f'took {inference_ms} s, overall {time.time() -t} s')
+            self.log.debug('took %f s, overall %f s', inference_ms, time.time() - t)
             for detection in results:
                 x, y, w, h, category_idx, probability = detection
                 category = self.model_info.categories[category_idx]
@@ -80,20 +82,30 @@ class Yolov5Detector(DetectorLogic):
                 if category.type == CategoryType.Box:
                     x, y, w, h = self.clip_box(x, y, w, h, im_width, im_height)
                     detections.box_detections.append(
-                        BoxDetection(category_name=category.name, x=x, y=y, width=w, height=h, category_id=category.id,
-                                     model_name=self.model_info.version, confidence=probability))
+                        BoxDetection(category_name=category.name,
+                                     x=round(x),
+                                     y=round(y),
+                                     width=round(x+w)-round(x),
+                                     height=round(y+h)-round(y),
+                                     category_id=category.id,
+                                     model_name=self.model_info.version,
+                                     confidence=probability))
                 elif category.type == CategoryType.Point:
-                    cx, cy = (np.average([x, x + w]), np.average([y, y + h]))
+                    cx, cy = x + w/2, y + h/2
                     cx, cy = self.clip_point(cx, cy, im_width, im_height)
                     detections.point_detections.append(
-                        PointDetection(category_name=category.name, x=int(cx), y=int(cy), category_id=category.id,
-                                       model_name=self.model_info.version, confidence=probability))
+                        PointDetection(category_name=category.name,
+                                       x=cx,
+                                       y=cy,
+                                       category_id=category.id,
+                                       model_name=self.model_info.version,
+                                       confidence=probability))
             if skipped_detections:
                 log_msg = '\n'.join([str(d) for d in skipped_detections])
                 logging.warning(
                     f'Removed {len(skipped_detections)} small detections from result: \n{log_msg}')
         except Exception:
-            logging.exception('inference failed')
+            self.log.exception('inference failed')
         return detections
 
     def _create_engine(self, resolution: int, cat_count: int, wts_file: str) -> str:
@@ -110,13 +122,13 @@ class Yolov5Detector(DetectorLogic):
         with open('../src/config.h', 'r+') as f:
             content = f.read()
             if self.weight_type == 'INT8':
-                logging.info('using INT8')
+                self.log.info('using INT8')
                 content = content.replace('#define USE_FP16', '#define USE_INT8')
             elif self.weight_type == 'FP32':
-                logging.info('using FP32')
+                self.log.info('using FP32')
                 content = content.replace('#define USE_FP16', '#define USE_FP32')
             else:
-                logging.info('using FP16')
+                self.log.info('using FP16')
 
             content = re.sub('(kNumClass =) \d*', r'\1 ' +
                              str(cat_count), content)
@@ -128,7 +140,7 @@ class Yolov5Detector(DetectorLogic):
 
         subprocess.run('make -j6 -Wno-deprecated-declarations',
                        shell=True, check=True)
-        logging.warning('currently we assume a Yolov5 s6 model;\
+        self.log.warning('currently we assume a Yolov5 s6 model;\
             parameterization of the variant (s, s6, m, m6, ...) still needs to be done')
         # TODO parameterize variant "s6"
         subprocess.run(
