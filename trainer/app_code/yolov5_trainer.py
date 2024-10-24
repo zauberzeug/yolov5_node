@@ -17,6 +17,7 @@ from learning_loop_node.data_classes import (BoxDetection, CategoryType,
                                              PointDetection, PretrainedModel,
                                              TrainingStateData)
 from learning_loop_node.trainer import trainer_logic
+from learning_loop_node.trainer.exceptions import NodeNeedsRestartError
 from learning_loop_node.trainer.executor import Executor
 
 from . import batch_size_calculation, model_files, yolov5_format
@@ -156,7 +157,11 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
         await executor.start(cmd)
         if await executor.wait() != 0:
-            logging.error(f'Error during detecting: \n {executor.get_log()}')
+            executor_log = executor.get_log()
+            logging.error(f'Error during detecting: \n {executor_log}')
+            if 'CUDA out of memory' in executor_log or 'No CUDA GPUs are available' in executor_log:
+                raise NodeNeedsRestartError()
+
             raise Exception('Error during detecting')
 
         logging.info('Start parsing detections')
