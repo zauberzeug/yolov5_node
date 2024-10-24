@@ -182,7 +182,12 @@ def main(opt):
 
 
 if __name__ == "__main__":
-    torch.cuda.init()
+    try:
+        torch.cuda.init()
+    except RuntimeError as e:
+        print(e)
+        sys.exit(1)
+
     torch.cuda.empty_cache()
     opt = parse_opt()
     main(opt)
