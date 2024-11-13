@@ -45,10 +45,13 @@ fi
 # make sure the remote repository always has the 'latest' tag (otherwise the CI tests will fail)
 
 SEMANTIC_VERSION=0.1.7
-NODE_LIB_VERSION=0.10.16
+NODE_LIB_VERSION=0.11.1
 
-#image="zauberzeug/yolov5-trainer:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION"
-image="zauberzeug/yolov5-trainer:latest"
+if [ "$2" = "test_latest" ]; then
+    image="zauberzeug/yolov5-trainer:latest"
+else
+    image="zauberzeug/yolov5-trainer:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION"
+fi
 
 build_args=" --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION"
 
@@ -90,7 +93,11 @@ fi
 # ========================== COMMAND EXECUTION =========================================
 
 cmd=$1
-cmd_args=${@:2}
+if [ "$2" = "test_latest" ]; then
+    cmd_args=${@:3}
+else
+    cmd_args=${@:2}
+fi
 case $cmd in
     b | build)
         docker build . -t $image $build_args $cmd_args

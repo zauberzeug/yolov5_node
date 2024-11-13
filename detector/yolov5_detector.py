@@ -9,7 +9,7 @@ from typing import Optional, Tuple
 import cv2
 import numpy as np
 from learning_loop_node.data_classes import (BoxDetection, CategoryType,
-                                             Detections, PointDetection)
+                                             ImageMetadata, PointDetection)
 from learning_loop_node.detector.detector_logic import DetectorLogic
 
 import yolov5
@@ -63,9 +63,9 @@ class Yolov5Detector(DetectorLogic):
         y = min(max(0, y), img_height)
         return x, y
 
-    def evaluate(self, image: np.ndarray) -> Detections:
+    def evaluate(self, image: np.ndarray) -> ImageMetadata:
         assert self.yolov5 is not None, 'init() must be executed first. Maybe loading the engine failed?!'
-        detections = Detections()
+        image_metadata = ImageMetadata()
         try:
             t = time.time()
             cv_image = cv2.imdecode(image, cv2.IMREAD_COLOR)
@@ -81,7 +81,7 @@ class Yolov5Detector(DetectorLogic):
                     continue
                 if category.type == CategoryType.Box:
                     x, y, w, h = self.clip_box(x, y, w, h, im_width, im_height)
-                    detections.box_detections.append(
+                    image_metadata.box_detections.append(
                         BoxDetection(category_name=category.name,
                                      x=round(x),
                                      y=round(y),
@@ -93,7 +93,7 @@ class Yolov5Detector(DetectorLogic):
                 elif category.type == CategoryType.Point:
                     cx, cy = x + w/2, y + h/2
                     cx, cy = self.clip_point(cx, cy, im_width, im_height)
-                    detections.point_detections.append(
+                    image_metadata.point_detections.append(
                         PointDetection(category_name=category.name,
                                        x=cx,
                                        y=cy,
@@ -106,7 +106,7 @@ class Yolov5Detector(DetectorLogic):
                     f'Removed {len(skipped_detections)} small detections from result: \n{log_msg}')
         except Exception:
             self.log.exception('inference failed')
-        return detections
+        return image_metadata
 
     def _create_engine(self, resolution: int, cat_count: int, wts_file: str) -> str:
         engine_file = os.path.dirname(wts_file) + '/model.engine'

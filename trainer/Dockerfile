@@ -21,6 +21,8 @@ RUN apt update && \
 WORKDIR /
 # fetch trainer code
 COPY ./ /yolov5_node/trainer/
+RUN rm -f /yolov5_node/trainer/.env
+
 
 # Install requirements
 RUN pip install --upgrade pip
