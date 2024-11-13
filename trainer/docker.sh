@@ -47,8 +47,11 @@ fi
 SEMANTIC_VERSION=0.1.8
 NODE_LIB_VERSION=0.11.0
 
-#image="zauberzeug/yolov5-trainer:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION"
-image="zauberzeug/yolov5-trainer:latest"
+if [ "$2" = "test_latest" ]; then
+    image="zauberzeug/yolov5-trainer:latest"
+else
+    image="zauberzeug/yolov5-trainer:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION"
+fi
 
 build_args=" --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION"
 
