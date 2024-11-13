@@ -93,7 +93,11 @@ fi
 # ========================== COMMAND EXECUTION =========================================
 
 cmd=$1
-cmd_args=${@:2}
+if [ "$2" = "test_latest" ]; then
+    cmd_args=${@:3}
+else
+    cmd_args=${@:2}
+fi
 case $cmd in
     b | build)
         docker build . -t $image $build_args $cmd_args

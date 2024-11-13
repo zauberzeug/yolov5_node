@@ -95,11 +95,7 @@ fi
 # ========================== COMMAND EXECUTION =========================================
 
 cmd=$1
-if [ "$2" = "test_latest" ]; then
-    cmd_args=${@:3}
-else
-    cmd_args=${@:2}
-fi
+cmd_args=${@:2}
 set -x
 case $cmd in
     b | build)
