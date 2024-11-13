@@ -45,7 +45,7 @@ fi
 # make sure the remote repository always has the 'latest' tag (otherwise the CI tests will fail)
 
 SEMANTIC_VERSION=0.1.7
-NODE_LIB_VERSION=0.11.0
+NODE_LIB_VERSION=0.11.1
 
 if [ "$2" = "test_latest" ]; then
     image="zauberzeug/yolov5-trainer:latest"
