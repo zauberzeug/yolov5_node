@@ -65,10 +65,12 @@ async def check_marks(request: SubRequest, glc: LoopCommunicator):  # pylint: di
         project = configuration['project_name']
         # May not return 200 if project does not exist
         await glc.delete(f"/zauberzeug/projects/{project}?keep_images=true")
-        await asyncio.sleep(1)
+        await asyncio.sleep(5)
         assert (await glc.post("/zauberzeug/projects/generator", json=configuration)).status_code == 200
-        await asyncio.sleep(1)
+        await asyncio.sleep(5)
         yield
+        await asyncio.sleep(5)
+        await glc.delete(f"/zauberzeug/projects/{project}?keep_images=true")
         # assert (await lc.delete(f"/zauberzeug/projects/{project}?keep_images=true")).status_code == 200
     else:
         yield
