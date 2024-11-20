@@ -2,10 +2,9 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple
 
-from learning_loop_node.data_classes import (CategoryType, Hyperparameter,
-                                             Training)
+from learning_loop_node.data_classes import CategoryType, Training
 from ruamel.yaml import YAML
 
 yaml = YAML()
@@ -13,9 +12,9 @@ yaml = YAML()
 
 def get_ids_and_sizes_of_point_classes(training: Training) -> Tuple[List[str], List[str]]:
     """Returns a list of trainingids and sizes (in px) of point classes in the training data."""
-    assert training.data is not None, 'Training should have data'
+    assert training is not None, 'Training should have data'
     point_ids, point_sizes = [], []
-    for i, category in enumerate(training.data.categories):
+    for i, category in enumerate(training.categories):
         if category.type == CategoryType.Point:
             point_ids.append(str(i))
             point_sizes.append(str(category.point_size or 20))
@@ -23,8 +22,7 @@ def get_ids_and_sizes_of_point_classes(training: Training) -> Tuple[List[str], L
 
 
 def category_lookup_from_training(training: Training) -> Dict[str, str]:
-    assert training.data is not None, 'Training should have data'
-    return {c.name: c.id for c in training.data.categories}
+    return {c.name: c.id for c in training.categories}
 
 
 def _create_set(training: Training, set_name: str) -> int:
@@ -35,7 +33,6 @@ def _create_set(training: Training, set_name: str) -> int:
     "class(id) x_center y_center width height" (normalized by image width and height)
     Note that the id here is not the uuid but the training id (0, 1, 2, ...).
     [see here](https://docs.ultralytics.com/tutorials/train-custom-datasets/)."""
-    assert training.data is not None, 'Training should have data'
 
     category_uuids = list(category_lookup_from_training(training).values())
 
@@ -46,7 +43,7 @@ def _create_set(training: Training, set_name: str) -> int:
     os.makedirs(images_path, exist_ok=True)
     img_count = 0
 
-    for image in training.data.image_data:
+    for image in training.image_data or []:
         if image['set'] == set_name:
             img_count += 1
             image_name = image['id'] + '.jpg'
@@ -68,7 +65,7 @@ def _create_set(training: Training, set_name: str) -> int:
                 yolo_boxes.append(c_id + ' ' + ' '.join([f"{c:.6f}" for c in coords]) + '\n')
 
             for point in image['point_annotations']:
-                size = [c for c in training.data.categories if c.id == point['category_id']][0].point_size or 20
+                size = [c for c in training.categories if c.id == point['category_id']][0].point_size or 20
                 coords = [
                     point['x']/width,
                     point['y']/height,
@@ -103,15 +100,15 @@ def _create_set_cla(training: Training, set_name: str):
         # │   │   ├── image2.jpg
 
     count = 0
-    assert training.data is not None, 'Training should have data'
-    for image in training.data.image_data:
+    assert training.image_data is not None, 'Training should have data'
+    for image in training.image_data:
         if image['set'] == set_name:
             image_name = image['id'] + '.jpg'
             classification = image['classification_annotation']
             if classification:
                 count += 1
                 category = classification['category_id']
-                category_name = [c for c in training.data.categories if c.id == category][0].name
+                category_name = [c for c in training.categories if c.id == category][0].name
                 image_path = f"{images_path}/{category_name}/{image_name}"
                 # logging.info(f'linking {image_name} to {image_path}')
                 os.symlink(f'{os.path.abspath(training.images_folder)}/{image_name}', image_path)
@@ -144,6 +141,10 @@ def create_file_structure_cla(training: Training):
 
 
 def create_file_structure(training: Training):
+    """Uses:
+    - training.training_folder to create the file structure.
+    - training.image_data to create the image links and annotations.
+    - training.categories to create the annotations."""
     path = training.training_folder
     Path(path).mkdir(parents=True, exist_ok=True)
 
@@ -154,13 +155,13 @@ def create_file_structure(training: Training):
     logging.info(f'Prepared file structure with {num_train_imgs} training images and {num_test_imgs} test images')
 
 
-def update_hyps(yaml_path: str, hyperparameter: Hyperparameter):
+def update_hyps(yaml_path: str, hyperparameter: Dict[str, Any]):
 
     with open(yaml_path) as f:
         content = yaml.load(f)
 
-    content['fliplr'] = 0.5 if hyperparameter.flip_rl else 0
-    content['flipud'] = 0.5 if hyperparameter.flip_ud else 0
+    content['fliplr'] = 0.5 if hyperparameter['flip_rl'] else 0
+    content['flipud'] = 0.5 if hyperparameter['flip_ud'] else 0
 
     with open(yaml_path, 'w') as f:
         yaml.dump(content, f)

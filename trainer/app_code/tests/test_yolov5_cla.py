@@ -4,14 +4,15 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List, Tuple
 from uuid import uuid4
 
 import pytest
 from learning_loop_node.data_classes import (Category, CategoryType, Context,
-                                             ModelInformation, Training,
-                                             TrainingData)
+                                             ModelInformation, TrainerState,
+                                             Training)
 from learning_loop_node.data_exchanger import DataExchanger
+from learning_loop_node.helpers.misc import create_image_folder
 from learning_loop_node.loop_communication import LoopCommunicator
 from learning_loop_node.trainer.downloader import TrainingsDownloader
 from learning_loop_node.trainer.executor import Executor
@@ -36,13 +37,20 @@ class TestWithLoop:
     async def test_cla_training_creates_model(
             self, use_training_dir, data_exchanger: DataExchanger, glc: LoopCommunicator):
         """Training should create a model file (best.pt)"""
+
+        project_folder = os.getcwd()
+        categories, image_data = await download_training_data(create_image_folder(project_folder), data_exchanger, glc)
+
         training = Training(id=str(uuid4()),
-                            project_folder=os.getcwd(),
+                            project_folder=project_folder,
                             training_folder=os.getcwd() + '/training', images_folder=os.getcwd() + '/images',
                             model_uuid_for_detecting='model.pt',
                             context=Context(project=os.environ['LOOP_PROJECT'],
-                                            organization=os.environ['LOOP_ORGANIZATION']))
-        training.data = await download_training_data(training, data_exchanger, glc)
+                                            organization=os.environ['LOOP_ORGANIZATION']),
+                            categories=categories, hyperparameters={}, model_variant='',
+                            image_data=image_data,
+                            training_state=TrainerState.Initialized.value,
+                            training_number=1)
 
         yolov5_format.create_file_structure_cla(training)
         logging.info(training.training_folder)  # /tmp/test_training/
@@ -69,13 +77,20 @@ class TestWithLoop:
         trainer.epochs = 3  # NOTE: must correspond to the value set in test_data/hyp_cla.yaml
         if os.path.isfile('/tmp/model.pt'):
             os.remove('/tmp/model.pt')
+
+        project_folder = os.getcwd()
+        categories, image_data = await download_training_data(create_image_folder(project_folder), data_exchanger, glc)
+
         trainer._training = Training(id=str(uuid4()),
-                                     project_folder=os.getcwd(),
+                                     project_folder=project_folder,
                                      training_folder=os.getcwd() + '/training',
                                      images_folder=os.getcwd() + '/images',
                                      model_uuid_for_detecting='model.pt',
-                                     context=Context(project='demo', organization='zauberzeug'))
-        trainer.training.data = await download_training_data(trainer.training, data_exchanger, glc)
+                                     context=Context(project='demo', organization='zauberzeug'),
+                                     categories=categories, hyperparameters={}, model_variant='',
+                                     image_data=image_data,
+                                     training_state=TrainerState.Initialized.value,
+                                     training_number=1)
         yolov5_format.create_file_structure_cla(trainer.training)
 
         await asyncio.sleep(1)
@@ -95,9 +110,11 @@ class TestWithLoop:
         """The trainer should find new models"""
         trainer = Yolov5TrainerLogic()
         trainer._training = Training(id='someid', context=Context(organization='o', project='p'),
-                                     project_folder='./',  images_folder='./', training_folder='./')
-        trainer.training.data = TrainingData(image_data=[], categories=[
-            Category(name='class_a', id='uuid_of_class_a', type='classification')])
+                                     project_folder='./', images_folder='./', training_folder='./',
+                                     hyperparameters={}, model_variant='',
+                                     training_number=1, training_state=TrainerState.Initialized.value,
+                                     categories=[Category(name='class_a', id='uuid_of_class_a', type='classification')],
+                                     image_data=[])
         assert trainer._get_new_best_training_state() is None, 'should not find any models'
 
         model_path = 'result/weights/published/latest.pt'
@@ -136,9 +153,10 @@ class TestWithLoop:
         """When a model is published, the old model files should be deleted"""
         trainer = Yolov5TrainerLogic()
         trainer._training = Training(id='someid', context=Context(organization='o', project='p'),
-                                     project_folder='./', images_folder='./', training_folder='./')
-        trainer.training.data = TrainingData(image_data=[], categories=[
-            Category(name='class_a', id='uuid_of_class_a', type='classification')])
+                                     project_folder='./', images_folder='./', training_folder='./',
+                                     categories=[Category(name='class_a', id='uuid_of_class_a', type='classification')],
+                                     hyperparameters={}, model_variant='',
+                                     image_data=[], training_number=1, training_state=TrainerState.Initialized.value)
         assert trainer._get_new_best_training_state() is None, 'should not find any models'
 
         mock_epoch({'class_a': {'fp': 0, 'tp': 1, 'fn': 0}})
@@ -165,7 +183,9 @@ class TestWithLoop:
         trainer = Yolov5TrainerLogic()
         os.makedirs('./data/o/p/trainings/some_uuid', exist_ok=True)
         trainer._training = Training(id='someid', context=Context(organization='o', project='p'), project_folder='./',
-                                     images_folder='./', training_folder='./data/o/p/trainings/some_uuid')
+                                     images_folder='./', training_folder='./data/o/p/trainings/some_uuid',
+                                     categories=[], hyperparameters={}, model_variant='',
+                                     image_data=[], training_number=1, training_state=TrainerState.Initialized.value)
         os.makedirs(f'{trainer.training.training_folder}/result/weights/', exist_ok=True)
         os.makedirs(f'{trainer.training.training_folder}/result/weights/published/', exist_ok=True)
 
@@ -225,8 +245,10 @@ class TestWithLoop:
                            'category_id': 'uuid_of_class_2', }}]
         trainer = Yolov5TrainerLogic()
         trainer._training = Training(id='someid', context=Context(organization='o', project='p'),
-                                     project_folder='./',  images_folder='./', training_folder='./')
-        trainer.training.data = TrainingData(image_data=image_data, categories=categories)
+                                     project_folder='./', images_folder='./', training_folder='./',
+                                     image_data=image_data, categories=categories, hyperparameters={},
+                                     model_variant='', training_number=1,
+                                     training_state=TrainerState.Initialized.value)
 
         yolov5_format.create_file_structure_cla(trainer.training)
 
@@ -234,21 +256,23 @@ class TestWithLoop:
         assert Path('./test/classification_category_2/image_2.jpg').is_symlink()
 
 
-# ---------------------- HELPER FUNCTIONS ----------------------
+# =======================================================================================================================
+# ---------------------------------------------- HELPERS ----------------------------------------------------------------
+# =======================================================================================================================
 
 
-async def download_training_data(
-        training: Training, data_exchanger: DataExchanger, glc: LoopCommunicator) -> TrainingData:
-    training_data = TrainingData()
+async def download_training_data(images_folder: str, data_exchanger: DataExchanger, glc: LoopCommunicator
+                                 ) -> Tuple[List[Category], List[Dict]]:
+    image_data, _ = await TrainingsDownloader(data_exchanger).download_training_data(images_folder)
+
     response = await glc.get(f"/{os.environ['LOOP_ORGANIZATION']}/projects/{os.environ['LOOP_PROJECT']}/data")
+    assert response.status_code != 401, 'Authentification error - did you set LOOP_USERNAME and LOOP_PASSWORD in your environment?'
     assert response.status_code == 200
     data = response.json()
-    training_data.categories = Category.from_list(
+    categories = Category.from_list(
         [category for category in data['categories'] if category['type'] == 'classification'])
 
-    image_data, _ = await TrainingsDownloader(data_exchanger).download_training_data(training.images_folder)
-    training_data.image_data = image_data
-    return training_data
+    return categories, image_data
 
 
 def mock_epoch(confusion_matrix: Dict):

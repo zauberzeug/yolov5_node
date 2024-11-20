@@ -22,19 +22,22 @@ def get_all_weightfiles(training_path: Path) -> List[Path]:
     return weightfiles
 
 
-def _epoch_from_weightfile(weightfile: Path) -> int:
-    number = weightfile.name[5:-3]
-    if number == '':
+def epoch_from_weightfile(weightfile: Path) -> int:
+    try:
+        number = weightfile.name[5:-3]
+        if number == '':
+            return 0
+        return int(number)
+    except ValueError:
         return 0
-    return int(number)
 
 
 def delete_older_epochs(training_path: Path, weightfile: Path):
     all_weightfiles = get_all_weightfiles(training_path)
 
-    target_epoch = _epoch_from_weightfile(weightfile)
+    target_epoch = epoch_from_weightfile(weightfile)
     for f in all_weightfiles:
-        if _epoch_from_weightfile(f) < target_epoch:
+        if epoch_from_weightfile(f) < target_epoch:
             _try_remove(f)
             delete_json_for_weightfile(f)
 
@@ -53,6 +56,6 @@ def _try_remove(file: Path):
 def get_new(training_path: Path) -> Union[Path, None]:
     all_weightfiles = get_all_weightfiles(training_path)
     if all_weightfiles:
-        all_weightfiles.sort(key=_epoch_from_weightfile)
+        all_weightfiles.sort(key=epoch_from_weightfile)
         return all_weightfiles[-1]
     return None
