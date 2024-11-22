@@ -196,7 +196,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         def move_and_update_hyps(source: Path, target: str) -> None:
             assert (source).exists(), 'Hyperparameter file not found at "{hyperparameter_source_path}"'
             shutil.copy(source, target)
-            yolov5_format.update_hyps(target, self.hyperparameters)
+            yolov5_format.set_hyperparameters_in_file(target, self.hyperparameters)
 
         hyp_path = Path(__file__).resolve().parents[1] / ('hyp_cla.yaml' if self.is_cla else 'hyp_det.yaml')
 

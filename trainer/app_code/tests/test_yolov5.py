@@ -19,7 +19,7 @@ from learning_loop_node.trainer.executor import Executor
 from ruamel.yaml import YAML
 
 from .. import model_files, yolov5_format
-from ..yolov5_format import update_hyps
+from ..yolov5_format import set_hyperparameters_in_file
 from ..yolov5_trainer import Yolov5TrainerLogic
 
 # pylint: disable=protected-access,unused-argument
@@ -296,7 +296,7 @@ def test_update_hyperparameter():
                       'flip_ud': True}
 
     assert_yaml_content('/tmp/hyp.yaml', fliplr=0, flipud=0)
-    update_hyps('/tmp/hyp.yaml', hyperparameter)
+    set_hyperparameters_in_file('/tmp/hyp.yaml', hyperparameter)
     assert_yaml_content('/tmp/hyp.yaml', fliplr=0.5, flipud=0.5)
 
 # =======================================================================================================================

@@ -100,7 +100,7 @@ def _create_set_cla(training: Training, set_name: str):
         # │   │   ├── image2.jpg
 
     count = 0
-    assert training.image_data is not None, 'Training should have data'
+    assert training.image_data is not None, 'Training should have image data'
     for image in training.image_data:
         if image['set'] == set_name:
             image_name = image['id'] + '.jpg'
@@ -155,7 +155,7 @@ def create_file_structure(training: Training):
     logging.info(f'Prepared file structure with {num_train_imgs} training images and {num_test_imgs} test images')
 
 
-def update_hyps(yaml_path: str, hyperparameter: Dict[str, Any]):
+def set_hyperparameters_in_file(yaml_path: str, hyperparameter: Dict[str, Any]):
 
     with open(yaml_path) as f:
         content = yaml.load(f)
