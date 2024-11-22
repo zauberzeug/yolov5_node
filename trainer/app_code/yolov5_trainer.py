@@ -122,7 +122,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     async def _get_latest_model_files(self) -> Dict[str, List[str]]:
         weightfile = (self.training.training_folder_path / "result/weights/published/latest.pt").absolute()
         if not os.path.isfile(weightfile):
-            logging.error(f'No model found at {weightfile} - Training failed!')
+            logging.error('No model found at %s - Training failed!', weightfile)
             raise CriticalError(f'No model found at {weightfile}')
 
         shutil.copy(weightfile, '/tmp/model.pt')
