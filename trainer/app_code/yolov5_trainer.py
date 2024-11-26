@@ -17,7 +17,8 @@ from learning_loop_node.data_classes import (BoxDetection, CategoryType,
                                              PointDetection, PretrainedModel,
                                              TrainingStateData)
 from learning_loop_node.trainer import trainer_logic
-from learning_loop_node.trainer.exceptions import NodeNeedsRestartError
+from learning_loop_node.trainer.exceptions import (CriticalError,
+                                                   NodeNeedsRestartError)
 from learning_loop_node.trainer.executor import Executor
 
 from . import batch_size_calculation, model_files, yolov5_format
@@ -65,7 +66,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         await self._start_training_from_model(f'{self.training.training_folder}/model.pt')
 
     async def _start_training_from_scratch(self) -> None:
-        await self._start_training_from_model(f'yolov5{self.training.base_model_uuid_or_name}.pt')
+        await self._start_training_from_model(f'yolov5{self.training.model_variant}.pt')
 
     def _can_resume(self) -> bool:
         path = self.training.training_folder_path / 'result/weights/published/latest.pt'
@@ -92,6 +93,11 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         if not weightfile:
             return None
 
+        if self.is_cla:
+            epoch = None
+        else:
+            epoch = model_files.epoch_from_weightfile(weightfile)
+
         weightfile_str = str(weightfile.absolute())
         logging.info(f'found new best model at {weightfile_str}')
 
@@ -101,7 +107,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             for category_name in list(metrics.keys()):
                 metrics[categories[category_name]] = metrics.pop(category_name)
 
-        return TrainingStateData(confusion_matrix=metrics, meta_information={'weightfile': weightfile_str})
+        return TrainingStateData(confusion_matrix=metrics, meta_information={'weightfile': weightfile_str}, epoch=epoch)
 
     def _on_metrics_published(self, training_state_data: TrainingStateData) -> None:
         pub_path = (self.training.training_folder_path / 'result/weights/published').absolute()
@@ -116,8 +122,8 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     async def _get_latest_model_files(self) -> Dict[str, List[str]]:
         weightfile = (self.training.training_folder_path / "result/weights/published/latest.pt").absolute()
         if not os.path.isfile(weightfile):
-            logging.warning(f'No model found at {weightfile}')
-            return {}
+            logging.error('No model found at %s - Training failed!', weightfile)
+            raise CriticalError(f'No model found at {weightfile}')
 
         shutil.copy(weightfile, '/tmp/model.pt')
         training_path = '/'.join(str(weightfile).split('/')[:-4])
@@ -190,7 +196,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         def move_and_update_hyps(source: Path, target: str) -> None:
             assert (source).exists(), 'Hyperparameter file not found at "{hyperparameter_source_path}"'
             shutil.copy(source, target)
-            yolov5_format.update_hyps(target, self.hyperparameter)
+            yolov5_format.set_hyperparameters_in_file(target, self.hyperparameters)
 
         hyp_path = Path(__file__).resolve().parents[1] / ('hyp_cla.yaml' if self.is_cla else 'hyp_det.yaml')
 
@@ -206,7 +212,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             await self._start(model, " --clear")
 
     async def _start(self, model: str, additional_parameters: str = ''):
-        resolution = self.hyperparameter.resolution
+        resolution = self.training.hyperparameters['resolution']
         hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
         self._load_hyps_set_epochs(hyperparameter_path)
 
@@ -218,8 +224,13 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         else:
             p_ids, p_sizes = yolov5_format.get_ids_and_sizes_of_point_classes(self.training)
             self._try_replace_optimized_hyperparameter()
-            batch_size = await batch_size_calculation.calc(self.training.training_folder, model, hyperparameter_path,
-                                                           f'{self.training.training_folder}/dataset.yaml', resolution)
+            try:
+                batch_size = await batch_size_calculation.calc(self.training.training_folder, model, hyperparameter_path,
+                                                               f'{self.training.training_folder}/dataset.yaml', resolution)
+            except Exception as e:
+                logging.error(f'Error during batch size calculation: {e}')
+                raise NodeNeedsRestartError() from e
+
             cmd = f'python /app/train_det.py --exist-ok --patience {self.patience} \
                 --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} \
                 --project {self.training.training_folder} --name result --hyp {hyperparameter_path} \
