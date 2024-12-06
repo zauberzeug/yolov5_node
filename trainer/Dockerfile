@@ -9,7 +9,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-setuptools \
     python3-matplotlib \
     curl \
- #   git \
     && rm -rf /var/lib/apt/lists/* 
 
 RUN apt update && \

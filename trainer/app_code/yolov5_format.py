@@ -2,15 +2,16 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
-from learning_loop_node.data_classes import CategoryType, Training
+from learning_loop_node.data_classes import Training
+from learning_loop_node.enums import CategoryType
 from ruamel.yaml import YAML
 
 yaml = YAML()
 
 
-def get_ids_and_sizes_of_point_classes(training: Training) -> Tuple[List[str], List[str]]:
+def get_ids_and_sizes_of_point_classes(training: Training) -> tuple[list[str], list[str]]:
     """Returns a list of trainingids and sizes (in px) of point classes in the training data."""
     assert training is not None, 'Training should have data'
     point_ids, point_sizes = [], []
@@ -21,7 +22,7 @@ def get_ids_and_sizes_of_point_classes(training: Training) -> Tuple[List[str], L
     return point_ids, point_sizes
 
 
-def category_lookup_from_training(training: Training) -> Dict[str, str]:
+def category_lookup_from_training(training: Training) -> dict[str, str]:
     return {c.name: c.id for c in training.categories}
 
 
@@ -81,7 +82,7 @@ def _create_set(training: Training, set_name: str) -> int:
     return img_count
 
 
-def _create_set_cla(training: Training, set_name: str):
+def _create_set_cla(training: Training, set_name: str) -> None:
     training_path = training.training_folder
     images_path = f'{training_path}/{set_name}'
 
@@ -116,7 +117,7 @@ def _create_set_cla(training: Training, set_name: str):
     logging.info(f'Created {count} image links')
 
 
-def create_dataset_yaml(training: Training):
+def create_dataset_yaml(training: Training) -> None:
     categories = category_lookup_from_training(training)
     path = training.training_folder
     data = {
@@ -131,7 +132,7 @@ def create_dataset_yaml(training: Training):
         yaml.dump(data, f)
 
 
-def create_file_structure_cla(training: Training):
+def create_file_structure_cla(training: Training) -> None:
     path = training.training_folder
     assert path is not None, 'Training should have a path'
     Path(path).mkdir(parents=True, exist_ok=True)
@@ -140,7 +141,7 @@ def create_file_structure_cla(training: Training):
     _create_set_cla(training, 'train')
 
 
-def create_file_structure(training: Training):
+def create_file_structure(training: Training) -> None:
     """Uses:
     - training.training_folder to create the file structure.
     - training.image_data to create the image links and annotations.
@@ -155,7 +156,7 @@ def create_file_structure(training: Training):
     logging.info(f'Prepared file structure with {num_train_imgs} training images and {num_test_imgs} test images')
 
 
-def set_hyperparameters_in_file(yaml_path: str, hyperparameter: Dict[str, Any]):
+def set_hyperparameters_in_file(yaml_path: str, hyperparameter: dict[str, Any]) -> None:
 
     with open(yaml_path) as f:
         content = yaml.load(f)

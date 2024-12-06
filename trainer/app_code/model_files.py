@@ -1,10 +1,9 @@
 import logging
 import os
 from pathlib import Path
-from typing import List, Optional, Union
 
 
-def get_best(training_path: Path) -> Optional[Path]:
+def get_best(training_path: Path) -> Path | None:
     path = training_path / 'result/weights'
     if not path.exists():
         return None
@@ -14,7 +13,7 @@ def get_best(training_path: Path) -> Optional[Path]:
     return weightfiles[0]
 
 
-def get_all_weightfiles(training_path: Path) -> List[Path]:
+def get_all_weightfiles(training_path: Path) -> list[Path]:
     path = (training_path / 'result/weights').absolute()
     if not path.exists():
         return []
@@ -32,7 +31,7 @@ def epoch_from_weightfile(weightfile: Path) -> int:
         return 0
 
 
-def delete_older_epochs(training_path: Path, weightfile: Path):
+def delete_older_epochs(training_path: Path, weightfile: Path) -> None:
     all_weightfiles = get_all_weightfiles(training_path)
 
     target_epoch = epoch_from_weightfile(weightfile)
@@ -42,18 +41,18 @@ def delete_older_epochs(training_path: Path, weightfile: Path):
             delete_json_for_weightfile(f)
 
 
-def delete_json_for_weightfile(weightfile: Path):
+def delete_json_for_weightfile(weightfile: Path) -> None:
     _try_remove(weightfile.with_suffix('.json'))
 
 
-def _try_remove(file: Path):
+def _try_remove(file: Path) -> None:
     try:
         os.remove(file)
     except Exception:
         logging.exception(f'could not remove {file}')
 
 
-def get_new(training_path: Path) -> Union[Path, None]:
+def get_new(training_path: Path) -> Path | None:
     all_weightfiles = get_all_weightfiles(training_path)
     if all_weightfiles:
         all_weightfiles.sort(key=epoch_from_weightfile)

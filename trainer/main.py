@@ -11,7 +11,6 @@ from app_code.yolov5_trainer import Yolov5TrainerLogic
 icecream.install()
 
 
-# check if env variable 'YOLOV5_MODE' is set to 'cla'
 print(f'Uvicorn reload is set to: {os.getenv("UVICORN_RELOAD", "FALSE").lower() == "true"}')
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
                     datefmt='%Y-%m-%d:%H:%M:%S', level=logging.INFO)

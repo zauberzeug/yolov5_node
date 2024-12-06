@@ -38,16 +38,11 @@ from pathlib import Path
 import torch
 
 from app_code.yolov5.models.common import DetectMultiBackend
-from app_code.yolov5.utils.dataloaders import (IMG_FORMATS, VID_FORMATS,
-                                               LoadImages, LoadScreenshots,
-                                               LoadStreams)
-from app_code.yolov5.utils.general import (LOGGER, Profile, check_file,
-                                           check_img_size, check_imshow,
-                                           check_requirements, colorstr, cv2,
-                                           increment_path, non_max_suppression,
-                                           print_args, scale_boxes,
-                                           strip_optimizer, xyxy2xywh)
-from app_code.yolov5.utils.plots import Annotator, save_one_box
+from app_code.yolov5.utils.dataloaders import LoadImages
+from app_code.yolov5.utils.general import (LOGGER, Profile, check_img_size,
+                                           check_requirements, colorstr,
+                                           non_max_suppression, print_args,
+                                           scale_boxes, xyxy2xywh)
 from app_code.yolov5.utils.torch_utils import (select_device,
                                                smart_inference_mode)
 

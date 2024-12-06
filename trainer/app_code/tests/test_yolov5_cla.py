@@ -4,14 +4,13 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Dict, List, Tuple
 from uuid import uuid4
 
 import pytest
-from learning_loop_node.data_classes import (Category, CategoryType, Context,
-                                             ModelInformation, TrainerState,
-                                             Training)
+from learning_loop_node.data_classes import (Category, Context,
+                                             ModelInformation, Training)
 from learning_loop_node.data_exchanger import DataExchanger
+from learning_loop_node.enums import CategoryType, TrainerState
 from learning_loop_node.helpers.misc import create_image_folder
 from learning_loop_node.loop_communication import LoopCommunicator
 from learning_loop_node.trainer.downloader import TrainingsDownloader
@@ -262,7 +261,7 @@ class TestWithLoop:
 
 
 async def download_training_data(images_folder: str, data_exchanger: DataExchanger, glc: LoopCommunicator
-                                 ) -> Tuple[List[Category], List[Dict]]:
+                                 ) -> tuple[list[Category], list[dict]]:
     image_data, _ = await TrainingsDownloader(data_exchanger).download_training_data(images_folder)
 
     response = await glc.get(f"/{os.environ['LOOP_ORGANIZATION']}/projects/{os.environ['LOOP_PROJECT']}/data")
@@ -275,7 +274,7 @@ async def download_training_data(images_folder: str, data_exchanger: DataExchang
     return categories, image_data
 
 
-def mock_epoch(confusion_matrix: Dict):
+def mock_epoch(confusion_matrix: dict) -> None:
     os.makedirs('result/weights/', exist_ok=True)
     with open('result/weights/best.json', 'w') as f:
         json.dump(confusion_matrix, f)

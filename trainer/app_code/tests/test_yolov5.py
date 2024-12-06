@@ -5,13 +5,12 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Dict, List, Tuple
 from uuid import uuid4
 
 import pytest
-from learning_loop_node.data_classes import (Category, Context, TrainerState,
-                                             Training)
+from learning_loop_node.data_classes import Category, Context, Training
 from learning_loop_node.data_exchanger import DataExchanger
+from learning_loop_node.enums import TrainerState
 from learning_loop_node.helpers.misc import create_image_folder
 from learning_loop_node.loop_communication import LoopCommunicator
 from learning_loop_node.trainer.downloader import TrainingsDownloader
@@ -305,7 +304,7 @@ def test_update_hyperparameter():
 
 
 async def download_training_data(images_folder: str, data_exchanger: DataExchanger, glc: LoopCommunicator
-                                 ) -> Tuple[List[Category], List[Dict]]:
+                                 ) -> tuple[list[Category], list[dict]]:
 
     image_data, _ = await TrainingsDownloader(data_exchanger).download_training_data(images_folder)
 
@@ -317,7 +316,7 @@ async def download_training_data(images_folder: str, data_exchanger: DataExchang
     return categories, image_data
 
 
-def mock_epoch(number: int, confusion_matrix: Dict):
+def mock_epoch(number: int, confusion_matrix: dict) -> None:
     os.makedirs('result/weights/', exist_ok=True)
     with open(f'result/weights/epoch{number}.json', 'w') as f:
         json.dump(confusion_matrix, f)
