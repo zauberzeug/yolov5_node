@@ -1,13 +1,11 @@
 # import logging
 import os
 
-import icecream
 import uvicorn
 from learning_loop_node import DetectorNode
 
 from yolov5_detector import Yolov5Detector
 
-icecream.install()
 reload = os.getenv("UVICORN_RELOAD", "FALSE").lower() == "true"
 print(f'Uvicorn reload is set to: {reload}')
 

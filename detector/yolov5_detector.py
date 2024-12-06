@@ -8,9 +8,10 @@ from typing import Optional, Tuple
 
 import cv2
 import numpy as np
-from learning_loop_node.data_classes import (BoxDetection, CategoryType,
-                                             ImageMetadata, PointDetection)
+from learning_loop_node.data_classes import (BoxDetection, ImageMetadata,
+                                             PointDetection)
 from learning_loop_node.detector.detector_logic import DetectorLogic
+from learning_loop_node.enums import CategoryType
 
 import yolov5
 
