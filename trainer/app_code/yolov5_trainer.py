@@ -6,16 +6,16 @@ import re
 import shutil
 from dataclasses import asdict
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 import cv2
 import yaml  # type: ignore
 from fastapi.encoders import jsonable_encoder
-from learning_loop_node.data_classes import (BoxDetection, CategoryType,
+from learning_loop_node.data_classes import (BoxDetection,
                                              ClassificationDetection,
                                              Detections, ModelInformation,
                                              PointDetection, PretrainedModel,
                                              TrainingStateData)
+from learning_loop_node.enums import CategoryType
 from learning_loop_node.trainer import trainer_logic
 from learning_loop_node.trainer.exceptions import (CriticalError,
                                                    NodeNeedsRestartError)
@@ -41,7 +41,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     # ---------------------------------------- IMPLEMENTED ABSTRACT PROPERTIES ----------------------------------------
 
     @property
-    def training_progress(self) -> Optional[float]:
+    def training_progress(self) -> float | None:
         if self._executor is None:
             return None
         if self.is_cla:
@@ -49,11 +49,11 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         return self._get_progress_from_log()
 
     @property
-    def model_architecture(self):
+    def model_architecture(self) -> str:
         return 'yolov5_cls' if self.is_cla else 'yolov5'
 
     @property
-    def provided_pretrained_models(self) -> List[PretrainedModel]:
+    def provided_pretrained_models(self) -> list[PretrainedModel]:
         if self.is_cla:
             return [PretrainedModel(name='s-cls', label='YOLO v5 small', description='~5fps on Jetson Nano'),
                     PretrainedModel(name='x-cls', label='YOLO v5 large', description='~5fps on Jetson Nano'),]
@@ -75,7 +75,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     async def _resume(self) -> None:
         await self._start(model=str(self.training.training_folder_path / 'result/weights/published/latest.pt'))
 
-    def _get_executor_error_from_log(self) -> Optional[str]:
+    def _get_executor_error_from_log(self) -> str | None:
         if self._executor is None:
             return None
         for line in self._executor.get_log_by_lines(tail=50):
@@ -85,7 +85,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
                 return 'graphics card not found'
         return None
 
-    def _get_new_best_training_state(self) -> Optional[TrainingStateData]:
+    def _get_new_best_training_state(self) -> TrainingStateData | None:
         if self.is_cla:
             weightfile = model_files.get_best(self.training.training_folder_path)
         else:
@@ -119,7 +119,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         model_files.delete_json_for_weightfile(Path(weightfile))
         model_files.delete_older_epochs(Path(self.training.training_folder), Path(weightfile))
 
-    async def _get_latest_model_files(self) -> Dict[str, List[str]]:
+    async def _get_latest_model_files(self) -> dict[str, list[str]]:
         weightfile = (self.training.training_folder_path / "result/weights/published/latest.pt").absolute()
         if not os.path.isfile(weightfile):
             logging.error('No model found at %s - Training failed!', weightfile)
@@ -139,9 +139,8 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
         return {self.model_format: ['/tmp/model.pt', f'{training_path}/hyp.yaml'], 'yolov5_wts': ['/tmp/model.wts']}
 
-    async def _detect(
-            self, model_information: ModelInformation, images: List[str],
-            model_folder: str) -> List[Detections]:
+    async def _detect(self, model_information: ModelInformation, images: list[str],
+                      model_folder: str) -> list[Detections]:
         images_folder = '/tmp/imagelinks_for_detecting'
         shutil.rmtree(images_folder, ignore_errors=True)
         os.makedirs(images_folder)
@@ -256,7 +255,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         else:
             logging.warning('No optimized hyperparameter found (!)')
 
-    def _parse(self, labels_path: str, images_folder: str, model_information: ModelInformation) -> List[Detections]:
+    def _parse(self, labels_path: str, images_folder: str, model_information: ModelInformation) -> list[Detections]:
         detections = []
         if os.path.exists(labels_path):
             for filename in os.scandir(labels_path):
@@ -302,7 +301,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     # ---------------------------------------- HELPER METHODS ----------------------------------------
 
     @staticmethod
-    def _parse_file_cla(model_info: ModelInformation, filepath: str) -> List[ClassificationDetection]:
+    def _parse_file_cla(model_info: ModelInformation, filepath: str) -> list[ClassificationDetection]:
         with open(filepath, 'r') as f:
             content = f.readlines()
         classification_detections = []
@@ -324,9 +323,8 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         return classification_detections
 
     @staticmethod
-    def clip_box(
-            x: float, y: float, width: float, height: float, img_width: int, img_height: int) -> Tuple[
-            float, float, float, float]:
+    def clip_box(x: float, y: float, width: float, height: float, img_width: int, img_height: int
+                 ) -> tuple[float, float, float, float]:
         '''make sure the box is within the image
             x,y is the center of the box
         '''
@@ -343,14 +341,14 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         return x, y, width, height
 
     @staticmethod
-    def clip_point(x: float, y: float, img_width: int, img_height: int) -> Tuple[float, float]:
+    def clip_point(x: float, y: float, img_width: int, img_height: int) -> tuple[float, float]:
         x = min(max(0, x), img_width)
         y = min(max(0, y), img_height)
         return x, y
 
     @staticmethod
-    def _parse_file(model_info: ModelInformation, images_folder: str, filename: str) -> Tuple[
-            List[BoxDetection], List[PointDetection]]:
+    def _parse_file(model_info: ModelInformation, images_folder: str, filename: str
+                    ) -> tuple[list[BoxDetection], list[PointDetection]]:
         uuid = os.path.splitext(os.path.basename(filename))[0]
 
         # TODO change to approach that does not require to read the image

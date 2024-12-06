@@ -1,11 +1,12 @@
 import signal
 import sys
 import time
+from typing import Any
 
 import torch
 
 
-def signal_handler(sig, frame):
+def signal_handler(sig: int, frame: Any) -> None:
     print('\n\nSignal received:', sig, flush=True)
     sys.exit(0)
 
