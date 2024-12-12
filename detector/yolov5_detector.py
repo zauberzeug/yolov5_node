@@ -33,6 +33,11 @@ class Yolov5Detector(DetectorLogic):
                                           len(self.model_info.categories),
                                           f'{self.model_info.model_root_path}/model.wts')
         ctypes.CDLL('/tensorrtx/yolov5/build/libmyplugins.so')
+        if self.yolov5 is not None:
+            self.yolov5.destroy()
+            self.yolov5 = None
+            self.log.info('destroyed old yolov5 instance')
+
         self.yolov5 = yolov5.YoLov5TRT(engine_file)
         for _ in range(3):
             warmup = yolov5.warmUpThread(self.yolov5)
