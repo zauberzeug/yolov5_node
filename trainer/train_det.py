@@ -32,6 +32,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import yaml
+from PIL import Image, ImageDraw, ImageFont
 from torch.optim import lr_scheduler
 from tqdm import tqdm
 
@@ -61,6 +62,80 @@ from app_code.yolov5.utils.plots import plot_evolve
 from app_code.yolov5.utils.torch_utils import (EarlyStopping, ModelEMA,
                                                de_parallel, select_device,
                                                smart_optimizer, smart_resume)
+
+
+def draw_example(img: torch.Tensor,
+                 target: torch.Tensor,
+                 idx: int,
+                 class_names: List[str] | None = None) -> Image.Image:
+    """
+    Takes the last image in the batch and returns it with the targets drawn on it.
+
+    Args:
+        img (torch.Tensor): Image [3, H, W].
+        target (torch.Tensor): Ground truth boxes having shape [num_targets, 5] (x1, y1, x2, y2, class).
+        class_names (List[str], optional): List of class names corresponding to class indices.
+
+    Returns:
+        PIL.Image.Image: The image with drawn bounding boxes.
+    """
+
+    # Select the last image in the batch
+    img_np = img.cpu().permute(1, 2, 0).numpy()  # [H, W, C]
+    img_np = np.clip(img_np, 0, 1)
+    img_np = (img_np * 255).astype(np.uint8)
+
+    # Convert to PIL Image
+    pil_img = Image.fromarray(img_np)
+    draw = ImageDraw.Draw(pil_img)
+    font = ImageFont.load_default()
+
+    # Get image dimensions
+    img_width, img_height = pil_img.size
+
+    # Draw ground truth boxes
+    if target is not None:
+        for gt in target:
+            index = int(gt[0])
+            if index != idx:
+                continue
+            cls, x, y, w, h = gt[1:].tolist()
+            cls = int(cls)
+            cx = x * img_width
+            cy = y * img_height
+            ow = w * img_width // 2
+            oh = h * img_height // 2
+            x1 = cx - ow
+            y1 = cy - oh
+            x2 = cx + ow
+            y2 = cy + oh
+
+            # Define colors
+            gt_box_color = "blue"
+            gt_text_color = "white"
+
+            # If class_names are provided, use them
+            gt_label = f"GT {class_names[cls]}" if class_names and cls < len(class_names) else f"GT Class {cls}"
+
+            # Ensure x1 <= x2 and y1 <= y2
+            x1, x2 = sorted([x1, x2])
+            y1, y2 = sorted([y1, y2])
+
+            # Clamp coordinates to image boundaries
+            x1 = max(0, min(x1, img_width - 1))
+            y1 = max(0, min(y1, img_height - 1))
+            x2 = max(0, min(x2, img_width - 1))
+            y2 = max(0, min(y2, img_height - 1))
+
+            # Draw bounding box
+            draw.rectangle([(x1, y1), (x2, y2)], outline=gt_box_color, width=2)
+
+            # Draw label text above the bounding box
+            text_y = y1 - 15 if y1 - 15 > 0 else y1 + 5
+            draw.text((x1, text_y), gt_label, fill=gt_text_color, font=font)
+
+    return pil_img
+
 
 stop_training = False
 
@@ -96,6 +171,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     point_sizes_by_id = dict(zip(point_ids, point_sizes))
 
     # Directories
+    examples = save_dir / 'examples'  # examples dir
     w = save_dir / 'weights'  # weights dir
     (w.parent if evolve else w).mkdir(parents=True, exist_ok=True)  # make dir
     last, best = w / 'last.pt', w / 'best.pt'
@@ -389,6 +465,17 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 'git': 'remote',
                 'date': datetime.now().isoformat()}
 
+            # Save examples (latest batch)
+            # preds -> Predictions
+            # imgs -> Images
+            # targets -> Ground Truth
+
+            if epoch < 10:
+                examples.mkdir(parents=True, exist_ok=True)
+                for idx in range(len(imgs)):
+                    visu = draw_example(imgs[idx], targets, idx)
+                    visu.save(examples / f'example_{epoch}_{idx}.png')
+
             # Save last, best and delete
             torch.save(ckpt, last)
             if best_fitness == fi:
@@ -647,3 +734,6 @@ if __name__ == "__main__":
     main(opt)
     torch.cuda.empty_cache()
     print('END: YOLOv5 - train det', flush=True)
+
+
+# HELPER

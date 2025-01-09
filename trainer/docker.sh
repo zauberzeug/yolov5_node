@@ -44,7 +44,7 @@ fi
 # NODE_LIB_VERSION should only be used, to build the corresponding version and deploy to docker
 # make sure the remote repository always has the 'latest' tag (otherwise the CI tests will fail)
 
-SEMANTIC_VERSION=0.1.9
+SEMANTIC_VERSION=0.1.10
 NODE_LIB_VERSION=0.13.0
 
 if [ "$2" = "test_latest" ]; then
