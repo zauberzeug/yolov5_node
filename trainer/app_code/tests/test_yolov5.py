@@ -291,8 +291,8 @@ def test_update_hyperparameter():
 
     shutil.copy('app_code/tests/test_data/hyp.yaml', '/tmp')
     hyperparameter = {'resolution': 600,
-                      'flip_rl': True,
-                      'flip_ud': True}
+                      'fliprl': 0.5,
+                      'flipud': 0.5}
 
     assert_yaml_content('/tmp/hyp.yaml', fliplr=0, flipud=0)
     set_hyperparameters_in_file('/tmp/hyp.yaml', hyperparameter)

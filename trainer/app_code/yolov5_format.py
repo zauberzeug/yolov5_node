@@ -161,8 +161,17 @@ def set_hyperparameters_in_file(yaml_path: str, hyperparameter: dict[str, Any]) 
     with open(yaml_path) as f:
         content = yaml.load(f)
 
-    content['fliplr'] = 0.5 if hyperparameter['flip_rl'] else 0
-    content['flipud'] = 0.5 if hyperparameter['flip_ud'] else 0
+    if 'flip_rl' in hyperparameter:
+        hyperparameter['fliplr'] = 0.5 if hyperparameter['flip_rl'] else 0.0
+    if 'flip_ud' in hyperparameter:
+        hyperparameter['flipud'] = 0.5 if hyperparameter['flip_ud'] else 0.0
+
+    for param in content:
+        if param in hyperparameter:
+            if type(hyperparameter[param]) != type(content[param]):  # pylint: disable=unidiomatic-typecheck
+                raise ValueError(
+                    f'Parameter {param} is of type {type(content[param])} but should be of type {type(hyperparameter[param])}')
+            content[param] = hyperparameter[param]
 
     with open(yaml_path, 'w') as f:
         yaml.dump(content, f)
