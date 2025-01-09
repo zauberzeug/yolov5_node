@@ -197,17 +197,17 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             shutil.copy(source, target)
             yolov5_format.set_hyperparameters_in_file(target, self.hyperparameters)
 
-        hyp_path = Path(__file__).resolve().parents[1] / ('hyp_cla.yaml' if self.is_cla else 'hyp_det.yaml')
+        base_hyp_path = Path(__file__).resolve().parents[1] / ('hyp_cla.yaml' if self.is_cla else 'hyp_det.yaml')
 
         if self.is_cla:
             yolov5_format.create_file_structure_cla(self.training)
             if model == 'model.pt':
                 model = f'{self.training.training_folder}/model.pt'
-            move_and_update_hyps(hyp_path, f'{self.training.training_folder}/hyp.yaml')
+            move_and_update_hyps(base_hyp_path, f'{self.training.training_folder}/hyp.yaml')
             await self._start(model)
         else:
             yolov5_format.create_file_structure(self.training)
-            move_and_update_hyps(hyp_path, f'{self.training.training_folder}/hyp.yaml')
+            move_and_update_hyps(base_hyp_path, f'{self.training.training_folder}/hyp.yaml')
             await self._start(model, " --clear")
 
     async def _start(self, model: str, additional_parameters: str = ''):
