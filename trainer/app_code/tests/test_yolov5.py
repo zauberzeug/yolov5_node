@@ -294,7 +294,7 @@ def test_update_hyperparameter():
                       'fliprl': 0.5,
                       'flipud': 0.5}
 
-    assert_yaml_content('/tmp/hyp.yaml', fliplr=0, flipud=0)
+    assert_yaml_content('/tmp/hyp.yaml', fliplr=0.0, flipud=0.0)
     set_hyperparameters_in_file('/tmp/hyp.yaml', hyperparameter)
     assert_yaml_content('/tmp/hyp.yaml', fliplr=0.5, flipud=0.5)
 
