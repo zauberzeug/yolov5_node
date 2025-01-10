@@ -180,6 +180,7 @@ def set_hyperparameters_in_file(yaml_path: str, hyperparameter: dict[str, Any]) 
                     raise ValueError(
                         f'Parameter {param} cannot be converted from {type(hp_value)} to {type(yaml_value)}') from e
 
+            logging.info(f'Setting {param} to {hp_value}')
             content[param] = hp_value
 
     with open(yaml_path, 'w') as f:
