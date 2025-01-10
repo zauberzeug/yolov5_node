@@ -168,10 +168,19 @@ def set_hyperparameters_in_file(yaml_path: str, hyperparameter: dict[str, Any]) 
 
     for param in content:
         if param in hyperparameter:
-            if type(hyperparameter[param]) != type(content[param]):  # pylint: disable=unidiomatic-typecheck
-                raise ValueError(
-                    f'Parameter {param} is of type {type(content[param])} but should be of type {type(hyperparameter[param])}')
-            content[param] = hyperparameter[param]
+            # Convert YAML value to Python native type
+            yaml_value = content[param]
+            hp_value = hyperparameter[param]
+
+            if not isinstance(yaml_value, type(hp_value)):
+                try:
+                    # Try to convert to the target type
+                    hp_value = type(yaml_value)(hp_value)
+                except (ValueError, TypeError) as e:
+                    raise ValueError(
+                        f'Parameter {param} cannot be converted from {type(hp_value)} to {type(yaml_value)}') from e
+
+            content[param] = hp_value
 
     with open(yaml_path, 'w') as f:
         yaml.dump(content, f)
