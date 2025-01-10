@@ -169,7 +169,6 @@ def set_hyperparameters_in_file(yaml_path: str, hyperparameter: dict[str, Any]) 
 
     for param in content:
         if param in hyperparameter:
-            # Convert YAML value to Python native type
             yaml_value = content[param]
             hp_value = hyperparameter[param]
 
