@@ -6,6 +6,7 @@ from typing import Any
 
 from learning_loop_node.data_classes import Training
 from learning_loop_node.enums import CategoryType
+from learning_loop_node.trainer.exceptions import CriticalError
 from ruamel.yaml import YAML
 
 yaml = YAML()
@@ -161,8 +162,24 @@ def set_hyperparameters_in_file(yaml_path: str, hyperparameter: dict[str, Any]) 
     with open(yaml_path) as f:
         content = yaml.load(f)
 
-    content['fliplr'] = 0.5 if hyperparameter['flip_rl'] else 0
-    content['flipud'] = 0.5 if hyperparameter['flip_ud'] else 0
+    if 'flip_rl' in hyperparameter:
+        hyperparameter['fliplr'] = 0.5 if hyperparameter['flip_rl'] else 0.0
+    if 'flip_ud' in hyperparameter:
+        hyperparameter['flipud'] = 0.5 if hyperparameter['flip_ud'] else 0.0
+
+    for param in content:
+        if param in hyperparameter:
+            yaml_value = content[param]
+            hp_value = hyperparameter[param]
+
+            try:
+                # Try to convert to float as all original yolov5 hyperparameters are floats
+                hp_value = float(hp_value)
+            except (ValueError, TypeError) as e:
+                raise CriticalError(f'Parameter {param} cannot be converted from {type(hp_value)} to float') from e
+
+            logging.info(f'Setting hyperparameter {param} to {hp_value} (Default was {yaml_value})')
+            content[param] = hp_value
 
     with open(yaml_path, 'w') as f:
         yaml.dump(content, f)
