@@ -5,12 +5,10 @@ from typing import Tuple
 
 import cv2
 import numpy as np
-from learning_loop_node.data_classes import (BoxDetection, ImageMetadata,
-                                             PointDetection)
+import torch  # type: ignore # pylint: disable=import-error
+from learning_loop_node.data_classes import BoxDetection, ImageMetadata, PointDetection
 from learning_loop_node.detector.detector_logic import DetectorLogic
 from learning_loop_node.enums import CategoryType
-
-import torch
 
 
 class Yolov5Detector(DetectorLogic):
@@ -18,6 +16,7 @@ class Yolov5Detector(DetectorLogic):
     def __init__(self) -> None:
         super().__init__('yolov5_pytorch')
         self.yolov5 = None
+        self.input_size: int = 0
         self.log = logging.getLogger('Yolov5Detector')
         self.log.setLevel(logging.INFO)
 
@@ -30,6 +29,7 @@ class Yolov5Detector(DetectorLogic):
             os.path.dirname(__file__), 'app_code', 'yolov5')
         self.yolov5 = torch.hub.load(
             yolov5_path, 'custom', pt_file, source='local')
+        assert self.yolov5 is not None
         self.yolov5.eval()
 
     @staticmethod
@@ -60,14 +60,13 @@ class Yolov5Detector(DetectorLogic):
     def evaluate(self, image: np.ndarray) -> ImageMetadata:
         assert self.yolov5 is not None, 'init() must be executed first!'
         image_metadata = ImageMetadata()
-
-        input_size = self.model_info.resolution
+        assert self.model_info.resolution, "input_size must be an integer > 0"
+        self.input_size = self.model_info.resolution
 
         try:
             t = time.time()
             cv_image = cv2.imdecode(image, cv2.IMREAD_COLOR)  # Returns BGR
-            input_image, image_raw, origin_h, origin_w = self._preprocess_image(
-                cv_image, input_size)
+            input_image, _, origin_h, origin_w = self._preprocess_image(cv_image)
 
             im_height = origin_h
             im_width = origin_w
@@ -80,13 +79,9 @@ class Yolov5Detector(DetectorLogic):
             iou_thres = 0.4
             max_det = 1000
 
-            # Let's see the actual values
-            self.log.debug(
-                f"Raw predictions before NMS: det.shape={det.shape}, det[:5]={det[:5]}")
-
             if len(det):
                 result_boxes, result_scores, result_classid = self._post_process(
-                    det, origin_h, origin_w, input_size, conf_thres, iou_thres)
+                    det, origin_h, origin_w, conf_thres, iou_thres)
 
                 for j, box in enumerate(result_boxes[:max_det]):
                     x, y, br_x, br_y = box
@@ -108,7 +103,7 @@ class Yolov5Detector(DetectorLogic):
                                          category_id=category.id,
                                          model_name=self.model_info.version,
                                          confidence=float(conf)))
-                        
+
                     elif category.type == CategoryType.Point:
                         cx, cy = x + w/2, y + h/2
                         cx, cy = self.clip_point(cx, cy, im_width, im_height)
@@ -127,7 +122,7 @@ class Yolov5Detector(DetectorLogic):
             self.log.exception('inference failed')
             return image_metadata
 
-    def _preprocess_image(self, raw_bgr_image, input_size):
+    def _preprocess_image(self, raw_bgr_image):
         """
         description: Convert BGR image to RGB,
                      resize and pad it to target size, normalize to [0,1],
@@ -140,6 +135,7 @@ class Yolov5Detector(DetectorLogic):
             h: original height
             w: original width
         """
+        input_size = self.input_size
         image_raw = raw_bgr_image
         h, w, _ = image_raw.shape
         image = cv2.cvtColor(image_raw, cv2.COLOR_BGR2RGB)
@@ -173,14 +169,13 @@ class Yolov5Detector(DetectorLogic):
 
         return image, image_raw, h, w
 
-    def _post_process(self, pred, origin_h, origin_w, input_size, conf_thres=0.2, nms_thres=0.4):
+    def _post_process(self, pred, origin_h, origin_w, conf_thres, nms_thres):
         """
         description: postprocess the prediction
         param:
             output:     A numpy likes [[cx,cy,w,h,conf,cls_id], [cx,cy,w,h,conf,cls_id], ...] 
             origin_h:   height of original image
             origin_w:   width of original image
-            input_size: the input size of the model
             conf_thres: confidence threshold
             nms_thres: iou threshold
         return:
@@ -191,13 +186,13 @@ class Yolov5Detector(DetectorLogic):
 
         # Do nms
         boxes = self._non_max_suppression(
-            pred, origin_h, origin_w, input_size, conf_thres, nms_thres)
+            pred, origin_h, origin_w, conf_thres, nms_thres)
         result_boxes = boxes[:, :4] if len(boxes) else np.array([])
         result_scores = boxes[:, 4] if len(boxes) else np.array([])
         result_classid = boxes[:, 5] if len(boxes) else np.array([])
         return result_boxes, result_scores, result_classid
 
-    def _non_max_suppression(self, pred, origin_h, origin_w, input_size, conf_thres, nms_thres):
+    def _non_max_suppression(self, pred, origin_h, origin_w, conf_thres, nms_thres):
         """
         description: Removes detections with lower object confidence score than 'conf_thres' and performs
         Non-Maximum Suppression to further filter detections.
@@ -214,8 +209,7 @@ class Yolov5Detector(DetectorLogic):
         # Get the boxes that score > CONF_THRESH
         boxes = pred[pred[:, 4] >= conf_thres]
         # Trasform bbox from [center_x, center_y, w, h] to [x1, y1, x2, y2]
-        boxes[:, :4] = self.xywh2xyxy(
-            origin_h, origin_w, boxes[:, :4], input_size)
+        boxes[:, :4] = self.xywh2xyxy(origin_h, origin_w, boxes[:, :4])
         # Object confidence
         confs = boxes[:, 4]
         # Sort by the confs
@@ -276,7 +270,7 @@ class Yolov5Detector(DetectorLogic):
 
         return iou
 
-    def xywh2xyxy(self, origin_h, origin_w, x, input_size):
+    def xywh2xyxy(self, origin_h, origin_w, x):
         """
         description:    Convert nx4 boxes from [x, y, w, h] to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
         param:
@@ -286,6 +280,7 @@ class Yolov5Detector(DetectorLogic):
         return:
             y:          A boxes numpy, each row is a box [x1, y1, x2, y2]
         """
+        input_size = self.input_size
         y = np.zeros_like(x)
         r_w = input_size / origin_w
         r_h = input_size / origin_h
