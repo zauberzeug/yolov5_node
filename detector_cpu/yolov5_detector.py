@@ -19,7 +19,7 @@ class Yolov5Detector(DetectorLogic):
         super().__init__('yolov5_pytorch')
         self.yolov5 = None
         self.log = logging.getLogger('Yolov5Detector')
-        self.log.setLevel(logging.DEBUG)
+        self.log.setLevel(logging.INFO)
 
     def init(self) -> None:
         resolution = self.model_info.resolution
