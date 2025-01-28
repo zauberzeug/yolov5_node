@@ -8,12 +8,10 @@ from typing import Optional, Tuple
 
 import cv2
 import numpy as np
-from learning_loop_node.data_classes import (BoxDetection, ImageMetadata,
-                                             PointDetection)
+import yolov5
+from learning_loop_node.data_classes import BoxDetection, ImageMetadata, PointDetection
 from learning_loop_node.detector.detector_logic import DetectorLogic
 from learning_loop_node.enums import CategoryType
-
-import yolov5
 
 
 class Yolov5Detector(DetectorLogic):
@@ -108,8 +106,7 @@ class Yolov5Detector(DetectorLogic):
                                        confidence=probability))
             if skipped_detections:
                 log_msg = '\n'.join([str(d) for d in skipped_detections])
-                logging.warning(
-                    f'Removed {len(skipped_detections)} small detections from result: \n{log_msg}')
+                self.log.warning('Removed %d small detections from result: \n%s', len(skipped_detections), log_msg)
         except Exception:
             self.log.exception('inference failed')
         return image_metadata
@@ -117,9 +114,9 @@ class Yolov5Detector(DetectorLogic):
     def _create_engine(self, resolution: int, cat_count: int, wts_file: str) -> str:
         engine_file = os.path.dirname(wts_file) + '/model.engine'
         if os.path.isfile(engine_file):
-            logging.info(f'{engine_file} already exists, skipping conversion')
+            self.log.info('%s already exists, skipping conversion', engine_file)
             return engine_file
-        logging.info(f'converting {wts_file} to {engine_file}')
+        self.log.info('converting %s to %s', wts_file, engine_file)
 
         # NOTE cmake and inital building is done in Dockerfile (to speeds things up)
         os.chdir('/tensorrtx/yolov5/build')
