@@ -8,6 +8,10 @@ from learning_loop_node.data_classes import Training
 from learning_loop_node.enums import CategoryType
 from learning_loop_node.trainer.exceptions import CriticalError
 from ruamel.yaml import YAML
+from ruamel.yaml.scalarbool import ScalarBoolean
+from ruamel.yaml.scalarfloat import ScalarFloat
+from ruamel.yaml.scalarint import ScalarInt
+from ruamel.yaml.scalarstring import LiteralScalarString
 
 yaml = YAML()
 
@@ -154,7 +158,7 @@ def create_file_structure(training: Training) -> None:
     num_train_imgs = _create_set(training, 'train')
     create_dataset_yaml(training)
 
-    logging.info(f'Prepared file structure with {num_train_imgs} training images and {num_test_imgs} test images')
+    logging.info('Prepared file structure with %d training images and %d test images', num_train_imgs, num_test_imgs)
 
 
 def set_hyperparameters_in_file(yaml_path: str, hyperparameter: dict[str, Any]) -> None:
@@ -170,18 +174,29 @@ def set_hyperparameters_in_file(yaml_path: str, hyperparameter: dict[str, Any]) 
         hyperparameter['flipud'] = 0.5 if hyperparameter['flip_ud'] else 0.0
 
     for param in content:
-        if param in hyperparameter:
+        if (hp_value := hyperparameter.get(param, None)) is not None:
             yaml_value = content[param]
-            hp_value = hyperparameter[param]
+            content[param] = convert_type(hp_value, yaml_value)
 
-            try:
-                # Try to convert to float as all original yolov5 hyperparameters are floats
-                hp_value = float(hp_value)
-            except (ValueError, TypeError) as e:
-                raise CriticalError(f'Parameter {param} cannot be converted from {type(hp_value)} to float') from e
+    logging.info('Hyps after update: %s', content)
 
-            logging.info(f'Setting hyperparameter {param} to {hp_value} (Default was {yaml_value})')
-            content[param] = hp_value
+    try:
+        with open(yaml_path, 'w') as f:
+            yaml.dump(content, f)
+    except Exception as e:
+        logging.error('Error writing to %s: %s', yaml_path, e)
+        raise CriticalError(f'Error writing to {yaml_path}') from None
 
-    with open(yaml_path, 'w') as f:
-        yaml.dump(content, f)
+
+def convert_type(value, reference: Any):
+
+    if isinstance(reference, (LiteralScalarString, str)):
+        return str(value)
+    if isinstance(reference, (ScalarFloat, float)):
+        return float(value)
+    if isinstance(reference, (ScalarInt, int)):
+        return int(value)
+    if isinstance(reference, (ScalarBoolean, bool)):
+        return bool(value)
+
+    raise CriticalError(f'Unknown type: {type(reference)}')
