@@ -17,7 +17,6 @@ from itertools import repeat
 from multiprocessing.pool import Pool, ThreadPool
 from pathlib import Path
 from threading import Thread
-from typing import List
 from urllib.parse import urlparse
 
 import numpy as np
@@ -30,13 +29,11 @@ from PIL import ExifTags, Image, ImageOps
 from torch.utils.data import DataLoader, Dataset, dataloader, distributed
 from tqdm import tqdm
 
-from .augmentations import (Albumentations, augment_hsv,
-                            classify_albumentations, classify_transforms,
-                            copy_paste, letterbox, mixup, random_perspective)
-from .general import (DATASETS_DIR, LOGGER, NUM_THREADS, TQDM_BAR_FORMAT,
-                      check_dataset, check_requirements, check_yaml, clean_str,
-                      cv2, is_colab, is_kaggle, segments2boxes, unzip_file,
-                      xyn2xy, xywh2xyxy, xywhn2xyxy, xyxy2xywhn)
+from .augmentations import (Albumentations, augment_hsv, classify_albumentations, classify_transforms, copy_paste,
+                            letterbox, mixup, random_perspective)
+from .general import (DATASETS_DIR, LOGGER, NUM_THREADS, TQDM_BAR_FORMAT, check_dataset, check_requirements, check_yaml,
+                      clean_str, cv2, is_colab, is_kaggle, segments2boxes, unzip_file, xyn2xy, xywh2xyxy, xywhn2xyxy,
+                      xyxy2xywhn)
 from .torch_utils import torch_distributed_zero_first
 
 # Parameters
@@ -674,6 +671,7 @@ class LoadImagesAndLabels(Dataset):
         index = self.indices[index]  # linear, shuffled, or image_weights
 
         hyp = self.hyp
+        assert hyp is not None, 'hyp should be set'
         mosaic = self.mosaic and random.random() < hyp['mosaic']
         if mosaic:
             # Load mosaic
@@ -737,7 +735,6 @@ class LoadImagesAndLabels(Dataset):
             # nl = len(labels)  # update after cutout
 
         # print('label info. image shape in:', self.prefix, img.shape)
-        # print('Reset points is set to:', os.getenv('RESET_POINTS', 'TRUE').lower() in ['true', '1'])
         # for label in labels:
         #     if label[0] in self.point_sizes_by_id:
         #         target_point_size_px = self.point_sizes_by_id[label[0]]
@@ -752,7 +749,7 @@ class LoadImagesAndLabels(Dataset):
         # all coorinates are normalized to the image size, i.e. xywh are in [0, 1]
         # Note that img.size may be larger than self.img_size, e.g. when using mosaic augmentation
 
-        reset_points = os.getenv('RESET_POINTS', 'FALSE').lower() in ['true', '1']
+        reset_points = hyp.get('reset_points', False)
         if reset_points and len(self.point_sizes_by_id) > 0:
             for label in labels:
                 if label[0] in self.point_sizes_by_id:
