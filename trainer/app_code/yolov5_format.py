@@ -116,10 +116,10 @@ def _create_set_cla(training: Training, set_name: str) -> None:
                 category = classification['category_id']
                 category_name = [c for c in training.categories if c.id == category][0].name
                 image_path = f"{images_path}/{category_name}/{image_name}"
-                # logging.info(f'linking {image_name} to {image_path}')
+                # logging.info('linking %s to %s', image_name, image_path)
                 os.symlink(f'{os.path.abspath(training.images_folder)}/{image_name}', image_path)
 
-    logging.info(f'Created {count} image links')
+    logging.info('Created %d image links', count)
 
 
 def create_dataset_yaml(training: Training) -> None:
@@ -132,7 +132,7 @@ def create_dataset_yaml(training: Training) -> None:
         'nc': len(categories),
         'names': list(categories.keys())
     }
-    logging.info(f'ordered names: {data["names"]}')
+    logging.info('ordered names: %s', data['names'])
     with open(f'{path}/dataset.yaml', 'w') as f:
         yaml.dump(data, f)
 
@@ -163,7 +163,7 @@ def create_file_structure(training: Training) -> None:
 
 def set_hyperparameters_in_file(yaml_path: str, hyperparameter: dict[str, Any]) -> None:
 
-    with open(yaml_path) as f:
+    with open(yaml_path, 'r') as f:
         content = yaml.load(f)
 
     if 'flip_rl' in hyperparameter:
@@ -174,7 +174,7 @@ def set_hyperparameters_in_file(yaml_path: str, hyperparameter: dict[str, Any]) 
         hyperparameter['flipud'] = 0.5 if hyperparameter['flip_ud'] else 0.0
 
     for param in content:
-        if (hp_value := hyperparameter.get(param, None)) is not None:
+        if (hp_value := hyperparameter.get(param)) is not None:
             yaml_value = content[param]
             content[param] = convert_type(hp_value, yaml_value)
 
