@@ -34,3 +34,4 @@ copy_paste: 0.0
 
 #own parameters
 epochs: 2000
+reset_points: false
