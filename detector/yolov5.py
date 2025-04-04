@@ -15,8 +15,6 @@ import pycuda.driver as cuda
 import tensorrt as trt
 from pycuda._driver import Error as CudaError
 
-CONF_THRESH = 0.2
-IOU_THRESHOLD = 0.4
 LEN_ALL_RESULT = 38001
 LEN_ONE_RESULT = 38
 
@@ -40,7 +38,9 @@ class YoLov5TRT():
     description: A YOLOv5 class that warps TensorRT ops, preprocess and postprocess ops.
     """
 
-    def __init__(self, engine_file_path: str):
+    def __init__(self, engine_file_path: str, iou_threshold: float, conf_threshold: float):
+        logging.info(
+            f'Initializing YOLOv5 TRT engine with iou_threshold: {iou_threshold}, conf_threshold: {conf_threshold}')
         # Create a Context on this device,
         try:
             cuda.init()
@@ -50,6 +50,9 @@ class YoLov5TRT():
             return
 
         self.cuda_init_error = False
+
+        self.iou_threshold = iou_threshold
+        self.conf_threshold = conf_threshold
 
         self.ctx = cuda.Device(0).make_context()
         stream = cuda.Stream()
@@ -260,7 +263,7 @@ class YoLov5TRT():
         pred = pred[:, :6]
         # Do nms
         boxes = self._non_max_suppression(
-            pred, origin_h, origin_w, conf_thres=CONF_THRESH, nms_thres=IOU_THRESHOLD)
+            pred, origin_h, origin_w, conf_thres=self.conf_threshold, nms_thres=self.iou_threshold)
         result_boxes = boxes[:, :4] if len(boxes) else np.array([])
         result_scores = boxes[:, 4] if len(boxes) else np.array([])
         result_classid = boxes[:, 5] if len(boxes) else np.array([])
@@ -309,7 +312,7 @@ class YoLov5TRT():
 
         return iou
 
-    def _non_max_suppression(self, prediction, origin_h, origin_w, conf_thres=0.5, nms_thres=0.4):
+    def _non_max_suppression(self, prediction, origin_h, origin_w, conf_thres, nms_thres):
         """
         description: Removes detections with lower object confidence score than 'conf_thres' and performs
         Non-Maximum Suppression to further filter detections.

@@ -23,6 +23,8 @@ class Yolov5Detector(DetectorLogic):
         assert self.weight_type in ['FP16', 'FP32', 'INT8'], 'WEIGHT_TYPE must be one of FP16, FP32, INT8'
         self.log = logging.getLogger('Yolov5Detector')
         self.log.setLevel(logging.INFO)
+        self.iou_threshold = float(os.getenv('IOU_THRESHOLD', '0.4'))
+        self.conf_threshold = float(os.getenv('CONF_THRESHOLD', '0.2'))
 
     def init(self) -> None:
         assert self.model_info is not None, 'model_info must be set before calling init()'
@@ -37,7 +39,7 @@ class Yolov5Detector(DetectorLogic):
             self.yolov5 = None
             self.log.info('destroyed old yolov5 instance')
 
-        self.yolov5 = yolov5.YoLov5TRT(engine_file)
+        self.yolov5 = yolov5.YoLov5TRT(engine_file, self.iou_threshold, self.conf_threshold)
         for _ in range(3):
             warmup = yolov5.warmUpThread(self.yolov5)
             warmup.start()
