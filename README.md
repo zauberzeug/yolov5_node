@@ -35,6 +35,17 @@ There are two variants of the detector:
 - to be deployed on a regular Linux computer, e.g. running Ubuntu (referred to as cloud-detectors)
 - to be deployed on a Jetson Nano running Linux4Tegra (L4T)
 
+Mandatory parameters are those described in [Zauberzeug Learning Loop Node Library](https://github.com/zauberzeug/learning_loop_node).
+Besides, the following parameters may be set:
+
+| Name           | Purpose                                   | Value                     | Default | Required only with ./docker.sh |
+| -------------- | ----------------------------------------- | ------------------------- | ------- | ------------------------------ |
+| LINKLL         | Link the node library into the container? | TRUE or FALSE             | FALSE   | Yes                            |
+| DETECTOR_NAME  | Will be the name of the container         | String                    | -       | Yes                            |
+| WEIGHT_TYPE    | Data type to convert weights to           | String [FP32, FP16, INT8] | FP16    | No                             |
+| IOU_THRESHOLD  | IoU threshold for NMS                     | Float                     | 0.45    | No                             |
+| CONF_THRESHOLD | Confidence threshold for NMS              | Float                     | 0.2     | No                             |
+
 ### Cloud-Detector
 
 New images can be pulled with `docker pull zauberzeug/yolov5-detector:nlvX.Y.Z-cloud`, where `X.Y.Z` is the version of the node-lib used.
@@ -43,13 +54,6 @@ Legacy images can be pulled with `docker pull zauberzeug/yolov5-detector:cloud`.
 Pulled images can be run with the `docker.sh` script by calling `./docker.sh run-image`.
 Local builds can be run with `./docker.sh run`.
 If the container does not use the GPU, try `./docker.sh d`.
-Mandatory parameters are those described in [Zauberzeug Learning Loop Node Library](https://github.com/zauberzeug/learning_loop_node). Besides, the following parameters may be set:
-
-| Name          | Purpose                                   | Value                     | Default | Required only with ./docker.sh |
-| ------------- | ----------------------------------------- | ------------------------- | ------- | ------------------------------ |
-| LINKLL        | Link the node library into the container? | TRUE or FALSE             | FALSE   | Yes                            |
-| DETECTOR_NAME | Will be the name of the container         | String                    | -       | Yes                            |
-| WEIGHT_TYPE   | Data type to convert weights to           | String [FP32, FP16, INT8] | FP16    | No                             |
 
 ### L4T-Detector
 

@@ -11,9 +11,11 @@ from collections import namedtuple
 
 import cv2
 import numpy as np
-import pycuda.driver as cuda
-import tensorrt as trt
-from pycuda._driver import Error as CudaError
+import pycuda.driver as cuda  # type: ignore # pylint: disable=import-error
+import tensorrt as trt  # type: ignore # pylint: disable=import-error
+from pycuda._driver import (  # type: ignore # pylint: disable=import-error
+    Error as CudaError,
+)
 
 LEN_ALL_RESULT = 38001
 LEN_ONE_RESULT = 38
@@ -39,20 +41,22 @@ class YoLov5TRT():
     """
 
     def __init__(self, engine_file_path: str, iou_threshold: float, conf_threshold: float):
-        logging.info(
-            f'Initializing YOLOv5 TRT engine with iou_threshold: {iou_threshold}, conf_threshold: {conf_threshold}')
+        logging.info('Initializing YOLOv5 TRT engine with iou_threshold: %s, conf_threshold: %s',
+                     iou_threshold, conf_threshold)
         # Create a Context on this device,
         try:
             cuda.init()
-        except CudaError as e:
-            logging.exception('cuda init error:', e)
+        except CudaError:
+            logging.exception('cuda init error:')
             self.cuda_init_error = True
             return
 
         self.cuda_init_error = False
 
         self.iou_threshold = iou_threshold
+        """a iou threshold to filter detections during nms"""
         self.conf_threshold = conf_threshold
+        """a confidence threshold to filter detections during nms"""
 
         self.ctx = cuda.Device(0).make_context()
         stream = cuda.Stream()
@@ -110,7 +114,7 @@ class YoLov5TRT():
     def infer(self, image_raw):
         self.check_cuda_init_error()
 
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self)  # type: ignore
         # Make self the active context, pushing it on top of the context stack.
         self.ctx.push()
         # Restore
@@ -262,8 +266,7 @@ class YoLov5TRT():
         pred = np.reshape(output[1:], (-1, LEN_ONE_RESULT))[:num, :]
         pred = pred[:, :6]
         # Do nms
-        boxes = self._non_max_suppression(
-            pred, origin_h, origin_w, conf_thres=self.conf_threshold, nms_thres=self.iou_threshold)
+        boxes = self._non_max_suppression(pred, origin_h, origin_w)
         result_boxes = boxes[:, :4] if len(boxes) else np.array([])
         result_scores = boxes[:, 4] if len(boxes) else np.array([])
         result_classid = boxes[:, 5] if len(boxes) else np.array([])
@@ -312,7 +315,7 @@ class YoLov5TRT():
 
         return iou
 
-    def _non_max_suppression(self, prediction, origin_h, origin_w, conf_thres, nms_thres):
+    def _non_max_suppression(self, prediction, origin_h, origin_w):
         """
         description: Removes detections with lower object confidence score than 'conf_thres' and performs
         Non-Maximum Suppression to further filter detections.
@@ -320,11 +323,13 @@ class YoLov5TRT():
             prediction: detections, (x1, y1, x2, y2, conf, cls_id)
             origin_h: original image height
             origin_w: original image width
-            conf_thres: a confidence threshold to filter detections
-            nms_thres: a iou threshold to filter detections
         return:
             boxes: output after nms with the shape (x1, y1, x2, y2, conf, cls_id)
         """
+
+        conf_thres = self.conf_threshold
+        nms_thres = self.iou_threshold
+
         # Get the boxes that score > CONF_THRESH
         boxes = prediction[prediction[:, 4] >= conf_thres]
         # Trandform bbox from [center_x, center_y, w, h] to [x1, y1, x2, y2]
