@@ -10,15 +10,18 @@ from pathlib import Path
 import cv2
 import yaml  # type: ignore
 from fastapi.encoders import jsonable_encoder
-from learning_loop_node.data_classes import (BoxDetection,
-                                             ClassificationDetection,
-                                             Detections, ModelInformation,
-                                             PointDetection, PretrainedModel,
-                                             TrainingStateData)
+from learning_loop_node.data_classes import (
+    BoxDetection,
+    ClassificationDetection,
+    Detections,
+    ModelInformation,
+    PointDetection,
+    PretrainedModel,
+    TrainingStateData,
+)
 from learning_loop_node.enums import CategoryType
 from learning_loop_node.trainer import trainer_logic
-from learning_loop_node.trainer.exceptions import (CriticalError,
-                                                   NodeNeedsRestartError)
+from learning_loop_node.trainer.exceptions import CriticalError, NodeNeedsRestartError
 from learning_loop_node.trainer.executor import Executor
 
 from . import batch_size_calculation, model_files, yolov5_format
@@ -32,11 +35,17 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             assert os.getenv('YOLOV5_MODE') == 'DETECTION', 'YOLOV5_MODE should be `DETECTION` or `CLASSIFICATION`'
         super().__init__(model_format='yolov5_pytorch' if not self.is_cla else 'yolov5_cla_pytorch')
 
-        logging.info(f'------ STARTING YOLOV5 TRAINER LOGIC WITH MODE {os.getenv("YOLOV5_MODE")} ------')
+        logging.info('------ STARTING YOLOV5 TRAINER LOGIC WITH MODE %s ------', os.getenv('YOLOV5_MODE'))
         self.latest_epoch = 0
-        self.epochs = 0  # will be overwritten by hyp.yaml
         self.patience = 300
         self.inference_batch_size = 100  # yolo processes images one by one
+
+        # Following will be overwritten by hyp.yaml
+        self.epochs = 0
+        self.detect_nms_conf_thres = 0.2
+        self.detect_nms_iou_thres = 0.45
+
+        self.additional_hyperparameters_parsed = False
 
     # ---------------------------------------- IMPLEMENTED ABSTRACT PROPERTIES ----------------------------------------
 
@@ -59,6 +68,10 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
                     PretrainedModel(name='x-cls', label='YOLO v5 large', description='~5fps on Jetson Nano'),]
 
         return [PretrainedModel(name='s6', label='YOLO v5 small', description='~5 fps on Jetson Nano'), ]
+
+    @property
+    def hyperparameter_path(self) -> str:
+        return f'{self.training.training_folder}/hyp.yaml'
 
     # ---------------------------------------- IMPLEMENTED ABSTRACT METHODS ----------------------------------------
 
@@ -99,7 +112,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             epoch = model_files.epoch_from_weightfile(weightfile)
 
         weightfile_str = str(weightfile.absolute())
-        logging.info(f'found new best model at {weightfile_str}')
+        logging.info('found new best model at %s', weightfile_str)
 
         with open(str(weightfile_str)[:-3] + '.json') as f:
             metrics = json.load(f)
@@ -134,13 +147,16 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         executor = Executor(self.training.training_folder, 'wts-converter.log')
         await executor.start('python /app/generate_wts.py -w /tmp/model.pt -o /tmp/model.wts')
         if await executor.wait() != 0:
-            logging.error(f'Error during generating wts file: \n {executor.get_log()}')
+            logging.error('Error during generating wts file: %s', executor.get_log())
             raise Exception('Error during generating wts file')
 
         return {self.model_format: ['/tmp/model.pt', f'{training_path}/hyp.yaml'], 'yolov5_wts': ['/tmp/model.wts']}
 
     async def _detect(self, model_information: ModelInformation, images: list[str],
                       model_folder: str) -> list[Detections]:
+
+        self._set_params_from_hyperparameters()
+
         images_folder = '/tmp/imagelinks_for_detecting'
         shutil.rmtree(images_folder, ignore_errors=True)
         os.makedirs(images_folder)
@@ -158,12 +174,12 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         if self.is_cla:
             cmd = f'python /app/pred_cla.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --save-txt'
         else:
-            cmd = f'python /app/pred_det.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --conf-thres 0.2'
+            cmd = f'python /app/pred_det.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --conf-thres {self.detect_nms_conf_thres} --iou-thres {self.detect_nms_iou_thres}'
 
         await executor.start(cmd)
         if await executor.wait() != 0:
             executor_log = executor.get_log()
-            logging.error(f'Error during detecting: \n {executor_log}')
+            logging.error('Error during detecting: %s', executor_log)
             if 'CUDA out of memory' in executor_log or 'No CUDA GPUs are available' in executor_log:
                 raise NodeNeedsRestartError()
 
@@ -192,68 +208,81 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     # ---------------------------------------- ADDITIONAL METHODS ----------------------------------------
 
     async def _start_training_from_model(self, model: str) -> None:
-        def move_and_update_hyps(source: Path, target: str) -> None:
-            assert (source).exists(), 'Hyperparameter file not found at "{hyperparameter_source_path}"'
-            shutil.copy(source, target)
-            yolov5_format.set_hyperparameters_in_file(target, self.hyperparameters)
-
-        base_hyp_path = Path(__file__).resolve().parents[1] / ('hyp_cla.yaml' if self.is_cla else 'hyp_det.yaml')
 
         if self.is_cla:
             yolov5_format.create_file_structure_cla(self.training)
             if model == 'model.pt':
                 model = f'{self.training.training_folder}/model.pt'
-            move_and_update_hyps(base_hyp_path, f'{self.training.training_folder}/hyp.yaml')
-            await self._start(model)
+            additional_params = ''
         else:
             yolov5_format.create_file_structure(self.training)
-            move_and_update_hyps(base_hyp_path, f'{self.training.training_folder}/hyp.yaml')
-            await self._start(model, " --clear")
+            additional_params = ' --clear'
+
+        base_hyp_path = Path(__file__).resolve().parents[1] / ('hyp_cla.yaml' if self.is_cla else 'hyp_det.yaml')
+        assert (base_hyp_path).exists(), f'Hyperparameter file not found at "{base_hyp_path}"'
+        shutil.copy(base_hyp_path, self.hyperparameter_path)
+        yolov5_format.set_hyperparameters_in_file(self.hyperparameter_path, self.hyperparameters)
+
+        await self._start(model, additional_params)
 
     async def _start(self, model: str, additional_parameters: str = ''):
         resolution = self.training.hyperparameters['resolution']
-        hyperparameter_path = f'{self.training.training_folder}/hyp.yaml'
-        self._load_hyps_set_epochs(hyperparameter_path)
+
+        self._set_params_from_hyperparameters()
 
         if self.is_cla:
             cmd = f'python /app/train_cla.py --exist-ok --img {resolution} \
                 --data {self.training.training_folder} --model {model} \
                 --project {self.training.training_folder} --name result \
-                --hyp {hyperparameter_path} --optimizer SGD {additional_parameters}'
+                --hyp {self.hyperparameter_path} --optimizer SGD {additional_parameters}'
         else:
             p_ids, p_sizes = yolov5_format.get_ids_and_sizes_of_point_classes(self.training)
-            self._try_replace_optimized_hyperparameter()
+            # self._try_replace_optimized_hyperparameter()
             try:
-                batch_size = await batch_size_calculation.calc(self.training.training_folder, model, hyperparameter_path,
+                batch_size = await batch_size_calculation.calc(self.training.training_folder, model, self.hyperparameter_path,
                                                                f'{self.training.training_folder}/dataset.yaml', resolution)
             except Exception as e:
-                logging.error(f'Error during batch size calculation: {e}')
+                logging.exception('Error during batch size calculation:')
                 raise NodeNeedsRestartError() from e
 
             cmd = f'python /app/train_det.py --exist-ok --patience {self.patience} \
                 --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} \
-                --project {self.training.training_folder} --name result --hyp {hyperparameter_path} \
+                --project {self.training.training_folder} --name result --hyp {self.hyperparameter_path} \
                 --epochs {self.epochs} {additional_parameters}'
             if p_ids:
                 cmd += f' --point_ids {",".join(p_ids)} --point_sizes {",".join(p_sizes)}'
 
         await self.executor.start(cmd, env={'WANDB_MODE': 'disabled'})
 
-    def _load_hyps_set_epochs(self, hyp_path: str) -> None:
-        with open(hyp_path, errors='ignore') as f:
+    def _set_params_from_hyperparameters(self) -> None:
+        if self.additional_hyperparameters_parsed:
+            return
+        self.additional_hyperparameters_parsed = True
+
+        if not os.path.exists(self.hyperparameter_path):
+            logging.warning('No hyperparameter file found at %s', self.hyperparameter_path)
+            raise CriticalError(f'No hyperparameter file found at {self.hyperparameter_path}')
+
+        with open(self.hyperparameter_path, errors='ignore') as f:
             hyp = yaml.safe_load(f)  # load hyps dict
         hyp = {k: float(v) for k, v in hyp.items()}
         hyp_str = 'hyps: ' + ', '.join(f'{k}={v}' for k, v in hyp.items())
-        logging.info(hyp_str)
-        self.epochs = int(hyp.get('epochs', self.epochs))
+        logging.info('parsing hyperparameters: %s', hyp_str)
 
-    def _try_replace_optimized_hyperparameter(self):
-        optimized_hyp = f'{self.training.project_folder}/yolov5s6_evolved_hyperparameter.yaml'
-        if os.path.exists(optimized_hyp):
-            logging.info('Found optimized hyperparameter')
-            shutil.copy(optimized_hyp, f'{self.training.training_folder}/hyp.yaml')
-        else:
-            logging.warning('No optimized hyperparameter found (!)')
+        self.epochs = int(hyp.get('epochs', self.epochs))
+        self.detect_nms_conf_thres = hyp.get('detect_nms_conf_thres', self.detect_nms_conf_thres)
+        self.detect_nms_iou_thres = hyp.get('detect_nms_iou_thres', self.detect_nms_iou_thres)
+
+        logging.info('parsing done: epochs: %d, detect_nms_conf_thres: %f, detect_nms_iou_thres: %f',
+                     self.epochs, self.detect_nms_conf_thres, self.detect_nms_iou_thres)
+
+    # def _try_replace_optimized_hyperparameter(self):
+    #     optimized_hyp = f'{self.training.project_folder}/yolov5s6_evolved_hyperparameter.yaml'
+    #     if os.path.exists(optimized_hyp):
+    #         logging.info('Found optimized hyperparameter')
+    #         shutil.copy(optimized_hyp, self.hyperparameter_path)
+    #     else:
+    #         logging.warning('No optimized hyperparameter found (!)')
 
     def _parse(self, labels_path: str, images_folder: str, model_information: ModelInformation) -> list[Detections]:
         detections = []

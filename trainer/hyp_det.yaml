@@ -35,3 +35,5 @@ copy_paste: 0.0
 #own parameters
 epochs: 2000
 reset_points: false
+detect_nms_conf_thres: 0.2
+detect_nms_iou_thres: 0.45

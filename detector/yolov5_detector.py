@@ -23,6 +23,8 @@ class Yolov5Detector(DetectorLogic):
         assert self.weight_type in ['FP16', 'FP32', 'INT8'], 'WEIGHT_TYPE must be one of FP16, FP32, INT8'
         self.log = logging.getLogger('Yolov5Detector')
         self.log.setLevel(logging.INFO)
+        self.iou_threshold = float(os.getenv('IOU_THRESHOLD', '0.45'))
+        self.conf_threshold = float(os.getenv('CONF_THRESHOLD', '0.2'))
 
     def init(self) -> None:
         assert self.model_info is not None, 'model_info must be set before calling init()'
@@ -37,7 +39,7 @@ class Yolov5Detector(DetectorLogic):
             self.yolov5 = None
             self.log.info('destroyed old yolov5 instance')
 
-        self.yolov5 = yolov5.YoLov5TRT(engine_file)
+        self.yolov5 = yolov5.YoLov5TRT(engine_file, self.iou_threshold, self.conf_threshold)
         for _ in range(3):
             warmup = yolov5.warmUpThread(self.yolov5)
             warmup.start()
@@ -45,22 +47,32 @@ class Yolov5Detector(DetectorLogic):
 
     @staticmethod
     def clip_box(
-            x: float, y: float, width: float, height: float, img_width: int, img_height: int) -> Tuple[
-            float, float, float, float]:
-        '''make sure the box is within the image
-            x,y is the center of the box
+            x1: float, y1: float, width: float, height: float, img_width: int, img_height: int) -> Tuple[
+            int, int, int, int]:
+        '''Clips a box defined by top-left corner (x1, y1), width, and height
+           to stay within image boundaries (img_width, img_height).
+           Returns the clipped (x1, y1, width, height) as ints.
         '''
-        left = max(0, x - 0.5 * width)
-        top = max(0, y - 0.5 * height)
-        right = min(img_width, x + 0.5 * width)
-        bottom = min(img_height, y + 0.5 * height)
+        x2 = x1 + width
+        y2 = y1 + height
 
-        x = 0.5 * (left + right)
-        y = 0.5 * (top + bottom)
-        width = right - left
-        height = bottom - top
+        # Clip coordinates
+        clipped_x1 = round(max(0.0, x1))
+        clipped_y1 = round(max(0.0, y1))
+        clipped_x2 = round(min(float(img_width), x2))
+        clipped_y2 = round(min(float(img_height), y2))
 
-        return x, y, width, height
+        # Recalculate dimensions
+        clipped_width = clipped_x2 - clipped_x1
+        clipped_height = clipped_y2 - clipped_y1
+
+        # Ensure width and height are non-negative
+        if clipped_width < 0:
+            clipped_width = 0
+        if clipped_height < 0:
+            clipped_height = 0
+
+        return clipped_x1, clipped_y1, clipped_width, clipped_height
 
     @staticmethod
     def clip_point(x: float, y: float, img_width: int, img_height: int) -> Tuple[float, float]:
@@ -87,13 +99,13 @@ class Yolov5Detector(DetectorLogic):
                     skipped_detections.append((category.name, detection))
                     continue
                 if category.type == CategoryType.Box:
-                    x, y, w, h = self.clip_box(x, y, w, h, im_width, im_height)
+                    clipped_x1, clipped_y1, clipped_w, clipped_h = self.clip_box(x, y, w, h, im_width, im_height)
                     image_metadata.box_detections.append(
                         BoxDetection(category_name=category.name,
-                                     x=round(x),
-                                     y=round(y),
-                                     width=round(x+w)-round(x),
-                                     height=round(y+h)-round(y),
+                                     x=clipped_x1,
+                                     y=clipped_y1,
+                                     width=clipped_w,
+                                     height=clipped_h,
                                      category_id=category.id,
                                      model_name=self.model_info.version,
                                      confidence=probability))
