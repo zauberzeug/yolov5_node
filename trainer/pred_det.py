@@ -30,21 +30,25 @@ Usage - formats:
 
 import argparse
 import os
-import platform
 import signal
 import sys
 from pathlib import Path
 
 import torch
-
 from app_code.yolov5.models.common import DetectMultiBackend
 from app_code.yolov5.utils.dataloaders import LoadImages
-from app_code.yolov5.utils.general import (LOGGER, Profile, check_img_size,
-                                           check_requirements, colorstr,
-                                           non_max_suppression, print_args,
-                                           scale_boxes, xyxy2xywh)
-from app_code.yolov5.utils.torch_utils import (select_device,
-                                               smart_inference_mode)
+from app_code.yolov5.utils.general import (
+    LOGGER,
+    Profile,
+    check_img_size,
+    check_requirements,
+    colorstr,
+    non_max_suppression,
+    print_args,
+    scale_boxes,
+    xyxy2xywh,
+)
+from app_code.yolov5.utils.torch_utils import select_device, smart_inference_mode
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]/'app_code/yolov5'  # yolov5 root directory
@@ -70,7 +74,7 @@ def parse_opt():
     parser.add_argument('--weights', nargs='+', type=str, default=ROOT / 'yolov5s.pt', help='model path or triton URL')
     parser.add_argument('--source', type=str, default=ROOT / 'data/images', help='file/dir/URL/glob/screen/0(webcam)')
     parser.add_argument('--imgsz', '--img', '--img-size', nargs='+', type=int, default=[640], help='inference size h,w')
-    parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
+    parser.add_argument('--conf-thres', type=float, default=0.2, help='confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
     parser.add_argument('--max-det', type=int, default=1000, help='maximum detections per image')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
@@ -109,17 +113,17 @@ def run(
 
     # Load model
     device = select_device(device)
-    model = DetectMultiBackend(weights, device=device, dnn=False, data=data, fp16=False)
+    model = DetectMultiBackend(weights, device=device, dnn=False, data=data, fp16=False)  # type: ignore
     stride, names, pt = model.stride, model.names, model.pt
     imgsz = check_img_size(imgsz, s=stride)  # check image size
 
     # Dataloader
     bs = 1  # batch_size
-    LOGGER.info(f'Loading images from: "{source}"')
-    dataset = LoadImages(source, img_size=imgsz, stride=stride, auto=pt, vid_stride=1)
+    LOGGER.info('Loading images from: "%s"', source)
+    dataset = LoadImages(source, img_size=imgsz, stride=stride, auto=pt, vid_stride=1)  # type: ignore
 
     # Run inference
-    model.warmup(imgsz=(1 if pt or model.triton else bs, 3, *imgsz))  # warmup
+    model.warmup(imgsz=(1 if pt or model.triton else bs, 3, *imgsz))  # warmup # type: ignore
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
     for path, im, im0s, vid_cap, s in dataset:
         with dt[0]:
