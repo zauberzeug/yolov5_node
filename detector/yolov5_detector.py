@@ -25,6 +25,7 @@ class Yolov5Detector(DetectorLogic):
         self.log.setLevel(logging.INFO)
 
     def init(self) -> None:
+        assert self.model_info is not None, 'model_info must be set before calling init()'
         resolution = self.model_info.resolution
         assert resolution is not None
         engine_file = self._create_engine(resolution,
@@ -67,12 +68,14 @@ class Yolov5Detector(DetectorLogic):
         y = min(max(0, y), img_height)
         return x, y
 
-    def evaluate(self, image: np.ndarray) -> ImageMetadata:
+    def evaluate(self, image: bytes) -> ImageMetadata:
         assert self.yolov5 is not None, 'init() must be executed first. Maybe loading the engine failed?!'
+        assert self.model_info is not None, 'model_info must be set before calling evaluate()'
+
         image_metadata = ImageMetadata()
         try:
             t = time.time()
-            cv_image = cv2.imdecode(image, cv2.IMREAD_COLOR)
+            cv_image = cv2.imdecode(np.frombuffer(image, np.uint8), cv2.IMREAD_COLOR)
             im_height, im_width, _ = cv_image.shape
             results, inference_ms = self.yolov5.infer(cv_image)
             skipped_detections = []
