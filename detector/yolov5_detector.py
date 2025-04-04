@@ -23,7 +23,7 @@ class Yolov5Detector(DetectorLogic):
         assert self.weight_type in ['FP16', 'FP32', 'INT8'], 'WEIGHT_TYPE must be one of FP16, FP32, INT8'
         self.log = logging.getLogger('Yolov5Detector')
         self.log.setLevel(logging.INFO)
-        self.iou_threshold = float(os.getenv('IOU_THRESHOLD', '0.4'))
+        self.iou_threshold = float(os.getenv('IOU_THRESHOLD', '0.45'))
         self.conf_threshold = float(os.getenv('CONF_THRESHOLD', '0.2'))
 
     def init(self) -> None:
