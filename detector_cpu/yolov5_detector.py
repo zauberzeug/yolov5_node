@@ -19,8 +19,11 @@ class Yolov5Detector(DetectorLogic):
         self.input_size: int = 0
         self.log = logging.getLogger('Yolov5Detector')
         self.log.setLevel(logging.INFO)
+        self.iou_threshold = float(os.getenv('IOU_THRESHOLD', '0.45'))
+        self.conf_threshold = float(os.getenv('CONF_THRESHOLD', '0.2'))
 
     def init(self) -> None:
+        assert self.model_info is not None, 'model_info must be set before calling init()'
         resolution = self.model_info.resolution
         assert resolution is not None
         pt_file = f'{self.model_info.model_root_path}/model.pt'
@@ -34,22 +37,32 @@ class Yolov5Detector(DetectorLogic):
 
     @staticmethod
     def clip_box(
-            x: float, y: float, width: float, height: float, img_width: int, img_height: int) -> Tuple[
-            float, float, float, float]:
-        '''make sure the box is within the image
-            x,y is the center of the box
+            x1: float, y1: float, width: float, height: float, img_width: int, img_height: int) -> Tuple[
+            int, int, int, int]:
+        '''Clips a box defined by top-left corner (x1, y1), width, and height
+           to stay within image boundaries (img_width, img_height).
+           Returns the clipped (x1, y1, width, height) as ints.
         '''
-        left = max(0, x - 0.5 * width)
-        top = max(0, y - 0.5 * height)
-        right = min(img_width, x + 0.5 * width)
-        bottom = min(img_height, y + 0.5 * height)
+        x2 = x1 + width
+        y2 = y1 + height
 
-        x = 0.5 * (left + right)
-        y = 0.5 * (top + bottom)
-        width = right - left
-        height = bottom - top
+        # Clip coordinates
+        clipped_x1 = round(max(0.0, x1))
+        clipped_y1 = round(max(0.0, y1))
+        clipped_x2 = round(min(float(img_width), x2))
+        clipped_y2 = round(min(float(img_height), y2))
 
-        return x, y, width, height
+        # Recalculate dimensions
+        clipped_width = clipped_x2 - clipped_x1
+        clipped_height = clipped_y2 - clipped_y1
+
+        # Ensure width and height are non-negative
+        if clipped_width < 0:
+            clipped_width = 0
+        if clipped_height < 0:
+            clipped_height = 0
+
+        return clipped_x1, clipped_y1, clipped_width, clipped_height
 
     @staticmethod
     def clip_point(x: float, y: float, img_width: int, img_height: int) -> Tuple[float, float]:
@@ -57,15 +70,17 @@ class Yolov5Detector(DetectorLogic):
         y = min(max(0, y), img_height)
         return x, y
 
-    def evaluate(self, image: np.ndarray) -> ImageMetadata:
+    def evaluate(self, image: bytes) -> ImageMetadata:
         assert self.yolov5 is not None, 'init() must be executed first!'
+        assert self.model_info is not None, 'model_info must be set before calling evaluate()'
+
         image_metadata = ImageMetadata()
         assert self.model_info.resolution, "input_size must be an integer > 0"
         self.input_size = self.model_info.resolution
 
         try:
             t = time.time()
-            cv_image = cv2.imdecode(image, cv2.IMREAD_COLOR)  # Returns BGR
+            cv_image = cv2.imdecode(np.frombuffer(image, np.uint8), cv2.IMREAD_COLOR)
             input_image, _, origin_h, origin_w = self._preprocess_image(cv_image)
 
             im_height = origin_h
@@ -75,45 +90,51 @@ class Yolov5Detector(DetectorLogic):
             det = self.yolov5(torch.from_numpy(input_image))[0].numpy()[0]
 
             # NMS with lower confidence threshold
-            conf_thres = 0.2  # Lowered from 0.25
-            iou_thres = 0.4
+            conf_thres = self.conf_threshold
+            iou_thres = self.iou_threshold
             max_det = 1000
 
-            if len(det):
-                result_boxes, result_scores, result_classid = self._post_process(
-                    det, origin_h, origin_w, conf_thres, iou_thres)
+            if len(det) == 0:
+                return image_metadata
 
-                for j, box in enumerate(result_boxes[:max_det]):
-                    x, y, br_x, br_y = box
-                    w = br_x - x
-                    h = br_y - y
-                    category_idx = int(result_classid[j])
-                    category = self.model_info.categories[category_idx]
-                    conf = round(float(result_scores[j]), 2)
+            result_boxes, result_scores, result_classid = self._post_process(
+                det, origin_h, origin_w, conf_thres, iou_thres)
 
-                    if category.type == CategoryType.Box:
-                        x, y, w, h = self.clip_box(
-                            x, y, w, h, im_width, im_height)
-                        image_metadata.box_detections.append(
-                            BoxDetection(category_name=category.name,
-                                         x=round(x),
-                                         y=round(y),
-                                         width=round(w),
-                                         height=round(h),
-                                         category_id=category.id,
-                                         model_name=self.model_info.version,
-                                         confidence=float(conf)))
+            for j, box in enumerate(result_boxes[:max_det]):
+                x, y, br_x, br_y = box
+                w = br_x - x
+                h = br_y - y
+                category_idx = result_classid[j]
+                if category_idx < 0 or category_idx >= len(self.model_info.categories):
+                    self.log.warning('invalid category index: %d for %d classes',
+                                     category_idx, len(self.model_info.categories))
+                    continue
+                category = self.model_info.categories[category_idx]
+                probability = round(float(result_scores[j]), 2)
 
-                    elif category.type == CategoryType.Point:
-                        cx, cy = x + w/2, y + h/2
-                        cx, cy = self.clip_point(cx, cy, im_width, im_height)
-                        image_metadata.point_detections.append(
-                            PointDetection(category_name=category.name,
-                                           x=cx,
-                                           y=cy,
-                                           category_id=category.id,
-                                           model_name=self.model_info.version,
-                                           confidence=float(conf)))
+                if category.type == CategoryType.Box:
+                    clipped_x1, clipped_y1, clipped_w, clipped_h = self.clip_box(
+                        x, y, w, h, im_width, im_height)
+                    image_metadata.box_detections.append(
+                        BoxDetection(category_name=category.name,
+                                     x=clipped_x1,
+                                     y=clipped_y1,
+                                     width=clipped_w,
+                                     height=clipped_h,
+                                     category_id=category.id,
+                                     model_name=self.model_info.version,
+                                     confidence=probability))
+
+                elif category.type == CategoryType.Point:
+                    cx, cy = x + w/2, y + h/2
+                    cx, cy = self.clip_point(cx, cy, im_width, im_height)
+                    image_metadata.point_detections.append(
+                        PointDetection(category_name=category.name,
+                                       x=cx,
+                                       y=cy,
+                                       category_id=category.id,
+                                       model_name=self.model_info.version,
+                                       confidence=probability))
 
             self.log.debug('took %f s', time.time() - t)
             return image_metadata
@@ -173,7 +194,8 @@ class Yolov5Detector(DetectorLogic):
         """
         description: postprocess the prediction
         param:
-            output:     A numpy likes [[cx,cy,w,h,conf,cls_id], [cx,cy,w,h,conf,cls_id], ...] 
+            pred:     A numpy likes [[cx,cy,w,h,conf, c0_prob, c1_prob, ...], 
+                                     [cx,cy,w,h,conf, c0_prob, c1_prob, ...], ...] 
             origin_h:   height of original image
             origin_w:   width of original image
             conf_thres: confidence threshold
@@ -184,12 +206,17 @@ class Yolov5Detector(DetectorLogic):
             result_classid: finally classid, a numpy, each element is the classid correspoing to box
         """
 
+        num_classes = pred.shape[1] - 5
+
         # Do nms
         boxes = self._non_max_suppression(
             pred, origin_h, origin_w, conf_thres, nms_thres)
         result_boxes = boxes[:, :4] if len(boxes) else np.array([])
         result_scores = boxes[:, 4] if len(boxes) else np.array([])
-        result_classid = boxes[:, 5] if len(boxes) else np.array([])
+        if num_classes > 1:
+            result_classid = np.argmax(boxes[:, 5:], axis=1)
+        else:
+            result_classid = np.zeros(boxes.shape[0], dtype=int)
         return result_boxes, result_scores, result_classid
 
     def _non_max_suppression(self, pred, origin_h, origin_w, conf_thres, nms_thres):
@@ -197,7 +224,8 @@ class Yolov5Detector(DetectorLogic):
         description: Removes detections with lower object confidence score than 'conf_thres' and performs
         Non-Maximum Suppression to further filter detections.
         param:
-            prediction: A numpy likes [[cx,cy,w,h,conf,cls_id], [cx,cy,w,h,conf,cls_id], ...] 
+            prediction: A numpy likes [[cx,cy,w,h,conf, c0_prob, c1_prob, ...], 
+                                       [cx,cy,w,h,conf, c0_prob, c1_prob, ...], ...] 
             origin_h: original image height
             origin_w: original image width
             input_size: the input size of the model
@@ -208,6 +236,9 @@ class Yolov5Detector(DetectorLogic):
         """
         # Get the boxes that score > CONF_THRESH
         boxes = pred[pred[:, 4] >= conf_thres]
+        if len(boxes) == 0:
+            return np.array([])
+        num_classes = boxes.shape[1] - 5
         # Trasform bbox from [center_x, center_y, w, h] to [x1, y1, x2, y2]
         boxes[:, :4] = self.xywh2xyxy(origin_h, origin_w, boxes[:, :4])
         # Object confidence
@@ -219,7 +250,10 @@ class Yolov5Detector(DetectorLogic):
         while boxes.shape[0]:
             large_overlap = self.bbox_iou(np.expand_dims(
                 boxes[0, :4], 0), boxes[:, :4]) > nms_thres
-            label_match = boxes[0, -1].astype(int) == boxes[:, -1].astype(int)
+            if num_classes > 1:
+                label_match = np.argmax(boxes[:, 5:], axis=1) == np.argmax(boxes[0, 5:])
+            else:
+                label_match = np.ones(boxes.shape[0], dtype=bool)
             # Indices of boxes with lower confidence scores, large IOUs and matching labels
             invalid = large_overlap & label_match
             keep_boxes += [boxes[0]]

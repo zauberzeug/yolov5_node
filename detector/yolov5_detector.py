@@ -99,7 +99,8 @@ class Yolov5Detector(DetectorLogic):
                     skipped_detections.append((category.name, detection))
                     continue
                 if category.type == CategoryType.Box:
-                    clipped_x1, clipped_y1, clipped_w, clipped_h = self.clip_box(x, y, w, h, im_width, im_height)
+                    clipped_x1, clipped_y1, clipped_w, clipped_h = self.clip_box(
+                        x, y, w, h, im_width, im_height)
                     image_metadata.box_detections.append(
                         BoxDetection(category_name=category.name,
                                      x=clipped_x1,
