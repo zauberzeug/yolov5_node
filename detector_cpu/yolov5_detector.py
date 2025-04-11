@@ -104,7 +104,11 @@ class Yolov5Detector(DetectorLogic):
                 x, y, br_x, br_y = box
                 w = br_x - x
                 h = br_y - y
-                category_idx = int(result_classid[j])
+                category_idx = result_classid[j]
+                if category_idx < 0 or category_idx >= len(self.model_info.categories):
+                    self.log.warning('invalid category index: %d for %d classes',
+                                     category_idx, len(self.model_info.categories))
+                    continue
                 category = self.model_info.categories[category_idx]
                 probability = round(float(result_scores[j]), 2)
 
@@ -190,7 +194,8 @@ class Yolov5Detector(DetectorLogic):
         """
         description: postprocess the prediction
         param:
-            output:     A numpy likes [[cx,cy,w,h,conf,cls_id], [cx,cy,w,h,conf,cls_id], ...] 
+            pred:     A numpy likes [[cx,cy,w,h,conf, c0_prob, c1_prob, ...], 
+                                     [cx,cy,w,h,conf, c0_prob, c1_prob, ...], ...] 
             origin_h:   height of original image
             origin_w:   width of original image
             conf_thres: confidence threshold
@@ -201,12 +206,17 @@ class Yolov5Detector(DetectorLogic):
             result_classid: finally classid, a numpy, each element is the classid correspoing to box
         """
 
+        num_classes = pred.shape[1] - 5
+
         # Do nms
         boxes = self._non_max_suppression(
             pred, origin_h, origin_w, conf_thres, nms_thres)
         result_boxes = boxes[:, :4] if len(boxes) else np.array([])
         result_scores = boxes[:, 4] if len(boxes) else np.array([])
-        result_classid = boxes[:, 5] if len(boxes) else np.array([])
+        if num_classes > 1:
+            result_classid = np.argmax(boxes[:, 5:], axis=1)
+        else:
+            result_classid = np.zeros(boxes.shape[0], dtype=int)
         return result_boxes, result_scores, result_classid
 
     def _non_max_suppression(self, pred, origin_h, origin_w, conf_thres, nms_thres):
@@ -214,7 +224,8 @@ class Yolov5Detector(DetectorLogic):
         description: Removes detections with lower object confidence score than 'conf_thres' and performs
         Non-Maximum Suppression to further filter detections.
         param:
-            prediction: A numpy likes [[cx,cy,w,h,conf,cls_id], [cx,cy,w,h,conf,cls_id], ...] 
+            prediction: A numpy likes [[cx,cy,w,h,conf, c0_prob, c1_prob, ...], 
+                                       [cx,cy,w,h,conf, c0_prob, c1_prob, ...], ...] 
             origin_h: original image height
             origin_w: original image width
             input_size: the input size of the model
@@ -225,6 +236,9 @@ class Yolov5Detector(DetectorLogic):
         """
         # Get the boxes that score > CONF_THRESH
         boxes = pred[pred[:, 4] >= conf_thres]
+        if len(boxes) == 0:
+            return np.array([])
+        num_classes = boxes.shape[1] - 5
         # Trasform bbox from [center_x, center_y, w, h] to [x1, y1, x2, y2]
         boxes[:, :4] = self.xywh2xyxy(origin_h, origin_w, boxes[:, :4])
         # Object confidence
@@ -236,7 +250,10 @@ class Yolov5Detector(DetectorLogic):
         while boxes.shape[0]:
             large_overlap = self.bbox_iou(np.expand_dims(
                 boxes[0, :4], 0), boxes[:, :4]) > nms_thres
-            label_match = boxes[0, -1].astype(int) == boxes[:, -1].astype(int)
+            if num_classes > 1:
+                label_match = np.argmax(boxes[:, 5:], axis=1) == np.argmax(boxes[0, 5:])
+            else:
+                label_match = np.ones(boxes.shape[0], dtype=bool)
             # Indices of boxes with lower confidence scores, large IOUs and matching labels
             invalid = large_overlap & label_match
             keep_boxes += [boxes[0]]
