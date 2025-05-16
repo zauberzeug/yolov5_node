@@ -37,3 +37,7 @@ epochs: 2000
 reset_points: false
 detect_nms_conf_thres: 0.2
 detect_nms_iou_thres: 0.45
+#
+#extra point parameters (not directly used by yolov5 but by the trainer logic)
+# point_sizes_by_id: "1111-2222-3333-4444:0.03,5555-6666-7777-8888:0.05"
+# flip_label_pairs: "1111-2222-3333-4444:5555-6666-7777-8888"

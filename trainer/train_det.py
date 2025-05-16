@@ -32,10 +32,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import yaml
-from PIL import Image, ImageDraw, ImageFont
-from torch.optim import lr_scheduler
-from tqdm import tqdm
-
 from app_code.yolov5 import val as validate  # for end-of-epoch mAP
 from app_code.yolov5.models.experimental import attempt_load
 from app_code.yolov5.models.yolo import Model
@@ -43,25 +39,45 @@ from app_code.yolov5.utils.autoanchor import check_anchors
 from app_code.yolov5.utils.callbacks import Callbacks
 from app_code.yolov5.utils.dataloaders import create_dataloader
 from app_code.yolov5.utils.downloads import attempt_download, is_url
-from app_code.yolov5.utils.general import (LOGGER, TQDM_BAR_FORMAT, check_amp,
-                                           check_dataset, check_file,
-                                           check_img_size, check_suffix,
-                                           check_yaml, colorstr,
-                                           get_latest_run, increment_path,
-                                           init_seeds, intersect_dicts,
-                                           labels_to_class_weights,
-                                           labels_to_image_weights, methods,
-                                           one_cycle, print_args,
-                                           print_mutation, strip_optimizer,
-                                           yaml_save)
+from app_code.yolov5.utils.general import (
+    LOGGER,
+    TQDM_BAR_FORMAT,
+    check_amp,
+    check_dataset,
+    check_file,
+    check_img_size,
+    check_suffix,
+    check_yaml,
+    colorstr,
+    get_latest_run,
+    increment_path,
+    init_seeds,
+    intersect_dicts,
+    labels_to_class_weights,
+    labels_to_image_weights,
+    methods,
+    one_cycle,
+    print_args,
+    print_mutation,
+    strip_optimizer,
+    yaml_save,
+)
 from app_code.yolov5.utils.loggers import Loggers
 from app_code.yolov5.utils.loggers.comet.comet_utils import check_comet_resume
 from app_code.yolov5.utils.loss import ComputeLoss
 from app_code.yolov5.utils.metrics import fitness
 from app_code.yolov5.utils.plots import plot_evolve
-from app_code.yolov5.utils.torch_utils import (EarlyStopping, ModelEMA,
-                                               de_parallel, select_device,
-                                               smart_optimizer, smart_resume)
+from app_code.yolov5.utils.torch_utils import (
+    EarlyStopping,
+    ModelEMA,
+    de_parallel,
+    select_device,
+    smart_optimizer,
+    smart_resume,
+)
+from PIL import Image, ImageDraw, ImageFont
+from torch.optim import lr_scheduler
+from tqdm import tqdm
 
 
 def draw_example(img: torch.Tensor,
@@ -165,10 +181,13 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     callbacks.run('on_pretrain_routine_start')
 
     # Modification by Zauberzeug
-    point_ids: List[int] = [int(x) for x in opt.point_ids.split(',')] if opt.point_ids else []  # type: ignore
-    point_sizes: List[int] = [int(x) for x in opt.point_sizes.split(',')] if opt.point_sizes else []  # type: ignore
+    # point_sizes_by_id: "1:0.2,3:0.3,4:0.02" (mapping from point id to fractional point size if point_sizes should be overridden during augmentation)
+    # flip_label_pairs: "1:2,3:4" (mapping from category id to category id which should be switched when performing h_flip augmentation)
 
-    point_sizes_by_id = dict(zip(point_ids, point_sizes))
+    point_sizes_by_id = {int(k): float(v) for k, v in (item.split(':')
+                         for item in str(opt.point_sizes_by_id).split(','))} if opt.point_sizes_by_id else {}
+    flip_label_pairs = [(int(k), int(v)) for k, v in (item.split(':')
+                        for item in str(opt.flip_label_pairs).split(','))] if opt.flip_label_pairs else []
 
     # Directories
     examples = save_dir / 'examples'  # examples dir
@@ -292,7 +311,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                               quad=opt.quad,
                                               prefix=colorstr('train: '),
                                               shuffle=True,
-                                              point_sizes_by_id=point_sizes_by_id)
+                                              point_sizes_by_id=point_sizes_by_id,
+                                              flip_label_pairs=flip_label_pairs)
 
     labels = np.concatenate(dataset.labels, 0)
     mlc = int(labels[:, 0].max())  # max label class
@@ -561,10 +581,12 @@ def parse_opt(known=False):
     parser.add_argument('--save-period', type=int, default=-1, help='Save checkpoint every x epochs (disabled if < 1)')
     parser.add_argument('--seed', type=int, default=0, help='Global training seed')
     parser.add_argument('--local_rank', type=int, default=-1, help='Automatic DDP Multi-GPU argument, do not modify')
-    parser.add_argument('--point_ids', type=str, default='',
-                        help='Comma separated list of point training ids as string, e.g. --point_ids 1,3')
-    parser.add_argument('--point_sizes', type=str, default='',
-                        help='Comma separated list of point sizes as string, e.g. --point_sizes 30, 50')
+
+    # Modification by Zauberzeug
+    parser.add_argument('--point_sizes_by_id', type=str, default='',
+                        help='Comma separated list of point sizes as string, e.g. --point_sizes_by_id "1:0.3,3:0.5"')
+    parser.add_argument('--flip_label_pairs', type=str, default='',
+                        help='Comma separated list of flip label pairs as string, e.g. --flip_label_pairs "1:2,3:4"')
 
     # Logger arguments
     parser.add_argument('--entity', default=None, help='Entity')
