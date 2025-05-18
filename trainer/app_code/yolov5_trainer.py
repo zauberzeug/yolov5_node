@@ -266,8 +266,11 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             cmd = f'python /app/train_det.py --exist-ok --patience {self.patience} \
                 --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} \
                 --project {self.training.training_folder} --name result --hyp {self.hyperparameter_path} \
-                --epochs {self.epochs} {additional_parameters} \
-                --point_sizes_by_id {p_sizes_by_id[:-1]} --flip_label_pairs {flip_label_pairs[:-1]}'
+                --epochs {self.epochs} {additional_parameters}'
+            if p_sizes_by_id:
+                cmd += f' --point_sizes_by_id {p_sizes_by_id[:-1]}'
+            if flip_label_pairs:
+                cmd += f' --flip_label_pairs {flip_label_pairs[:-1]}'
 
         await self.executor.start(cmd, env={'WANDB_MODE': 'disabled'})
 
@@ -284,24 +287,27 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             raise CriticalError(f'No hyperparameter file found at {self.hyperparameter_path}')
 
         with open(self.hyperparameter_path, errors='ignore') as f:
-            hyp = yaml.safe_load(f)  # load hyps dict
-        hyp = {k: float(v) for k, v in hyp.items()}
+            hyp = dict(yaml.safe_load(f))  # load hyps dict
 
         self.epochs = int(hyp.get('epochs', self.epochs))
-        self.detect_nms_conf_thres = hyp.get('detect_nms_conf_thres', self.detect_nms_conf_thres)
-        self.detect_nms_iou_thres = hyp.get('detect_nms_iou_thres', self.detect_nms_iou_thres)
+        self.detect_nms_conf_thres = float(hyp.get('detect_nms_conf_thres', self.detect_nms_conf_thres))
+        self.detect_nms_iou_thres = float(hyp.get('detect_nms_iou_thres', self.detect_nms_iou_thres))
 
-        for item in str(hyp.get('point_sizes_by_id', '')).split(','):
-            k, v = item.split(':')
-            self.point_sizes_by_uuid[str(k)] = float(v)
+        if point_sizes_by_id_str := str(hyp.get('point_sizes_by_id', '')):
+            for item in point_sizes_by_id_str.split(','):
+                k, v = item.split(':')
+                self.point_sizes_by_uuid[str(k)] = float(v)
 
-        for item in str(hyp.get('flip_label_pairs', '')).split(','):
-            k, v = item.split(':')
-            self.flip_label_uuid_pairs.append((str(k), str(v)))
+        if flip_label_pairs_str := str(hyp.get('flip_label_pairs', '')):
+            for item in flip_label_pairs_str.split(','):
+                k, v = item.split(':')
+                self.flip_label_uuid_pairs.append((str(k), str(v)))
 
         hyp_str = ', '.join(f'{k}={v}' for k, v in hyp.items())
         logging.info('parsed hyperparameters %s: epochs: %d, detect_nms_conf_thres: %f, detect_nms_iou_thres: %f',
                      hyp_str, self.epochs, self.detect_nms_conf_thres, self.detect_nms_iou_thres)
+        logging.info('point_sizes_by_id: %s', self.point_sizes_by_uuid)
+        logging.info('flip_label_pairs: %s', self.flip_label_uuid_pairs)
 
     def _parse(self, labels_path: str, images_folder: str, model_information: ModelInformation) -> list[Detections]:
         detections = []

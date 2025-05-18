@@ -26,8 +26,8 @@ translate: 0.245
 scale: 0.898
 shear: 0.602
 perspective: 0.0 # image perspective (+/- fraction), range 0-0.001
-flipud: 0 # 0.00856 # image flip up-down (probability)
-fliplr: 0 # 0.5 # image flip left-right (probability)
+flipud: 0.0 # 0.00856 # image flip up-down (probability)
+fliplr: 0.0 # 0.5 # image flip left-right (probability)
 mosaic: 1.0 # image mosaic (probability)
 mixup: 0.243 # image mixup (probability)
 copy_paste: 0.0
@@ -39,5 +39,5 @@ detect_nms_conf_thres: 0.2
 detect_nms_iou_thres: 0.45
 #
 #extra point parameters (not directly used by yolov5 but by the trainer logic)
-# point_sizes_by_id: "1111-2222-3333-4444:0.03,5555-6666-7777-8888:0.05"
-# flip_label_pairs: "1111-2222-3333-4444:5555-6666-7777-8888"
+point_sizes_by_id: "" # e.g "1111-2222-3333-4444:0.03,5555-6666-7777-8888:0.05"
+flip_label_pairs: "" # e.g "1111-2222-3333-4444:5555-6666-7777-8888"
