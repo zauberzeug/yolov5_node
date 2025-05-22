@@ -788,10 +788,9 @@ class LoadImagesAndLabels(Dataset):
         if reset_points and len(self.point_sizes_by_id) > 0:
             for label in labels:
                 if label[0] in self.point_sizes_by_id:
-                    target_point_size_px = self.point_sizes_by_id[label[0]]
-                    # target_point_size_px = 10
-                    label[3] = target_point_size_px  # / self.img_size
-                    label[4] = target_point_size_px  # / self.img_size
+                    target_point_size_fraction = self.point_sizes_by_id[label[0]]
+                    label[3] = target_point_size_fraction
+                    label[4] = target_point_size_fraction
 
         labels_out = torch.zeros((nl, 6))
         if nl:
