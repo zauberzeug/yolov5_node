@@ -29,11 +29,35 @@ from PIL import ExifTags, Image, ImageOps
 from torch.utils.data import DataLoader, Dataset, dataloader, distributed
 from tqdm import tqdm
 
-from .augmentations import (Albumentations, augment_hsv, classify_albumentations, classify_transforms, copy_paste,
-                            letterbox, mixup, random_perspective)
-from .general import (DATASETS_DIR, LOGGER, NUM_THREADS, TQDM_BAR_FORMAT, check_dataset, check_requirements, check_yaml,
-                      clean_str, cv2, is_colab, is_kaggle, segments2boxes, unzip_file, xyn2xy, xywh2xyxy, xywhn2xyxy,
-                      xyxy2xywhn)
+from .augmentations import (
+    Albumentations,
+    augment_hsv,
+    classify_albumentations,
+    classify_transforms,
+    copy_paste,
+    letterbox,
+    mixup,
+    random_perspective,
+)
+from .general import (
+    DATASETS_DIR,
+    LOGGER,
+    NUM_THREADS,
+    TQDM_BAR_FORMAT,
+    check_dataset,
+    check_requirements,
+    check_yaml,
+    clean_str,
+    cv2,
+    is_colab,
+    is_kaggle,
+    segments2boxes,
+    unzip_file,
+    xyn2xy,
+    xywh2xyxy,
+    xywhn2xyxy,
+    xyxy2xywhn,
+)
 from .torch_utils import torch_distributed_zero_first
 
 # Parameters
@@ -117,7 +141,8 @@ def create_dataloader(path,
                       quad=False,
                       prefix='',
                       shuffle=False,
-                      point_sizes_by_id: dict[int, int] = dict()):
+                      point_sizes_by_id: dict[int, float] | None = None,
+                      flip_label_pairs: list[tuple[int, int]] | None = None):
     if rect and shuffle:
         LOGGER.warning('WARNING ⚠️ --rect is incompatible with DataLoader shuffle, setting shuffle=False')
         shuffle = False
@@ -135,7 +160,8 @@ def create_dataloader(path,
             pad=pad,
             image_weights=image_weights,
             prefix=prefix,
-            point_sizes_by_id=point_sizes_by_id)
+            point_sizes_by_id=point_sizes_by_id,
+            flip_label_pairs=flip_label_pairs)
 
     batch_size = min(batch_size, len(dataset))
     nd = torch.cuda.device_count()  # number of CUDA devices
@@ -463,7 +489,8 @@ class LoadImagesAndLabels(Dataset):
                  pad=0.0,
                  min_items=0,
                  prefix='',
-                 point_sizes_by_id: dict[int, int] = dict()):
+                 point_sizes_by_id: dict[int, float] | None = None,
+                 flip_label_pairs: list[tuple[int, int]] | None = None):
 
         self.img_size = img_size
         self.augment = augment
@@ -475,7 +502,8 @@ class LoadImagesAndLabels(Dataset):
         self.stride = stride
         self.path = path
         self.albumentations = Albumentations(size=img_size) if augment else None
-        self.point_sizes_by_id = point_sizes_by_id
+        self.point_sizes_by_id = point_sizes_by_id or {}
+        self.flip_label_pairs = flip_label_pairs or []
         self.prefix = prefix
 
         try:
@@ -729,6 +757,15 @@ class LoadImagesAndLabels(Dataset):
                 img = np.fliplr(img)
                 if nl:
                     labels[:, 1] = 1 - labels[:, 1]
+                if len(self.flip_label_pairs) > 0:
+                    for label in labels:
+                        for pair in self.flip_label_pairs:
+                            if label[0] == pair[0]:
+                                label[0] = pair[1]
+                                break
+                            if label[0] == pair[1]:
+                                label[0] = pair[0]
+                                break
 
             # Cutouts
             # labels = cutout(img, labels, p=0.5)
@@ -753,10 +790,9 @@ class LoadImagesAndLabels(Dataset):
         if reset_points and len(self.point_sizes_by_id) > 0:
             for label in labels:
                 if label[0] in self.point_sizes_by_id:
-                    target_point_size_px = self.point_sizes_by_id[label[0]]
-                    # target_point_size_px = 10
-                    label[3] = target_point_size_px / self.img_size
-                    label[4] = target_point_size_px / self.img_size
+                    target_point_size_fraction = self.point_sizes_by_id[label[0]]
+                    label[3] = target_point_size_fraction
+                    label[4] = target_point_size_fraction
 
         labels_out = torch.zeros((nl, 6))
         if nl:

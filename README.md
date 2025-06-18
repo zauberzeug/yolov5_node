@@ -7,6 +7,21 @@ This repository is an implementation of Nodes that interact with the Zauberzeug 
 
 This node is used to train Yolov5 Models in the Learning Loop. It is based on [this image](https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel-23-07.html) running Python 3.10.
 
+## Hyperparameters
+
+We support all native hyperparameters of YOLOv5 (cf. `hyp_det.yaml` / `hyp_cla.yaml` for reference).
+In addition, we support the following hyperparameters:
+
+- `epochs`: The number of epochs to train the model.
+- `detect_nms_conf_thres`: The confidence threshold for the NMS during inference and validation (not relevant for training).
+- `detect_nms_iou_thres`: The IoU threshold for the NMS during inference and validation (not used for training).
+
+Further, we support the following hyperparameters for point detection:
+
+- `reset_points`: Whether to reset the size of the points after data augmentation.
+- `point_sizes_by_id`: A dictionary that maps from point category uuids to the size of the points in the output (fractional size 0-1).
+- `flip_label_pairs`: A list of pairs of point uuids that should be swapped when a horizontal flip is applied during data augmentation.
+
 ## Images
 
 Trainer Docker-Images are published on https://hub.docker.com/r/zauberzeug/yolov5-trainer

@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any
 
 from learning_loop_node.data_classes import Training
-from learning_loop_node.enums import CategoryType
 from learning_loop_node.trainer.exceptions import CriticalError
 from ruamel.yaml import YAML
 from ruamel.yaml.scalarbool import ScalarBoolean
@@ -14,17 +13,6 @@ from ruamel.yaml.scalarint import ScalarInt
 from ruamel.yaml.scalarstring import LiteralScalarString
 
 yaml = YAML()
-
-
-def get_ids_and_sizes_of_point_classes(training: Training) -> tuple[list[str], list[str]]:
-    """Returns a list of trainingids and sizes (in px) of point classes in the training data."""
-    assert training is not None, 'Training should have data'
-    point_ids, point_sizes = [], []
-    for i, category in enumerate(training.categories):
-        if category.type == CategoryType.Point:
-            point_ids.append(str(i))
-            point_sizes.append(str(category.point_size or 20))
-    return point_ids, point_sizes
 
 
 def category_lookup_from_training(training: Training) -> dict[str, str]:
@@ -162,6 +150,8 @@ def create_file_structure(training: Training) -> None:
 
 
 def set_hyperparameters_in_file(yaml_path: str, hyperparameter: dict[str, Any]) -> None:
+    """Override the hyperparameters in the yaml file used by the yolov5 trainer with the ones from the hyperparameter dict (coming from the loop configuration).
+    The yaml file is modified in place."""
 
     with open(yaml_path, 'r') as f:
         content = yaml.load(f)

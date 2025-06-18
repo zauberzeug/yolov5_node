@@ -44,6 +44,8 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         self.epochs = 0
         self.detect_nms_conf_thres = 0.2
         self.detect_nms_iou_thres = 0.45
+        self.point_sizes_by_uuid: dict[str, float] = {}
+        self.flip_label_uuid_pairs: list[tuple[str, str]] = []
 
         self.additional_hyperparameters_parsed = False
 
@@ -155,7 +157,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     async def _detect(self, model_information: ModelInformation, images: list[str],
                       model_folder: str) -> list[Detections]:
 
-        self._set_params_from_hyperparameters()
+        self._save_additional_hyperparameters()
 
         images_folder = '/tmp/imagelinks_for_detecting'
         shutil.rmtree(images_folder, ignore_errors=True)
@@ -228,7 +230,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     async def _start(self, model: str, additional_parameters: str = ''):
         resolution = self.training.hyperparameters['resolution']
 
-        self._set_params_from_hyperparameters()
+        self._save_additional_hyperparameters()
 
         if self.is_cla:
             cmd = f'python /app/train_cla.py --exist-ok --img {resolution} \
@@ -236,8 +238,6 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
                 --project {self.training.training_folder} --name result \
                 --hyp {self.hyperparameter_path} --optimizer SGD {additional_parameters}'
         else:
-            p_ids, p_sizes = yolov5_format.get_ids_and_sizes_of_point_classes(self.training)
-            # self._try_replace_optimized_hyperparameter()
             try:
                 batch_size = await batch_size_calculation.calc(self.training.training_folder, model, self.hyperparameter_path,
                                                                f'{self.training.training_folder}/dataset.yaml', resolution)
@@ -245,16 +245,39 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
                 logging.exception('Error during batch size calculation:')
                 raise NodeNeedsRestartError() from e
 
+            p_sizes_by_id = ""
+            for i, category in enumerate(self.training.categories):
+                if category.type == CategoryType.Point:
+                    size = self.point_sizes_by_uuid.get(category.id, 0.03)
+                    p_sizes_by_id += f"{i}:{size},"
+
+            flip_label_pairs = ""
+            for uuid_i, uuid_j in self.flip_label_uuid_pairs:
+                id_i = None
+                id_j = None
+                for i, category in enumerate(self.training.categories):
+                    if category.id == uuid_i:
+                        id_i = i
+                    if category.id == uuid_j:
+                        id_j = i
+                if id_i is not None and id_j is not None:
+                    flip_label_pairs += f"{id_i}:{id_j},"
+
             cmd = f'python /app/train_det.py --exist-ok --patience {self.patience} \
                 --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} \
                 --project {self.training.training_folder} --name result --hyp {self.hyperparameter_path} \
                 --epochs {self.epochs} {additional_parameters}'
-            if p_ids:
-                cmd += f' --point_ids {",".join(p_ids)} --point_sizes {",".join(p_sizes)}'
+            if p_sizes_by_id:
+                cmd += f' --point_sizes_by_id {p_sizes_by_id[:-1]}'
+            if flip_label_pairs:
+                cmd += f' --flip_label_pairs {flip_label_pairs[:-1]}'
 
         await self.executor.start(cmd, env={'WANDB_MODE': 'disabled'})
 
-    def _set_params_from_hyperparameters(self) -> None:
+    def _save_additional_hyperparameters(self) -> None:
+        """Save additional hyperparameters to attributes of self.
+        These parameters are not passed to the yolov5 trainer, but are used to modify the training (and inference) process.
+        """
         if self.additional_hyperparameters_parsed:
             return
         self.additional_hyperparameters_parsed = True
@@ -264,25 +287,27 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             raise CriticalError(f'No hyperparameter file found at {self.hyperparameter_path}')
 
         with open(self.hyperparameter_path, errors='ignore') as f:
-            hyp = yaml.safe_load(f)  # load hyps dict
-        hyp = {k: float(v) for k, v in hyp.items()}
-        hyp_str = 'hyps: ' + ', '.join(f'{k}={v}' for k, v in hyp.items())
-        logging.info('parsing hyperparameters: %s', hyp_str)
+            hyp = dict(yaml.safe_load(f))  # load hyps dict
 
         self.epochs = int(hyp.get('epochs', self.epochs))
-        self.detect_nms_conf_thres = hyp.get('detect_nms_conf_thres', self.detect_nms_conf_thres)
-        self.detect_nms_iou_thres = hyp.get('detect_nms_iou_thres', self.detect_nms_iou_thres)
+        self.detect_nms_conf_thres = float(hyp.get('detect_nms_conf_thres', self.detect_nms_conf_thres))
+        self.detect_nms_iou_thres = float(hyp.get('detect_nms_iou_thres', self.detect_nms_iou_thres))
 
-        logging.info('parsing done: epochs: %d, detect_nms_conf_thres: %f, detect_nms_iou_thres: %f',
-                     self.epochs, self.detect_nms_conf_thres, self.detect_nms_iou_thres)
+        if point_sizes_by_id_str := str(hyp.get('point_sizes_by_id', '')):
+            for item in point_sizes_by_id_str.split(','):
+                k, v = item.split(':')
+                self.point_sizes_by_uuid[str(k)] = float(v)
 
-    # def _try_replace_optimized_hyperparameter(self):
-    #     optimized_hyp = f'{self.training.project_folder}/yolov5s6_evolved_hyperparameter.yaml'
-    #     if os.path.exists(optimized_hyp):
-    #         logging.info('Found optimized hyperparameter')
-    #         shutil.copy(optimized_hyp, self.hyperparameter_path)
-    #     else:
-    #         logging.warning('No optimized hyperparameter found (!)')
+        if flip_label_pairs_str := str(hyp.get('flip_label_pairs', '')):
+            for item in flip_label_pairs_str.split(','):
+                k, v = item.split(':')
+                self.flip_label_uuid_pairs.append((str(k), str(v)))
+
+        hyp_str = ', '.join(f'{k}={v}' for k, v in hyp.items())
+        logging.info('parsed hyperparameters %s: epochs: %d, detect_nms_conf_thres: %f, detect_nms_iou_thres: %f',
+                     hyp_str, self.epochs, self.detect_nms_conf_thres, self.detect_nms_iou_thres)
+        logging.info('point_sizes_by_id: %s', self.point_sizes_by_uuid)
+        logging.info('flip_label_pairs: %s', self.flip_label_uuid_pairs)
 
     def _parse(self, labels_path: str, images_folder: str, model_information: ModelInformation) -> list[Detections]:
         detections = []
