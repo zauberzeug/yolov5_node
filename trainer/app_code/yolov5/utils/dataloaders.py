@@ -762,8 +762,10 @@ class LoadImagesAndLabels(Dataset):
                         for pair in self.flip_label_pairs:
                             if label[0] == pair[0]:
                                 label[0] = pair[1]
-                            elif label[0] == pair[1]:
+                                break
+                            if label[0] == pair[1]:
                                 label[0] = pair[0]
+                                break
 
             # Cutouts
             # labels = cutout(img, labels, p=0.5)
