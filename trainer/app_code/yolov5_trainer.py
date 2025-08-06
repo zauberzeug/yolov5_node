@@ -10,15 +10,8 @@ from pathlib import Path
 import cv2
 import yaml  # type: ignore
 from fastapi.encoders import jsonable_encoder
-from learning_loop_node.data_classes import (
-    BoxDetection,
-    ClassificationDetection,
-    Detections,
-    ModelInformation,
-    PointDetection,
-    PretrainedModel,
-    TrainingStateData,
-)
+from learning_loop_node.data_classes import (BoxDetection, ClassificationDetection, Detections, ModelInformation,
+                                             PointDetection, PretrainedModel, TrainingStateData)
 from learning_loop_node.enums import CategoryType
 from learning_loop_node.trainer import trainer_logic
 from learning_loop_node.trainer.exceptions import CriticalError, NodeNeedsRestartError
@@ -69,7 +62,9 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             return [PretrainedModel(name='s-cls', label='YOLO v5 small', description='~5fps on Jetson Nano'),
                     PretrainedModel(name='x-cls', label='YOLO v5 large', description='~5fps on Jetson Nano'),]
 
-        return [PretrainedModel(name='s6', label='YOLO v5 small', description='~5 fps on Jetson Nano'), ]
+        return [PretrainedModel(name='s', label='YOLO v5 640 small', description=''),
+                PretrainedModel(name='m', label='YOLO v5 640 medium', description=''),
+                PretrainedModel(name='s6', label='YOLO v5 1280 small', description='~5 fps on Jetson Nano'), ]
 
     @property
     def hyperparameter_path(self) -> str:
@@ -174,9 +169,11 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         img_size = model_information.resolution
 
         if self.is_cla:
-            cmd = f'python /app/pred_cla.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --save-txt'
+            cmd = f'python /app/pred_cla.py --weights {model_folder}/model.pt --source {images_folder} --img-size {
+                img_size} --save-txt'
         else:
-            cmd = f'python /app/pred_det.py --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size} --conf-thres {self.detect_nms_conf_thres} --iou-thres {self.detect_nms_iou_thres}'
+            cmd = f'python /app/pred_det.py --weights {model_folder}/model.pt --source {images_folder} --img-size {
+                img_size} --conf-thres {self.detect_nms_conf_thres} --iou-thres {self.detect_nms_iou_thres}'
 
         await executor.start(cmd)
         if await executor.wait() != 0:
@@ -340,10 +337,10 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         lines = list(reversed(self.executor.get_log_by_lines()))
         progress = 0.0
         for line in lines:
-            if re.search(f'/{self.epochs -1}', line):
+            if re.search(f'/{self.epochs - 1}', line):
                 found_line = line.split(' ')
                 for item in found_line:
-                    if f'/{self.epochs -1}' in item:
+                    if f'/{self.epochs - 1}' in item:
                         epoch, total_epochs = item.split('/')[:2]
                         try:
                             progress = float(epoch) / float(total_epochs)
