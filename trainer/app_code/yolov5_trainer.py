@@ -169,11 +169,11 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         img_size = model_information.resolution
 
         if self.is_cla:
-            cmd = f'python /app/pred_cla.py --weights {model_folder}/model.pt --source {images_folder} --img-size {
-                img_size} --save-txt'
+            cmd = 'python /app/pred_cla.py'
+            cmd += f' --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size}  --save-txt'
         else:
-            cmd = f'python /app/pred_det.py --weights {model_folder}/model.pt --source {images_folder} --img-size {
-                img_size} --conf-thres {self.detect_nms_conf_thres} --iou-thres {self.detect_nms_iou_thres}'
+            cmd = f'python /app/pred_det.py --weights {model_folder}/model.pt --source {images_folder}'
+            cmd += f' --img-size {img_size} --conf-thres {self.detect_nms_conf_thres} --iou-thres {self.detect_nms_iou_thres}'
 
         await executor.start(cmd)
         if await executor.wait() != 0:
