@@ -4,12 +4,12 @@ import os
 import re
 import subprocess
 import time
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import cv2
 import numpy as np
 import yolov5
-from learning_loop_node.data_classes import BoxDetection, ImageMetadata, PointDetection
+from learning_loop_node.data_classes import BoxDetection, ImageMetadata, ImagesMetadata, PointDetection
 from learning_loop_node.detector.detector_logic import DetectorLogic
 from learning_loop_node.enums import CategoryType
 
@@ -32,6 +32,7 @@ class Yolov5Detector(DetectorLogic):
         assert resolution is not None
         engine_file = self._create_engine(resolution,
                                           len(self.model_info.categories),
+                                          self.model_info.model_size,
                                           f'{self.model_info.model_root_path}/model.wts')
         ctypes.CDLL('/tensorrtx/yolov5/build/libmyplugins.so')
         if self.yolov5 is not None:
@@ -46,13 +47,13 @@ class Yolov5Detector(DetectorLogic):
             warmup.join()
 
     @staticmethod
-    def clip_box(
-            x1: float, y1: float, width: float, height: float, img_width: int, img_height: int) -> Tuple[
-            int, int, int, int]:
-        '''Clips a box defined by top-left corner (x1, y1), width, and height
-           to stay within image boundaries (img_width, img_height).
-           Returns the clipped (x1, y1, width, height) as ints.
-        '''
+    def clip_box(x1: float, y1: float, width: float, height: float, img_width: int, img_height: int) -> Tuple[int, int, int, int]:
+        """
+        Clips a box defined by top-left corner (x1, y1), width, and height
+        to stay within image boundaries (img_width, img_height).
+        Returns the clipped (x1, y1, width, height) as ints.
+        """
+
         x2 = x1 + width
         y2 = y1 + height
 
@@ -127,12 +128,19 @@ class Yolov5Detector(DetectorLogic):
             self.log.exception('inference failed')
         return image_metadata
 
-    def _create_engine(self, resolution: int, cat_count: int, wts_file: str) -> str:
+    def batch_evaluate(self, images: List[bytes]) -> ImagesMetadata:
+        raise NotImplementedError('batch_evaluate is not implemented for Yolov5Detector')
+
+    def _create_engine(self, resolution: int, cat_count: int, model_variant: Optional[str], wts_file: str) -> str:
         engine_file = os.path.dirname(wts_file) + '/model.engine'
         if os.path.isfile(engine_file):
-            self.log.info('%s already exists, skipping conversion', engine_file)
+            self.log.info('Engine at %s already exists, skipping conversion', engine_file)
             return engine_file
-        self.log.info('converting %s to %s', wts_file, engine_file)
+        self.log.info('Building Engine (%s to %s)', wts_file, engine_file)
+        self.log.info('Resolution: %s', resolution)
+        self.log.info('Weight_type: %s', self.weight_type)
+        self.log.info('Num Categories: %d', cat_count)
+        self.log.info('Model_variant: %s', model_variant)
 
         # NOTE cmake and inital building is done in Dockerfile (to speeds things up)
         os.chdir('/tensorrtx/yolov5/build')
@@ -149,19 +157,17 @@ class Yolov5Detector(DetectorLogic):
             else:
                 self.log.info('using FP16')
 
-            content = re.sub('(kNumClass =) \d*', r'\1 ' +
-                             str(cat_count), content)
-            content = re.sub('(kInput[HW] =) \d*',
-                             r'\1 ' + str(resolution), content)
+            content = re.sub('(kNumClass =) \d*', r'\1 ' + str(cat_count), content)
+            content = re.sub('(kInput[HW] =) \d*', r'\1 ' + str(resolution), content)
             f.seek(0)
             f.truncate()
             f.write(content)
 
-        subprocess.run('make -j6 -Wno-deprecated-declarations',
-                       shell=True, check=True)
-        self.log.warning('currently we assume a Yolov5 s6 model;\
-            parameterization of the variant (s, s6, m, m6, ...) still needs to be done')
-        # TODO parameterize variant "s6"
-        subprocess.run(
-            f'./yolov5_det -s {wts_file} {engine_file} s6', shell=True, check=True)
+        self.log.info('Making tensorrtx/yolov5')
+        subprocess.run('make -j6 -Wno-deprecated-declarations', shell=True, check=True)
+
+        self.log.info('Building engine file with tensorrtx/yolov5_det')
+        model_variant = model_variant or 's6'
+
+        subprocess.run(f'./yolov5_det -s {wts_file} {engine_file} {model_variant}', shell=True, check=True)
         return engine_file

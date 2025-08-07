@@ -32,7 +32,7 @@ RUN pip3 install --no-cache-dir async_generator aiofiles psutil pillow multidict
 WORKDIR /
 RUN git clone https://github.com/wang-xinyu/tensorrtx.git
 WORKDIR /tensorrtx
-RUN git checkout c997e35710ff0230ae6361d9ba3b9ae82ed3a7d8
+RUN git checkout 7b95f981f6b875601e85304c5a7eb413a281e3dc
 
 # Edit calibrator.cpp to make it compile (comment out some lines)
 WORKDIR /tensorrtx/yolov5/src
@@ -41,7 +41,10 @@ RUN sed -i '72s/^/\/\//' calibrator.cpp
 RUN sed -i '74s/^/\/\//' calibrator.cpp
 
 WORKDIR /tensorrtx/yolov5/build
-RUN cmake .. && make -j6
+RUN cmake \
+    -DCMAKE_CUDA_FLAGS="--diag-suppress=997 -Xcompiler=-Wno-deprecated-declarations" \
+    -DCMAKE_CXX_FLAGS="-Wno-deprecated-declarations" \
+    .. && make -j6
 ENV PYTHONPATH="${PYTHONPATH:-}:/tensorrtx/yolov5/"
 
 # LL_NODE-Library can be overwritten by local version if environment variable LINKLL is set to TRUE
