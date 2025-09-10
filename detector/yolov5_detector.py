@@ -9,7 +9,12 @@ from typing import List, Optional, Tuple
 import cv2
 import numpy as np
 import yolov5
-from learning_loop_node.data_classes import BoxDetection, ImageMetadata, ImagesMetadata, PointDetection
+from learning_loop_node.data_classes import (
+    BoxDetection,
+    ImageMetadata,
+    ImagesMetadata,
+    PointDetection,
+)
 from learning_loop_node.detector.detector_logic import DetectorLogic
 from learning_loop_node.enums import CategoryType
 
@@ -81,11 +86,19 @@ class Yolov5Detector(DetectorLogic):
         y = min(max(0, y), img_height)
         return x, y
 
-    def evaluate(self, image: bytes) -> ImageMetadata:
+    def evaluate(self,
+                 image: bytes,
+                 tags: List[str],
+                 source: Optional[str] = None,
+                 creation_date: Optional[str] = None) -> ImageMetadata:
         assert self.yolov5 is not None, 'init() must be executed first. Maybe loading the engine failed?!'
         assert self.model_info is not None, 'model_info must be set before calling evaluate()'
 
         image_metadata = ImageMetadata()
+        image_metadata.tags = tags
+        image_metadata.source = source
+        image_metadata.created = creation_date
+
         try:
             t = time.time()
             cv_image = cv2.imdecode(np.frombuffer(image, np.uint8), cv2.IMREAD_COLOR)
@@ -128,7 +141,10 @@ class Yolov5Detector(DetectorLogic):
             self.log.exception('inference failed')
         return image_metadata
 
-    def batch_evaluate(self, images: List[bytes]) -> ImagesMetadata:
+    def batch_evaluate(self, images: List[bytes],
+                       tags: List[str],
+                       source: Optional[str] = None,
+                       creation_date: Optional[str] = None) -> ImagesMetadata:
         raise NotImplementedError('batch_evaluate is not implemented for Yolov5Detector')
 
     def _create_engine(self, resolution: int, cat_count: int, model_variant: Optional[str], wts_file: str) -> str:
