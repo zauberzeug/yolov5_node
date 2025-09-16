@@ -1,12 +1,17 @@
 import logging
 import os
 import time
-from typing import Tuple
+from typing import List, Tuple
 
 import cv2
 import numpy as np
 import torch  # type: ignore # pylint: disable=import-error
-from learning_loop_node.data_classes import BoxDetection, ImageMetadata, PointDetection
+from learning_loop_node.data_classes import (
+    BoxDetection,
+    ImageMetadata,
+    ImagesMetadata,
+    PointDetection,
+)
 from learning_loop_node.detector.detector_logic import DetectorLogic
 from learning_loop_node.enums import CategoryType
 
@@ -336,3 +341,6 @@ class Yolov5Detector(DetectorLogic):
             y /= r_h
 
         return y
+
+    def batch_evaluate(self, images: List[bytes]) -> ImagesMetadata:
+        raise NotImplementedError('batch_evaluate is not implemented yet')

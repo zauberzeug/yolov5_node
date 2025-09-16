@@ -1,38 +1,45 @@
-from typing import List
-from learning_loop_node import ModelInformation, Detector
-from learning_loop_node.detector import Detections
-from learning_loop_node.detector.classification_detection import ClassificationDetection
 import logging
-import numpy as np
-import torch
+from typing import List, Tuple
+
 import cv2
+import torch
 import torch.nn.functional as F
 import torchvision.transforms as T
-
+from learning_loop_node.data_classes import (
+    ClassificationDetection,
+    ImageMetadata,
+    ImagesMetadata,
+)
+from learning_loop_node.detector.detector_logic import DetectorLogic
 
 IMAGENET_MEAN = 0.485, 0.456, 0.406
 IMAGENET_STD = 0.229, 0.224, 0.225
 
 
-def classify_transforms(size=832):
+def classify_transforms(size: Tuple[int, int] = (832, 832)):
     return T.Compose([T.ToTensor(), T.Resize(size), T.CenterCrop(size), T.Normalize(IMAGENET_MEAN, IMAGENET_STD)])
 
 
-class Yolov5Detector(Detector):
+class Yolov5Detector(DetectorLogic):
 
     def __init__(self) -> None:
         super().__init__('yolov5_pytorch')
 
-    def init(self,  model_info: ModelInformation):
-        self.model_info = model_info
-        self.imgsz = (model_info.resolution, model_info.resolution)
+    def init(self):
+        assert self.model_info is not None, 'model_info must be set before calling init()'
+        assert self.model_info.resolution is not None
+
+        self.imgsz = (self.model_info.resolution, self.model_info.resolution)
         self.torch_transforms = classify_transforms(self.imgsz)
         self.model = torch.hub.load('ultralytics/yolov5', 'custom',
-                                    path=f'{model_info.model_root_path}/model.pt', force_reload=True)
+                                    path=f'{self.model_info.model_root_path}/model.pt', force_reload=True)
 
-    def evaluate(self, image: List[np.uint8]) -> Detections:
+    def evaluate(self, image: bytes) -> ImageMetadata:
+        if self.model_info is None or self.model is None:
+            return ImageMetadata()
+
         self.model.warmup(imgsz=(1, 3, *self.imgsz))
-        detections = Detections()
+        metadata = ImageMetadata()
         try:
             image = cv2.imdecode(image, cv2.IMREAD_COLOR)
             # Perform yolov5 preprocessing
@@ -49,10 +56,13 @@ class Yolov5Detector(Detector):
                 category_index = top_i[0]
                 category = [category for category in self.model_info.categories if category.name ==
                             self.model.names[category_index]][0]
-                detections.classification_detections.append(ClassificationDetection(
+                metadata.classification_detections.append(ClassificationDetection(
                     category.name, self.model_info.version, pred[0][category_index].item(), category.id
                 ))
 
-        except Exception as e:
+        except Exception:
             logging.exception('inference failed')
-        return detections
+        return metadata
+
+    def batch_evaluate(self, images: List[bytes]) -> ImagesMetadata:
+        raise NotImplementedError('batch_evaluate is not implemented for Yolov5Detector')
