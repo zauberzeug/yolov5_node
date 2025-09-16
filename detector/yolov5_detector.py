@@ -9,7 +9,12 @@ from typing import List, Optional, Tuple
 import cv2
 import numpy as np
 import yolov5
-from learning_loop_node.data_classes import BoxDetection, ImageMetadata, ImagesMetadata, PointDetection
+from learning_loop_node.data_classes import (
+    BoxDetection,
+    ImageMetadata,
+    ImagesMetadata,
+    PointDetection,
+)
 from learning_loop_node.detector.detector_logic import DetectorLogic
 from learning_loop_node.enums import CategoryType
 
@@ -86,6 +91,7 @@ class Yolov5Detector(DetectorLogic):
         assert self.model_info is not None, 'model_info must be set before calling evaluate()'
 
         image_metadata = ImageMetadata()
+
         try:
             t = time.time()
             cv_image = cv2.imdecode(np.frombuffer(image, np.uint8), cv2.IMREAD_COLOR)
