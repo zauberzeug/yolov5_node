@@ -32,10 +32,12 @@ class Yolov5Detector(DetectorLogic):
         self.conf_threshold = float(os.getenv('CONF_THRESHOLD', '0.2'))
 
     def init(self) -> None:
-        assert self.model_info is not None, 'model_info must be set before calling init()'
-        resolution = self.model_info.resolution
-        assert resolution is not None
-        engine_file = self._create_engine(resolution,
+        if self.model_info is None:
+            raise RuntimeError('Model info not initialized. Call load_model_info_and_init_model() first.')
+        if not isinstance(self.model_info.resolution, int) or self.model_info.resolution <= 0:
+            raise RuntimeError("resolution must be an integer > 0")
+
+        engine_file = self._create_engine(self.model_info.resolution,
                                           len(self.model_info.categories),
                                           self.model_info.model_size,
                                           f'{self.model_info.model_root_path}/model.wts')
@@ -87,8 +89,10 @@ class Yolov5Detector(DetectorLogic):
         return x, y
 
     def evaluate(self, image: bytes) -> ImageMetadata:
-        assert self.yolov5 is not None, 'init() must be executed first. Maybe loading the engine failed?!'
-        assert self.model_info is not None, 'model_info must be set before calling evaluate()'
+        if self.yolov5 is None:
+            raise RuntimeError('init() must be executed first. Maybe loading the engine failed?!')
+        if self.model_info is None:
+            raise RuntimeError('model_info must be set before calling evaluate()')
 
         image_metadata = ImageMetadata()
 
@@ -130,9 +134,10 @@ class Yolov5Detector(DetectorLogic):
             if skipped_detections:
                 log_msg = '\n'.join([str(d) for d in skipped_detections])
                 self.log.warning('Removed %d small detections from result: \n%s', len(skipped_detections), log_msg)
-        except Exception:
-            self.log.exception('inference failed')
-        return image_metadata
+            return image_metadata
+
+        except Exception as e:
+            raise RuntimeError('Error during inference') from e
 
     def batch_evaluate(self, images: List[bytes]) -> ImagesMetadata:
         raise NotImplementedError('batch_evaluate is not implemented for Yolov5Detector')
