@@ -31,7 +31,7 @@ class Yolov5Detector(DetectorLogic):
         if self.model_info is None:
             raise RuntimeError('Model info not initialized. Call load_model_info_and_init_model() first.')
         if not isinstance(self.model_info.resolution, int) or self.model_info.resolution <= 0:
-            raise RuntimeError("input_size must be an integer > 0")
+            raise RuntimeError("model_info.resolution must be an integer > 0")
 
         pt_file = f'{self.model_info.model_root_path}/model.pt'
         yolov5_path = os.path.join(
@@ -151,8 +151,8 @@ class Yolov5Detector(DetectorLogic):
             self.log.debug('took %f s', time.time() - t)
             return image_metadata
 
-        except Exception:
-            raise RuntimeError('Error during inference') from None
+        except Exception as e:
+            raise RuntimeError('Error during inference') from e
 
     def _preprocess_image(self, raw_bgr_image):
         """

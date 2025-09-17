@@ -35,7 +35,7 @@ class Yolov5Detector(DetectorLogic):
         if self.model_info is None:
             raise RuntimeError('Model info not initialized. Call load_model_info_and_init_model() first.')
         if not isinstance(self.model_info.resolution, int) or self.model_info.resolution <= 0:
-            raise RuntimeError("input_size must be an integer > 0")
+            raise RuntimeError("resolution must be an integer > 0")
 
         engine_file = self._create_engine(self.model_info.resolution,
                                           len(self.model_info.categories),
@@ -134,9 +134,10 @@ class Yolov5Detector(DetectorLogic):
             if skipped_detections:
                 log_msg = '\n'.join([str(d) for d in skipped_detections])
                 self.log.warning('Removed %d small detections from result: \n%s', len(skipped_detections), log_msg)
-        except Exception:
-            self.log.exception('inference failed')
-        return image_metadata
+            return image_metadata
+
+        except Exception as e:
+            raise RuntimeError('Error during inference') from e
 
     def batch_evaluate(self, images: List[bytes]) -> ImagesMetadata:
         raise NotImplementedError('batch_evaluate is not implemented for Yolov5Detector')
