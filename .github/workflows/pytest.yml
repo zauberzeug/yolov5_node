@@ -16,26 +16,15 @@ jobs:
         run: |
           docker run -d -it --rm nvcr.io/nvidia/pytorch:23.07-py3 echo "I have to be startet to authenticate against nvcr.io"
       - name: build
-        if: github.ref != 'refs/heads/release'
         run: |
           cd trainer
           ./docker.sh b test_latest
-      - name: buildnocaches
-        if: github.ref == 'refs/heads/release'
-        run: |
-          cd trainer
-          ./docker.sh bnc test_latest
       - name: run
         run: |
           docker run -d -it --rm -v /home/zauberzeug/data:/data -h n6 -e LOOP_HOST=$LOOP_HOST  -e LOOP_USERNAME=$LOOP_USERNAME -e LOOP_PASSWORD=$LOOP_PASSWORD -e YOLOV5_MODE=DETECTION --name yolov5_trainer_node_github_action --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all --gpus all --ipc host zauberzeug/yolov5-trainer:latest
       - name: tests
         run: |
           docker exec yolov5_trainer_node_github_action pytest -vv
-      - name: publish
-        if: github.ref == 'refs/heads/release'
-        run: |
-          cd trainer
-          ./docker.sh p test_latest
       - name: cleanup
         if: always() # also execute when pytest fails
         run: |
