@@ -42,7 +42,7 @@ jobs:
           docker stop yolov5_trainer_node_github_action | echo "Nothing to do. No container running."
 
   pytest_detector_cpu:
-    runs-on: []
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - name: checkout | cleanup
