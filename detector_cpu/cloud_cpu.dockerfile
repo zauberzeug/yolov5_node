@@ -34,6 +34,7 @@ RUN rm -r /trainer_app_code
 
 ADD ./detector_cpu /yolov5_node/detector_cpu/
 ADD ./trainer/app_code /yolov5_node/detector_cpu/app_code
+RUN rm -rf /yolov5_node/detector_cpu/app_code/tests
 RUN rm -f /yolov5_node/detector_cpu/.env
 RUN ln -sf /yolov5_node/detector_cpu /app
 
