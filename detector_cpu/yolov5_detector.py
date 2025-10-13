@@ -222,9 +222,12 @@ class Yolov5Detector(DetectorLogic):
         # Do nms
         boxes = self._non_max_suppression(
             pred, origin_h, origin_w, conf_thres, nms_thres)
-        result_boxes = boxes[:, :4] if len(boxes) else np.array([])
-        result_scores = boxes[:, 4] if len(boxes) else np.array([])
-        if num_classes > 1 and len(boxes.shape) >= 2:
+        if len(boxes) == 0:
+            return np.empty((0, 4)), np.empty((0,)), np.empty((0,), dtype=int)
+
+        result_boxes = boxes[:, :4]
+        result_scores = boxes[:, 4]
+        if num_classes > 1:
             result_classid = np.argmax(boxes[:, 5:], axis=1)
         else:
             # Either we have no classes or all boxes have been removed in _non_max_suppression
