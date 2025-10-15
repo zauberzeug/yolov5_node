@@ -34,10 +34,8 @@ class Yolov5Detector(DetectorLogic):
             raise RuntimeError("model_info.resolution must be an integer > 0")
 
         pt_file = f'{self.model_info.model_root_path}/model.pt'
-        yolov5_path = os.path.join(
-            os.path.dirname(__file__), 'app_code', 'yolov5')
-        self.yolov5 = torch.hub.load(
-            yolov5_path, 'custom', pt_file, source='local')
+        yolov5_path = os.path.join(os.path.dirname(__file__), 'app_code', 'yolov5')
+        self.yolov5 = torch.hub.load(yolov5_path, 'custom', pt_file, source='local')
 
         if self.yolov5 is None:
             raise RuntimeError('Failed to load YOLOv5 model')
@@ -222,12 +220,15 @@ class Yolov5Detector(DetectorLogic):
         # Do nms
         boxes = self._non_max_suppression(
             pred, origin_h, origin_w, conf_thres, nms_thres)
-        result_boxes = boxes[:, :4] if len(boxes) else np.array([])
-        result_scores = boxes[:, 4] if len(boxes) else np.array([])
-        if num_classes > 1 and len(boxes.shape) >= 2:
+        if len(boxes) == 0:
+            return np.empty((0, 4)), np.empty((0,)), np.empty((0,), dtype=int)
+
+        result_boxes = boxes[:, :4]
+        result_scores = boxes[:, 4]
+        if num_classes > 1:
             result_classid = np.argmax(boxes[:, 5:], axis=1)
         else:
-            # Either we have no classes or all boxes have been removed in _non_max_suppression
+            # Without classes there is no classid to return
             result_classid = np.zeros(boxes.shape[0], dtype=int)
         return result_boxes, result_scores, result_classid
 
@@ -251,7 +252,7 @@ class Yolov5Detector(DetectorLogic):
         if len(boxes) == 0:
             return np.array([])
         num_classes = boxes.shape[1] - 5
-        # Trasform bbox from [center_x, center_y, w, h] to [x1, y1, x2, y2]
+        # Transform bbox from [center_x, center_y, w, h] to [x1, y1, x2, y2]
         boxes[:, :4] = self.xywh2xyxy(origin_h, origin_w, boxes[:, :4])
         # Object confidence
         confs = boxes[:, 4]

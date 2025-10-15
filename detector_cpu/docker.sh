@@ -34,7 +34,11 @@ build_args=" --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION"
 
 
 dockerfile="cloud_cpu.dockerfile"
-image="zauberzeug/yolov5-detector:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION-cloud-cpu"
+if [ "$2" = "test_latest" ]; then
+    image="zauberzeug/yolov5-detector:latest-cpu"
+else
+    image="zauberzeug/yolov5-detector:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION-cloud-cpu"
+fi
 
 
 # ========================== RUN CONFIGURATION =========================================
@@ -61,7 +65,11 @@ fi
 # ========================== COMMAND EXECUTION =========================================
 
 cmd=$1
-cmd_args=${@:2}
+if [ "$2" = "test_latest" ]; then
+    cmd_args=${@:3}
+else
+    cmd_args=${@:2}
+fi
 set -x
 case $cmd in
     b | build)
