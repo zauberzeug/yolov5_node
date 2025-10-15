@@ -28,15 +28,13 @@ RUN pip3 install IPython
 ARG NODE_LIB_VERSION
 RUN pip3 install "learning_loop_node==${NODE_LIB_VERSION}"
 
-ADD ./trainer/app_code /trainer_app_code
-RUN pip install --no-cache -r /trainer_app_code/yolov5/requirements.txt
-RUN rm -r /trainer_app_code
-
 ADD ./detector_cpu /yolov5_node/detector_cpu/
-ADD ./trainer/app_code /yolov5_node/detector_cpu/app_code
-RUN rm -rf /yolov5_node/detector_cpu/app_code/tests
+ADD ./trainer/app_code/yolov5 /yolov5_node/detector_cpu/app_code/yolov5
 RUN rm -f /yolov5_node/detector_cpu/.env
 RUN ln -sf /yolov5_node/detector_cpu /app
+
+RUN pip install --no-cache -r /yolov5_node/detector_cpu/app_code/yolov5/requirements.txt
+
 
 WORKDIR /app
 
