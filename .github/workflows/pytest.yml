@@ -62,7 +62,7 @@ jobs:
           ./docker.sh bnc test_latest
       - name: run tests
         run: |
-          docker run -d -it --rm -h n6 -e --name=yolov5_detector_cpu_node_github_action --ipc=host zauberzeug/yolov5-detector:latest-cpu pytest -vv
+          docker run -d -it --rm -h n6 --name yolov5_detector_cpu_node_github_action --ipc=host zauberzeug/yolov5-detector:latest-cpu pytest -vv
       - name: publish
         if: github.ref == 'refs/heads/release'
         run: |
