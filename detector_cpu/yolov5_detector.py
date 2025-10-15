@@ -34,10 +34,8 @@ class Yolov5Detector(DetectorLogic):
             raise RuntimeError("model_info.resolution must be an integer > 0")
 
         pt_file = f'{self.model_info.model_root_path}/model.pt'
-        yolov5_path = os.path.join(
-            os.path.dirname(__file__), 'app_code', 'yolov5')
-        self.yolov5 = torch.hub.load(
-            yolov5_path, 'custom', pt_file, source='local')
+        yolov5_path = os.path.join(os.path.dirname(__file__), 'app_code', 'yolov5')
+        self.yolov5 = torch.hub.load(yolov5_path, 'custom', pt_file, source='local')
 
         if self.yolov5 is None:
             raise RuntimeError('Failed to load YOLOv5 model')
