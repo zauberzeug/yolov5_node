@@ -29,7 +29,7 @@ fi
 # ========================== BUILD CONFIGURATION / IMAGE SELECTION =======================
 
 SEMANTIC_VERSION=0.1.13
-NODE_LIB_VERSION=0.17.1
+NODE_LIB_VERSION=0.18.0
 build_args=" --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION"
 
 
