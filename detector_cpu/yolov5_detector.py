@@ -77,7 +77,7 @@ class Yolov5Detector(DetectorLogic):
         y = min(max(0, y), img_height)
         return x, y
 
-    def evaluate(self, image: bytes) -> ImageMetadata:
+    def evaluate(self, image: np.ndarray) -> ImageMetadata:
         if self.yolov5 is None:
             raise RuntimeError('Model not initialized. Call load_model_info_and_init_model() first.')
         if self.model_info is None:
@@ -90,8 +90,7 @@ class Yolov5Detector(DetectorLogic):
 
         try:
             t = time.time()
-            cv_image = cv2.imdecode(np.frombuffer(image, np.uint8), cv2.IMREAD_COLOR)
-            input_image, _, origin_h, origin_w = self._preprocess_image(cv_image)
+            input_image, _, origin_h, origin_w = self._preprocess_image(image)
 
             im_height = origin_h
             im_width = origin_w
@@ -152,10 +151,9 @@ class Yolov5Detector(DetectorLogic):
         except Exception as e:
             raise RuntimeError('Error during inference') from e
 
-    def _preprocess_image(self, raw_bgr_image):
+    def _preprocess_image(self, image_raw):
         """
-        description: Convert BGR image to RGB,
-                     resize and pad it to target size, normalize to [0,1],
+        description: resize and pad it to target size, normalize to [0,1],
                      transform to NCHW format.
         param:
             input_image_path: str, image path
@@ -166,9 +164,7 @@ class Yolov5Detector(DetectorLogic):
             w: original width
         """
         input_size = self.input_size
-        image_raw = raw_bgr_image
         h, w, _ = image_raw.shape
-        image = cv2.cvtColor(image_raw, cv2.COLOR_BGR2RGB)
         # Calculate widht and height and paddings
         r_w = input_size / w
         r_h = input_size / h
@@ -186,7 +182,7 @@ class Yolov5Detector(DetectorLogic):
             ty1 = ty2 = 0
 
         # Resize the image with long side while maintaining ratio
-        image = cv2.resize(image, (tw, th))
+        image = cv2.resize(image_raw, (tw, th))
         # Pad the short side with (128,128,128)
         image = cv2.copyMakeBorder(
             image, ty1, ty2, tx1, tx2, cv2.BORDER_CONSTANT, None, (128, 128, 128))
@@ -350,5 +346,5 @@ class Yolov5Detector(DetectorLogic):
 
         return y
 
-    def batch_evaluate(self, images: List[bytes]) -> ImagesMetadata:
+    def batch_evaluate(self, images: List[np.ndarray]) -> ImagesMetadata:
         raise NotImplementedError('batch_evaluate is not implemented yet')
