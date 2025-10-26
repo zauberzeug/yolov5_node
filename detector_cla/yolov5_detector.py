@@ -1,7 +1,7 @@
 import logging
 from typing import List, Tuple
 
-import cv2
+import numpy as np
 import torch
 import torch.nn.functional as F
 import torchvision.transforms as T
@@ -34,21 +34,18 @@ class Yolov5Detector(DetectorLogic):
         self.model = torch.hub.load('ultralytics/yolov5', 'custom',
                                     path=f'{self.model_info.model_root_path}/model.pt', force_reload=True)
 
-    def evaluate(self, image: bytes) -> ImageMetadata:
+    def evaluate(self, image: np.ndarray) -> ImageMetadata:
         if self.model_info is None or self.model is None:
             return ImageMetadata()
 
         self.model.warmup(imgsz=(1, 3, *self.imgsz))
         metadata = ImageMetadata()
         try:
-            image = cv2.imdecode(image, cv2.IMREAD_COLOR)
-            # Perform yolov5 preprocessing
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            image = self.torch_transforms(image)
-            image = image.unsqueeze(0)
+            torch_image = self.torch_transforms(image)
+            torch_image = torch_image.unsqueeze(0)
 
-            image = torch.Tensor(image).cuda()
-            results = self.model(image)
+            torch_image = torch_image.cuda()
+            results = self.model(torch_image)
             pred = F.softmax(results, dim=1)
 
             top_i = pred[0].argsort(0, descending=True)[:1].tolist()
@@ -64,5 +61,5 @@ class Yolov5Detector(DetectorLogic):
             logging.exception('inference failed')
         return metadata
 
-    def batch_evaluate(self, images: List[bytes]) -> ImagesMetadata:
+    def batch_evaluate(self, images: List[np.ndarray]) -> ImagesMetadata:
         raise NotImplementedError('batch_evaluate is not implemented for Yolov5Detector')
