@@ -90,7 +90,7 @@ class Yolov5Detector(DetectorLogic):
 
         try:
             t = time.time()
-            input_image, _, origin_h, origin_w = self._preprocess_image(image)
+            input_image, origin_h, origin_w = self._preprocess_image(image)
 
             im_height = origin_h
             im_width = origin_w
@@ -159,7 +159,6 @@ class Yolov5Detector(DetectorLogic):
             input_image_path: str, image path
         return:
             image:  the processed image
-            image_raw: the original image
             h: original height
             w: original width
         """
@@ -193,7 +192,7 @@ class Yolov5Detector(DetectorLogic):
         # Convert the image to row-major order, also known as "C order":
         image = np.ascontiguousarray(image)
 
-        return image, image_raw, h, w
+        return image, h, w
 
     def _post_process(self, pred, origin_h, origin_w, conf_thres, nms_thres):
         """
