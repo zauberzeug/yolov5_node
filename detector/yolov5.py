@@ -127,8 +127,7 @@ class YoLov5TRT():
         cuda_outputs = self.cuda_outputs
         bindings = self.bindings
         # Do image preprocess
-        input_image, image_raw, origin_h, origin_w = self._preprocess_image(
-            image_raw)
+        input_image, origin_h, origin_w = self._preprocess_image(image_raw)
         # Copy input image to host buffer
         np.copyto(host_inputs[0], input_image.ravel())
         start = time.time()
@@ -149,8 +148,7 @@ class YoLov5TRT():
         # Do postprocess
         detections = []
         Detection = namedtuple('Detection', 'x y w h category probability')
-        result_boxes, result_scores, result_classid = self._post_process(
-            output[0:LEN_ALL_RESULT], origin_h, origin_w)
+        result_boxes, result_scores, result_classid = self._post_process(output[0:LEN_ALL_RESULT], origin_h, origin_w)
         for j, box in enumerate(result_boxes):
             x, y, br_x, br_y = box
             w = br_x - x
@@ -170,22 +168,18 @@ class YoLov5TRT():
         self.check_cuda_init_error()
         return np.zeros([self.input_h, self.input_w, 3], dtype=np.uint8)
 
-    def _preprocess_image(self, raw_bgr_image):
+    def _preprocess_image(self, image_raw):
         """
-        description: Convert BGR image to RGB,
-                     resize and pad it to target size, normalize to [0,1],
+        description: resize and pad it to target size, normalize to [0,1],
                      transform to NCHW format.
         param:
             input_image_path: str, image path
         return:
             image:  the processed image
-            image_raw: the original image
             h: original height
             w: original width
         """
-        image_raw = raw_bgr_image
         h, w, _ = image_raw.shape
-        image = cv2.cvtColor(image_raw, cv2.COLOR_BGR2RGB)
         # Calculate widht and height and paddings
         r_w = self.input_w / w
         r_h = self.input_h / h
@@ -203,7 +197,7 @@ class YoLov5TRT():
             ty1 = ty2 = 0
 
         # Resize the image with long side while maintaining ratio
-        image = cv2.resize(image, (tw, th))
+        image = cv2.resize(image_raw, (tw, th))
         # Pad the short side with (128,128,128)
         image = cv2.copyMakeBorder(
             image, ty1, ty2, tx1, tx2, cv2.BORDER_CONSTANT, None, (128, 128, 128))
@@ -214,7 +208,7 @@ class YoLov5TRT():
         # Convert the image to row-major order, also known as "C order":
         image = np.ascontiguousarray(image)
 
-        return image, image_raw, h, w
+        return image, h, w
 
     def xywh2xyxy(self, origin_h, origin_w, x):
         """

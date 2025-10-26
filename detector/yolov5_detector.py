@@ -6,7 +6,6 @@ import subprocess
 import time
 from typing import List, Optional, Tuple
 
-import cv2
 import numpy as np
 import yolov5
 from learning_loop_node.data_classes import (
@@ -88,7 +87,7 @@ class Yolov5Detector(DetectorLogic):
         y = min(max(0, y), img_height)
         return x, y
 
-    def evaluate(self, image: bytes) -> ImageMetadata:
+    def evaluate(self, image: np.ndarray) -> ImageMetadata:
         if self.yolov5 is None:
             raise RuntimeError('init() must be executed first. Maybe loading the engine failed?!')
         if self.model_info is None:
@@ -98,9 +97,8 @@ class Yolov5Detector(DetectorLogic):
 
         try:
             t = time.time()
-            cv_image = cv2.imdecode(np.frombuffer(image, np.uint8), cv2.IMREAD_COLOR)
-            im_height, im_width, _ = cv_image.shape
-            results, inference_ms = self.yolov5.infer(cv_image)
+            im_height, im_width, _ = image.shape
+            results, inference_ms = self.yolov5.infer(image)
             skipped_detections = []
             self.log.debug('took %f s, overall %f s', inference_ms, time.time() - t)
             for detection in results:
@@ -139,7 +137,7 @@ class Yolov5Detector(DetectorLogic):
         except Exception as e:
             raise RuntimeError('Error during inference') from e
 
-    def batch_evaluate(self, images: List[bytes]) -> ImagesMetadata:
+    def batch_evaluate(self, images: List[np.ndarray]) -> ImagesMetadata:
         raise NotImplementedError('batch_evaluate is not implemented for Yolov5Detector')
 
     def _create_engine(self, resolution: int, cat_count: int, model_variant: Optional[str], wts_file: str) -> str:
