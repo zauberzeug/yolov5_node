@@ -47,7 +47,7 @@ class Yolov5Detector(DetectorLogic):
             self.log.info('destroyed old yolov5 instance')
 
         self.yolov5 = yolov5.YoLov5TRT(engine_file, self.iou_threshold, self.conf_threshold)
-        for _ in range(3):
+        for _ in range(8):
             warmup = yolov5.warmUpThread(self.yolov5)
             warmup.start()
             warmup.join()
