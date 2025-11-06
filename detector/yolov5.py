@@ -35,7 +35,7 @@ def get_img_path_batches(batch_size, img_dir):
     return ret
 
 
-class YoLov5TRT():
+class YoLov5TRT(object):
     """
     description: A YOLOv5 class that warps TensorRT ops, preprocess and postprocess ops.
     """
@@ -66,35 +66,37 @@ class YoLov5TRT():
         # Deserialize the engine from file
         with open(engine_file_path, "rb") as f:
             engine = runtime.deserialize_cuda_engine(f.read())
-        if not engine:
-            raise RuntimeError(
-                f'Could not load engine from file ({engine_file_path}). Try to delete the link & model folder and restart the machine.')
         context = engine.create_execution_context()
 
         host_inputs = []
         cuda_inputs = []
         host_outputs = []
         cuda_outputs = []
-        bindings = []
+        input_binding_names = []
+        output_binding_names = []
 
-        for binding in engine:
-            print('binding:', binding, engine.get_binding_shape(binding))
-            size = trt.volume(engine.get_binding_shape(binding))
-            dtype = trt.nptype(engine.get_binding_dtype(binding))
+        for binding_name in engine:
+            shape = engine.get_tensor_shape(binding_name)
+            print('binding_name:', binding_name, shape)
+            size = trt.volume(shape)
+            dtype = trt.nptype(engine.get_tensor_dtype(binding_name))
             # Allocate host and device buffers
             host_mem = cuda.pagelocked_empty(size, dtype)
             cuda_mem = cuda.mem_alloc(host_mem.nbytes)
             # Append the device buffer to device bindings.
-            bindings.append(int(cuda_mem))
             # Append to the appropriate list.
-            if engine.binding_is_input(binding):
-                self.input_w = engine.get_binding_shape(binding)[-1]
-                self.input_h = engine.get_binding_shape(binding)[-2]
+            if engine.get_tensor_mode(binding_name) == trt.TensorIOMode.INPUT:
+                input_binding_names.append(binding_name)
+                self.input_w = shape[-1]
+                self.input_h = shape[-2]
                 host_inputs.append(host_mem)
                 cuda_inputs.append(cuda_mem)
-            else:
+            elif engine.get_tensor_mode(binding_name) == trt.TensorIOMode.OUTPUT:
+                output_binding_names.append(binding_name)
                 host_outputs.append(host_mem)
                 cuda_outputs.append(cuda_mem)
+            else:
+                print(f'unknown binding: "{binding_name}"')
 
         # Store
         self.stream = stream
@@ -104,38 +106,38 @@ class YoLov5TRT():
         self.cuda_inputs = cuda_inputs
         self.host_outputs = host_outputs
         self.cuda_outputs = cuda_outputs
-        self.bindings = bindings
-        self.batch_size = 1
+        self.input_binding_names = input_binding_names
+        self.output_binding_names = output_binding_names
+        self.batch_size = engine.get_tensor_shape(input_binding_names[0])[0]
 
-    def check_cuda_init_error(self):
+    def _check_cuda_init_error(self):
         if self.cuda_init_error:
             raise RuntimeError('cuda.init() failed .. detector cannot be used! Try to restart the machine.')
 
-    def infer(self, image_raw):
-        self.check_cuda_init_error()
-
-        threading.Thread.__init__(self)  # type: ignore
+    def infer(self, image_raw: np.ndarray):
+        threading.Thread.__init__(self) # type: ignore
         # Make self the active context, pushing it on top of the context stack.
         self.ctx.push()
         # Restore
         stream = self.stream
         context = self.context
-        engine = self.engine
         host_inputs = self.host_inputs
         cuda_inputs = self.cuda_inputs
         host_outputs = self.host_outputs
         cuda_outputs = self.cuda_outputs
-        bindings = self.bindings
+        input_binding_names = self.input_binding_names
+        output_binding_names = self.output_binding_names
         # Do image preprocess
         input_image, origin_h, origin_w = self._preprocess_image(image_raw)
-        # Copy input image to host buffer
+               # Copy input image to host buffer
         np.copyto(host_inputs[0], input_image.ravel())
         start = time.time()
         # Transfer input data  to the GPU.
         cuda.memcpy_htod_async(cuda_inputs[0], host_inputs[0], stream)
         # Run inference.
-        context.execute_async(batch_size=self.batch_size,
-                              bindings=bindings, stream_handle=stream.handle)
+        context.set_tensor_address(input_binding_names[0], cuda_inputs[0])
+        context.set_tensor_address(output_binding_names[0], cuda_outputs[0])
+        context.execute_async_v3(stream_handle=stream.handle)
         # Transfer predictions back from the GPU.
         cuda.memcpy_dtoh_async(host_outputs[0], cuda_outputs[0], stream)
         # Synchronize the stream
@@ -165,7 +167,7 @@ class YoLov5TRT():
         """
         description: Ready data for warmup
         """
-        self.check_cuda_init_error()
+        self._check_cuda_init_error()
         return np.zeros([self.input_h, self.input_w, 3], dtype=np.uint8)
 
     def _preprocess_image(self, image_raw):
@@ -195,7 +197,6 @@ class YoLov5TRT():
             tx1 = int((self.input_w - tw) / 2)
             tx2 = self.input_w - tw - tx1
             ty1 = ty2 = 0
-
         # Resize the image with long side while maintaining ratio
         image = cv2.resize(image_raw, (tw, th))
         # Pad the short side with (128,128,128)
@@ -226,16 +227,12 @@ class YoLov5TRT():
         if r_h > r_w:
             y[:, 0] = x[:, 0] - x[:, 2] / 2
             y[:, 2] = x[:, 0] + x[:, 2] / 2
-            y[:, 1] = x[:, 1] - x[:, 3] / 2 - \
-                (self.input_h - r_w * origin_h) / 2
-            y[:, 3] = x[:, 1] + x[:, 3] / 2 - \
-                (self.input_h - r_w * origin_h) / 2
+            y[:, 1] = x[:, 1] - x[:, 3] / 2 - (self.input_h - r_w * origin_h) / 2
+            y[:, 3] = x[:, 1] + x[:, 3] / 2 - (self.input_h - r_w * origin_h) / 2
             y /= r_w
         else:
-            y[:, 0] = x[:, 0] - x[:, 2] / 2 - \
-                (self.input_w - r_h * origin_w) / 2
-            y[:, 2] = x[:, 0] + x[:, 2] / 2 - \
-                (self.input_w - r_h * origin_w) / 2
+            y[:, 0] = x[:, 0] - x[:, 2] / 2 - (self.input_w - r_h * origin_w) / 2
+            y[:, 2] = x[:, 0] + x[:, 2] / 2 - (self.input_w - r_h * origin_w) / 2
             y[:, 1] = x[:, 1] - x[:, 3] / 2
             y[:, 3] = x[:, 1] + x[:, 3] / 2
             y /= r_h
@@ -246,7 +243,7 @@ class YoLov5TRT():
         """
         description: postprocess the prediction
         param:
-            output:     A numpy likes [num_boxes,cx,cy,w,h,conf,cls_id, cx,cy,w,h,conf,cls_id, ...] 
+            output:     A numpy likes [num_boxes,cx,cy,w,h,conf,cls_id, cx,cy,w,h,conf,cls_id, ...]
             origin_h:   height of original image
             origin_w:   width of original image
         return:
@@ -271,27 +268,21 @@ class YoLov5TRT():
         description: compute the IoU of two bounding boxes
         param:
             box1: A box coordinate (can be (x1, y1, x2, y2) or (x, y, w, h))
-            box2: A box coordinate (can be (x1, y1, x2, y2) or (x, y, w, h))            
+            box2: A box coordinate (can be (x1, y1, x2, y2) or (x, y, w, h))
             x1y1x2y2: select the coordinate format
         return:
             iou: computed iou
         """
         if not x1y1x2y2:
             # Transform from center and width to exact coordinates
-            b1_x1, b1_x2 = box1[:, 0] - box1[:, 2] / \
-                2, box1[:, 0] + box1[:, 2] / 2
-            b1_y1, b1_y2 = box1[:, 1] - box1[:, 3] / \
-                2, box1[:, 1] + box1[:, 3] / 2
-            b2_x1, b2_x2 = box2[:, 0] - box2[:, 2] / \
-                2, box2[:, 0] + box2[:, 2] / 2
-            b2_y1, b2_y2 = box2[:, 1] - box2[:, 3] / \
-                2, box2[:, 1] + box2[:, 3] / 2
+            b1_x1, b1_x2 = box1[:, 0] - box1[:, 2] / 2, box1[:, 0] + box1[:, 2] / 2
+            b1_y1, b1_y2 = box1[:, 1] - box1[:, 3] / 2, box1[:, 1] + box1[:, 3] / 2
+            b2_x1, b2_x2 = box2[:, 0] - box2[:, 2] / 2, box2[:, 0] + box2[:, 2] / 2
+            b2_y1, b2_y2 = box2[:, 1] - box2[:, 3] / 2, box2[:, 1] + box2[:, 3] / 2
         else:
             # Get the coordinates of bounding boxes
-            b1_x1, b1_y1, b1_x2, b1_y2 = box1[:,
-                                              0], box1[:, 1], box1[:, 2], box1[:, 3]
-            b2_x1, b2_y1, b2_x2, b2_y2 = box2[:,
-                                              0], box2[:, 1], box2[:, 2], box2[:, 3]
+            b1_x1, b1_y1, b1_x2, b1_y2 = box1[:, 0], box1[:, 1], box1[:, 2], box1[:, 3]
+            b2_x1, b2_y1, b2_x2, b2_y2 = box2[:, 0], box2[:, 1], box2[:, 2], box2[:, 3]
 
         # Get the coordinates of the intersection rectangle
         inter_rect_x1 = np.maximum(b1_x1, b2_x1)
@@ -328,6 +319,11 @@ class YoLov5TRT():
         boxes = prediction[prediction[:, 4] >= conf_thres]
         # Trandform bbox from [center_x, center_y, w, h] to [x1, y1, x2, y2]
         boxes[:, :4] = self.xywh2xyxy(origin_h, origin_w, boxes[:, :4])
+        # clip the coordinates
+        boxes[:, 0] = np.clip(boxes[:, 0], 0, origin_w - 1)
+        boxes[:, 2] = np.clip(boxes[:, 2], 0, origin_w - 1)
+        boxes[:, 1] = np.clip(boxes[:, 1], 0, origin_h - 1)
+        boxes[:, 3] = np.clip(boxes[:, 3], 0, origin_h - 1)
         # Object confidence
         confs = boxes[:, 4]
         # Sort by the confs
@@ -335,8 +331,7 @@ class YoLov5TRT():
         # Perform non-maximum suppression
         keep_boxes = []
         while boxes.shape[0]:
-            large_overlap = self.bbox_iou(np.expand_dims(
-                boxes[0, :4], 0), boxes[:, :4]) > nms_thres
+            large_overlap = self.bbox_iou(np.expand_dims(boxes[0, :4], 0), boxes[:, :4]) > nms_thres
             label_match = boxes[0, -1] == boxes[:, -1]
             # Indices of boxes with lower confidence scores, large IOUs and matching labels
             invalid = large_overlap & label_match
