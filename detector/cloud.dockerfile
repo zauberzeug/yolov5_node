@@ -15,11 +15,8 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-RUN pip3 install --upgrade pip
-RUN pip3 install --no-cache-dir wheel
-RUN pip3 install --no-cache-dir pycuda==2022.2.2
-RUN pip3 install --no-cache-dir "uvicorn" 
-RUN pip3 install --no-cache-dir async_generator aiofiles psutil pillow multidict attrs yarl async_timeout idna_ssl cchardet aiosignal
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 # Download the coco model. 
 # RUN pip3 install --no-cache-dir gdown==4.6.3
@@ -30,15 +27,7 @@ RUN pip3 install --no-cache-dir async_generator aiofiles psutil pillow multidict
 
 # Install TensorRT and use it as working directory
 WORKDIR /
-RUN git clone https://github.com/wang-xinyu/tensorrtx.git
-WORKDIR /tensorrtx
-RUN git checkout 7b95f981f6b875601e85304c5a7eb413a281e3dc
-
-# Edit calibrator.cpp to make it compile (comment out some lines)
-WORKDIR /tensorrtx/yolov5/src
-RUN sed -i 's|^#include <opencv2/dnn/dnn.hpp>|\/\/&|' calibrator.cpp
-RUN sed -i '72s/^/\/\//' calibrator.cpp
-RUN sed -i '74s/^/\/\//' calibrator.cpp
+COPY ./tensorrtx /tensorrtx
 
 WORKDIR /tensorrtx/yolov5/build
 RUN cmake \
@@ -49,13 +38,14 @@ ENV PYTHONPATH="${PYTHONPATH:-}:/tensorrtx/yolov5/"
 
 # LL_NODE-Library can be overwritten by local version if environment variable LINKLL is set to TRUE
 ARG NODE_LIB_VERSION
-RUN pip3 install --no-cache-dir "learning_loop_node==${NODE_LIB_VERSION}"
+RUN uv pip install --system "learning_loop_node==${NODE_LIB_VERSION}"
 
 ADD ./ /yolov5_node/detector/
 RUN rm -f /yolov5_node/detector/.env
 RUN ln -sf /yolov5_node/detector /app
 
 WORKDIR /app
+RUN uv pip install --system -e ".[cloud]"
 
 EXPOSE 80
 

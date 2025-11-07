@@ -20,12 +20,9 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-RUN pip3 install --upgrade pip
-RUN pip3 install --no-cache-dir wheel
-RUN pip3 install --no-cache-dir pycuda==2024.1
-RUN pip3 install --no-cache-dir "uvicorn"
-RUN pip3 install --no-cache-dir async_generator aiofiles psutil pillow multidict attrs yarl async_timeout idna_ssl cchardet aiosignal
-RUN pip3 install --no-cache-dir --ignore-installed pyyaml numpy==1.22.4
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+RUN uv pip install --system --reinstall pyyaml
 
 # Download the coco model. 
 # RUN pip3 install --no-cache-dir gdown==4.6.3
@@ -55,13 +52,14 @@ ENV PYTHONPATH=$PYTHONPATH:/tensorrtx/yolov5/
 
 # LL_NODE-Library can be overwritten by local version if environment variable LINKLL is set to TRUE
 ARG NODE_LIB_VERSION
-RUN pip3 install --no-cache-dir "learning_loop_node==${NODE_LIB_VERSION}" 
+RUN uv pip install --system "learning_loop_node==${NODE_LIB_VERSION}"
 
 ADD ./ /yolov5_node/detector/
 RUN rm -f /yolov5_node/detector/.env
 RUN ln -sf /yolov5_node/detector /app
 
 WORKDIR /app
+RUN uv pip install --system -e ".[jetson]"
 
 EXPOSE 80
 
