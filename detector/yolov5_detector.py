@@ -4,7 +4,6 @@ import os
 import re
 import subprocess
 import time
-from typing import List, Optional, Tuple
 
 import numpy as np
 from learning_loop_node.data_classes import (
@@ -20,10 +19,11 @@ import yolov5
 
 
 class Yolov5Detector(DetectorLogic):
+    MIN_BOX_SIZE = 2
 
     def __init__(self) -> None:
         super().__init__('yolov5_wts')
-        self.yolov5: Optional[yolov5.YoLov5TRT] = None
+        self.yolov5: yolov5.YoLov5TRT | None = None
         self.weight_type = os.getenv('WEIGHT_TYPE', 'FP16')
         assert self.weight_type in ['FP16', 'FP32', 'INT8'], 'WEIGHT_TYPE must be one of FP16, FP32, INT8'
         self.log = logging.getLogger('Yolov5Detector')
@@ -54,7 +54,7 @@ class Yolov5Detector(DetectorLogic):
             warmup.join()
 
     @staticmethod
-    def clip_box(x1: float, y1: float, width: float, height: float, img_width: int, img_height: int) -> Tuple[int, int, int, int]:
+    def clip_box(x1: float, y1: float, width: float, height: float, img_width: int, img_height: int) -> tuple[int, int, int, int]:  # noqa: PLR0913
         """
         Clips a box defined by top-left corner (x1, y1), width, and height
         to stay within image boundaries (img_width, img_height).
@@ -75,15 +75,13 @@ class Yolov5Detector(DetectorLogic):
         clipped_height = clipped_y2 - clipped_y1
 
         # Ensure width and height are non-negative
-        if clipped_width < 0:
-            clipped_width = 0
-        if clipped_height < 0:
-            clipped_height = 0
+        clipped_width = max(clipped_width, 0)
+        clipped_height = max(clipped_height, 0)
 
         return clipped_x1, clipped_y1, clipped_width, clipped_height
 
     @staticmethod
-    def clip_point(x: float, y: float, img_width: int, img_height: int) -> Tuple[float, float]:
+    def clip_point(x: float, y: float, img_width: int, img_height: int) -> tuple[float, float]:
         x = min(max(0, x), img_width)
         y = min(max(0, y), img_height)
         return x, y
@@ -105,7 +103,7 @@ class Yolov5Detector(DetectorLogic):
             for detection in results:
                 x, y, w, h, category_idx, probability = detection
                 category = self.model_info.categories[category_idx]
-                if w <= 2 or h <= 2:  # skip very small boxes.
+                if w <= self.MIN_BOX_SIZE or h <= self.MIN_BOX_SIZE:  # skip very small boxes.
                     skipped_detections.append((category.name, detection))
                     continue
                 if category.type == CategoryType.Box:
@@ -138,10 +136,10 @@ class Yolov5Detector(DetectorLogic):
         except Exception as e:
             raise RuntimeError('Error during inference') from e
 
-    def batch_evaluate(self, images: List[np.ndarray]) -> ImagesMetadata:
+    def batch_evaluate(self, images: list[np.ndarray]) -> ImagesMetadata:
         raise NotImplementedError('batch_evaluate is not implemented for Yolov5Detector')
 
-    def _create_engine(self, resolution: int, cat_count: int, model_variant: Optional[str], wts_file: str) -> str:
+    def _create_engine(self, resolution: int, cat_count: int, model_variant: str | None, wts_file: str) -> str:
         engine_file = os.path.dirname(wts_file) + '/model.engine'
         if os.path.isfile(engine_file):
             self.log.info('Engine at %s already exists, skipping conversion', engine_file)

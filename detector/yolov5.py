@@ -24,7 +24,7 @@ LEN_ONE_RESULT = 38
 def get_img_path_batches(batch_size, img_dir):
     ret = []
     batch = []
-    for root, dirs, files in os.walk(img_dir):
+    for root, _dirs, files in os.walk(img_dir):
         for name in files:
             if len(batch) == batch_size:
                 ret.append(batch)
@@ -35,7 +35,7 @@ def get_img_path_batches(batch_size, img_dir):
     return ret
 
 
-class YoLov5TRT(object):
+class YoLov5TRT:
     """
     description: A YOLOv5 class that warps TensorRT ops, preprocess and postprocess ops.
     """
@@ -54,7 +54,7 @@ class YoLov5TRT(object):
         self.cuda_init_error = False
 
         self.iou_threshold = iou_threshold
-        """a iou threshold to filter detections during nms"""
+        """an iou threshold to filter detections during nms"""
         self.conf_threshold = conf_threshold
         """a confidence threshold to filter detections during nms"""
 
@@ -68,12 +68,26 @@ class YoLov5TRT(object):
             engine = runtime.deserialize_cuda_engine(f.read())
         context = engine.create_execution_context()
 
-        host_inputs = []
-        cuda_inputs = []
-        host_outputs = []
-        cuda_outputs = []
-        input_binding_names = []
-        output_binding_names = []
+        self._setup_bindings(engine)
+
+        # Store
+        self.stream = stream
+        self.context = context
+        self.engine = engine
+        self.batch_size = engine.get_tensor_shape(self.input_binding_names[0])[0]
+
+    def _setup_bindings(self, engine: trt.ICudaEngine):
+        """
+        Set up TensorRT bindings for input and output tensors.
+
+        :param engine: TensorRT CUDA engine
+        """
+        self.host_inputs = []
+        self.cuda_inputs = []
+        self.host_outputs = []
+        self.cuda_outputs = []
+        self.input_binding_names = []
+        self.output_binding_names = []
 
         for binding_name in engine:
             shape = engine.get_tensor_shape(binding_name)
@@ -86,29 +100,17 @@ class YoLov5TRT(object):
             # Append the device buffer to device bindings.
             # Append to the appropriate list.
             if engine.get_tensor_mode(binding_name) == trt.TensorIOMode.INPUT:
-                input_binding_names.append(binding_name)
+                self.input_binding_names.append(binding_name)
                 self.input_w = shape[-1]
                 self.input_h = shape[-2]
-                host_inputs.append(host_mem)
-                cuda_inputs.append(cuda_mem)
+                self.host_inputs.append(host_mem)
+                self.cuda_inputs.append(cuda_mem)
             elif engine.get_tensor_mode(binding_name) == trt.TensorIOMode.OUTPUT:
-                output_binding_names.append(binding_name)
-                host_outputs.append(host_mem)
-                cuda_outputs.append(cuda_mem)
+                self.output_binding_names.append(binding_name)
+                self.host_outputs.append(host_mem)
+                self.cuda_outputs.append(cuda_mem)
             else:
                 print(f'unknown binding: "{binding_name}"')
-
-        # Store
-        self.stream = stream
-        self.context = context
-        self.engine = engine
-        self.host_inputs = host_inputs
-        self.cuda_inputs = cuda_inputs
-        self.host_outputs = host_outputs
-        self.cuda_outputs = cuda_outputs
-        self.input_binding_names = input_binding_names
-        self.output_binding_names = output_binding_names
-        self.batch_size = engine.get_tensor_shape(input_binding_names[0])[0]
 
     def _check_cuda_init_error(self):
         if self.cuda_init_error:
@@ -349,4 +351,4 @@ class warmUpThread(threading.Thread):
     def run(self):
         _, use_time = self.yolov5_wrapper.infer(
             self.yolov5_wrapper.get_raw_image_zeros())
-        print('warm_up time->{:.2f}ms'.format(use_time * 1000))
+        print(f'warm_up time->{use_time * 1000:.2f}ms')
