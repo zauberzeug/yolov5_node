@@ -1,0 +1,27 @@
+name: Run Tests
+
+on: [push]
+
+jobs:
+  code-checks:
+    strategy:
+      fail-fast: false
+      matrix:
+        tools:
+          - command: "mypy"
+          - command: "pylint"
+          - command: "pre-commit"
+    name: code check - ${{ matrix.tools.command }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: install dependencies
+        run: make install-ci
+      - name: ${{ matrix.tools.command }}
+        run: make ${{ matrix.tools.command }}

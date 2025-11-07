@@ -115,7 +115,7 @@ class YoLov5TRT(object):
             raise RuntimeError('cuda.init() failed .. detector cannot be used! Try to restart the machine.')
 
     def infer(self, image_raw: np.ndarray):
-        threading.Thread.__init__(self) # type: ignore
+        threading.Thread.__init__(self)  # type: ignore
         # Make self the active context, pushing it on top of the context stack.
         self.ctx.push()
         # Restore
@@ -129,7 +129,7 @@ class YoLov5TRT(object):
         output_binding_names = self.output_binding_names
         # Do image preprocess
         input_image, origin_h, origin_w = self._preprocess_image(image_raw)
-               # Copy input image to host buffer
+        # Copy input image to host buffer
         np.copyto(host_inputs[0], input_image.ravel())
         start = time.time()
         # Transfer input data  to the GPU.

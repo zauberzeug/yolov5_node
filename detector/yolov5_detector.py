@@ -7,7 +7,6 @@ import time
 from typing import List, Optional, Tuple
 
 import numpy as np
-import yolov5
 from learning_loop_node.data_classes import (
     BoxDetection,
     ImageMetadata,
@@ -16,6 +15,8 @@ from learning_loop_node.data_classes import (
 )
 from learning_loop_node.detector.detector_logic import DetectorLogic
 from learning_loop_node.enums import CategoryType
+
+import yolov5
 
 
 class Yolov5Detector(DetectorLogic):
@@ -151,7 +152,7 @@ class Yolov5Detector(DetectorLogic):
         self.log.info('Num Categories: %d', cat_count)
         self.log.info('Model_variant: %s', model_variant)
 
-        # NOTE cmake and inital building is done in Dockerfile (to speeds things up)
+        # NOTE cmake and initial building is done in Dockerfile (to speeds things up)
         os.chdir('/tensorrtx/yolov5/build')
 
         # Adapt resolution
@@ -166,8 +167,8 @@ class Yolov5Detector(DetectorLogic):
             else:
                 self.log.info('using FP16')
 
-            content = re.sub('(kNumClass =) \d*', r'\1 ' + str(cat_count), content)
-            content = re.sub('(kInput[HW] =) \d*', r'\1 ' + str(resolution), content)
+            content = re.sub(r'(kNumClass =) \d*', r'\1 ' + str(cat_count), content)
+            content = re.sub(r'(kInput[HW] =) \d*', r'\1 ' + str(resolution), content)
             f.seek(0)
             f.truncate()
             f.write(content)
