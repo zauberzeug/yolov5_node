@@ -29,7 +29,7 @@ fi
 # ========================== BUILD CONFIGURATION / IMAGE SELECTION =======================
 
 SEMANTIC_VERSION=0.2.0
-NODE_LIB_VERSION=0.18.0
+NODE_LIB_VERSION=$(grep -oP 'learning_loop_node==\K[0-9.]+' pyproject.toml)
 build_args=" --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION"
 
 if [ -f /etc/nv_tegra_release ] # Check if we are on a Jetson device
@@ -89,10 +89,10 @@ cmd_args=${@:2}
 set -x
 case $cmd in
     b | build)
-        DOCKER_BUILDKIT=0 docker build . --target release -t $image $build_args $cmd_args
+        DOCKER_BUILDKIT=0 docker build . -t $image $build_args $cmd_args
         ;;
     bnc | build-no-cache)
-        docker build --no-cache . --target release -t $image $build_args $cmd_args
+        docker build --no-cache . -t $image $build_args $cmd_args
         ;;
     U | update)
 	    docker pull ${image}

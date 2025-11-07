@@ -17,10 +17,10 @@ dependencies = [
     "async_timeout",
     "idna_ssl",
     "aiosignal",
-    "opencv-python",
     "numpy",
     "pyyaml",
     "pycuda==2025.1.2",
+    "learning_loop_node==0.18.0",
 ]
 
 # Note: learning_loop_node is installed separately in Dockerfiles with a specific version

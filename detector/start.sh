@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 if [[ $1 = "debug" ]]; then
-   python3 -m debugpy --listen 5678 /app/main.py
+   /app/.venv/bin/python -m debugpy --listen 5678 /app/main.py
 elif [[ $1 = "catchsegv" ]]; then
-   catchsegv python3 /app/main.py
+   catchsegv /app/.venv/bin/python /app/main.py
 else
-   python3 /app/main.py
+   /app/.venv/bin/python /app/main.py
 fi

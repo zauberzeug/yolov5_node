@@ -1,31 +1,27 @@
 ARG BASE_IMAGE
-FROM ${BASE_IMAGE} AS release
+FROM ${BASE_IMAGE}
 
+# Install build tools and runtime dependencies (needed for runtime engine compilation)
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
     apt-get install -y --no-install-recommends \
-    libjpeg8-dev zlib1g-dev \
-    ca-certificates \
-    openssh-client \
-    curl \
-    git \
     cmake \
-    build-essential \
-    unzip \
+    g++ \
+    make \
+    libopencv-dev \
+    libjpeg8 \
+    zlib1g \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /usr/share/doc/* \
+    && rm -rf /usr/share/man/* \
+    && rm -rf /usr/share/locale/* \
     && apt-get clean
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# Download the coco model. 
-# RUN pip3 install --no-cache-dir gdown==4.6.3
-# WORKDIR /data/models
-# RUN gdown --fuzzy https://drive.google.com/file/d/1KGZe7OUX9QWZm-dnkssSV9lSXxCn7nD_/view?usp=sharing  -O coco.zip && unzip coco.zip && rm coco.zip
-# WORKDIR /data/
-# RUN ln -s models/coco model
-
-# Install TensorRT and use it as working directory
+# Copy and build TensorRT (initial build, will be rebuilt at runtime with model-specific config)
 WORKDIR /
 COPY ./tensorrtx /tensorrtx
 
@@ -34,18 +30,26 @@ RUN cmake \
     -DCMAKE_CUDA_FLAGS="--diag-suppress=997 -Xcompiler=-Wno-deprecated-declarations" \
     -DCMAKE_CXX_FLAGS="-Wno-deprecated-declarations" \
     .. && make -j$(nproc)
+
 ENV PYTHONPATH="${PYTHONPATH:-}:/tensorrtx/yolov5/"
 
-# LL_NODE-Library can be overwritten by local version if environment variable LINKLL is set to TRUE
+# Install Python dependencies
 ARG NODE_LIB_VERSION
-RUN uv pip install --system "learning_loop_node==${NODE_LIB_VERSION}"
 
+# Copy application code
 ADD ./ /yolov5_node/detector/
 RUN rm -f /yolov5_node/detector/.env
 RUN ln -sf /yolov5_node/detector /app
 
+# Install application dependencies
 WORKDIR /app
-RUN uv sync install
+RUN uv venv --python-preference system --allow-existing --system-site-packages && \
+    uv sync --frozen && \
+    # Clean up pip cache and unnecessary files
+    rm -rf /root/.cache/pip /root/.cache/uv && \
+    find /app/.venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && \
+    find /app/.venv -type f -name "*.pyc" -delete && \
+    find /app/.venv -type f -name "*.pyo" -delete
 
 EXPOSE 80
 
