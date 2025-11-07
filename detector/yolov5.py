@@ -4,15 +4,14 @@ MIT License
 """
 
 import logging
-import os
 import threading
 import time
 from collections import namedtuple
 
-import cv2
 import numpy as np
 import pycuda.driver as cuda  # type: ignore # pylint: disable=import-error
 import tensorrt as trt  # type: ignore # pylint: disable=import-error
+from PIL import Image
 from pycuda._driver import (  # type: ignore # pylint: disable=import-error
     Error as CudaError,
 )
@@ -52,6 +51,14 @@ class YoLov5TRT:
         # Deserialize the engine from file
         with open(engine_file_path, "rb") as f:
             engine = runtime.deserialize_cuda_engine(f.read())
+
+        if engine is None:
+            raise RuntimeError(
+                f'Failed to deserialize TensorRT engine from {engine_file_path}. '
+                'This is typically caused by a TensorRT version mismatch. '
+                'The engine file needs to be rebuilt with the current TensorRT version.'
+            )
+
         context = engine.create_execution_context()
 
         self._setup_bindings(engine)
@@ -186,10 +193,16 @@ class YoLov5TRT:
             tx2 = self.input_w - tw - tx1
             ty1 = ty2 = 0
         # Resize the image with long side while maintaining ratio
-        image = cv2.resize(image_raw, (tw, th))
-        # Pad the short side with (128,128,128)
-        image = cv2.copyMakeBorder(
-            image, ty1, ty2, tx1, tx2, cv2.BORDER_CONSTANT, None, (128, 128, 128))
+        pil_image = Image.fromarray(image_raw)
+        pil_image = pil_image.resize((tw, th), Image.Resampling.BILINEAR)
+        image = np.array(pil_image)
+        # Pad with (128, 128, 128)
+        image = np.pad(
+            image,
+            ((ty1, ty2), (tx1, tx2), (0, 0)),
+            mode='constant',
+            constant_values=128
+        )
         image = image.astype(np.float32)
         image /= 255.0  # Normalize to [0,1]
         image = np.transpose(image, [2, 0, 1])  # HWC to CHW format:

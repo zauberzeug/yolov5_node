@@ -47,7 +47,20 @@ class Yolov5Detector(DetectorLogic):
             self.yolov5 = None
             self.log.info('destroyed old yolov5 instance')
 
-        self.yolov5 = yolov5.YoLov5TRT(engine_file, self.iou_threshold, self.conf_threshold)
+        try:
+            self.yolov5 = yolov5.YoLov5TRT(engine_file, self.iou_threshold, self.conf_threshold)
+        except RuntimeError as e:
+            if 'TensorRT version mismatch' in str(e) or 'deserialize' in str(e):
+                self.log.error('TensorRT engine compatibility issue: %s', e)
+                if os.path.isfile(engine_file):
+                    self.log.info('Removing incompatible engine file: %s', engine_file)
+                    os.remove(engine_file)
+                    raise
+                else:
+                    raise
+            else:
+                raise
+
         for _ in range(8):
             warmup = yolov5.warmUpThread(self.yolov5)
             warmup.start()
