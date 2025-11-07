@@ -34,20 +34,16 @@ build_args=" --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION"
 
 if [ -f /etc/nv_tegra_release ] # Check if we are on a Jetson device
 then
-    dockerfile="jetson.dockerfile"
-
     # version discovery borrowed from https://github.com/dusty-nv/jetson-containers/blob/master/scripts/l4t_version.sh
     L4T_VERSION_STRING=$(head -n 1 /etc/nv_tegra_release)
     L4T_RELEASE=$(echo $L4T_VERSION_STRING | cut -f 2 -d ' ' | grep -Po '(?<=R)[^;]+')
     L4T_REVISION=$(echo $L4T_VERSION_STRING | cut -f 2 -d ',' | grep -Po '(?<=REVISION: )[^;]+')
     L4T_VERSION="$L4T_RELEASE.$L4T_REVISION"
     
-    if [ "$L4T_RELEASE" == "35" ]; then 
-        # available versions of the dusty images: 32.7.1, 35.2.1, 35.3.1, 35.4.1
-        # L4T R35.x containers can run on other versions of L4T R35.x (JetPack 5.1+)
-        L4T_VERSION="35.4.1"
-        echo "Using L4T version 35.4.1 (dusty image for exact version $L4T_VERSION)"
-        build_args+=" --build-arg BASE_IMAGE=dustynv/opencv:r$L4T_VERSION"
+    if [ "$L4T_RELEASE" == "36" ]; then 
+        # L4T R36.x containers can run on other versions of L4T R36.x (JetPack 6.0+)
+        echo "Using L4T version 36.4.0 (dusty image for exact version $L4T_VERSION)"
+        build_args+=" --build-arg BASE_IMAGE=dustynv/l4t-ml:r36.4.0"
     else
         echo "Unsupported L4T version: $L4T_VERSION"
         exit 1
@@ -55,9 +51,7 @@ then
 
     image="zauberzeug/yolov5-detector:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION-$L4T_VERSION"
 else # ----------------------------------------------------------------------- This is cloud (linux) (python 3.12)
-    dockerfile="cloud.dockerfile"
-
-    build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:25.04-py3"
+    build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/tensorrt:25.01-py3"
     image="zauberzeug/yolov5-detector:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION-cloud"
 fi
 
@@ -95,10 +89,10 @@ cmd_args=${@:2}
 set -x
 case $cmd in
     b | build)
-        DOCKER_BUILDKIT=0 docker build . -f $dockerfile --target release -t $image $build_args $cmd_args
+        DOCKER_BUILDKIT=0 docker build . --target release -t $image $build_args $cmd_args
         ;;
     bnc | build-no-cache)
-        docker build --no-cache . -f $dockerfile --target release -t $image $build_args $cmd_args
+        docker build --no-cache . --target release -t $image $build_args $cmd_args
         ;;
     U | update)
 	    docker pull ${image}
