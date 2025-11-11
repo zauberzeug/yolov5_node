@@ -43,7 +43,7 @@ RUN ln -sf /yolov5_node/detector /app
 
 # Install application dependencies
 WORKDIR /app
-RUN uv sync --locked
+RUN uv sync --locked --compile-bytecode
 
 # Place executables in environment at the front of the PATH
 ENV PATH="/app/.venv/bin:${PATH}"
