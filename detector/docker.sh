@@ -68,6 +68,8 @@ run_args+=" -e HOST=$LOOP_HOST -e ORGANIZATION=$LOOP_ORGANIZATION -e PROJECT=$LO
 run_args+=" -e USE_BACKDOOR_CONTROLS=$USE_BACKDOOR_CONTROLS"
 run_args+=" --name $DETECTOR_NAME"
 run_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all"
+# Mount the virtual environment separately, so the developer's environment doesn't end up in the container
+run_args+=" --volume /app/.venv"
 run_args+=" -p 8004:80"
 
 # Link Learning Loop Node library if requested
