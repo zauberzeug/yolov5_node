@@ -12,7 +12,7 @@ import numpy as np
 import pycuda.driver as cuda  # type: ignore # pylint: disable=import-error
 import tensorrt as trt  # type: ignore # pylint: disable=import-error
 from PIL import Image
-from pycuda._driver import (  # type: ignore # pylint: disable=import-error
+from pycuda._driver import (  # type: ignore # pylint: disable=import-error, no-name-in-module
     Error as CudaError,
 )
 
