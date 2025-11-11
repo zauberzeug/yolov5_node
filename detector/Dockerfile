@@ -43,13 +43,10 @@ RUN ln -sf /yolov5_node/detector /app
 
 # Install application dependencies
 WORKDIR /app
-RUN uv venv --python-preference system --allow-existing --system-site-packages && \
-    uv sync --frozen && \
-    # Clean up pip cache and unnecessary files
-    rm -rf /root/.cache/pip /root/.cache/uv && \
-    find /app/.venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true && \
-    find /app/.venv -type f -name "*.pyc" -delete && \
-    find /app/.venv -type f -name "*.pyo" -delete
+RUN uv sync --locked
+
+# Place executables in environment at the front of the PATH
+ENV PATH="/app/.venv/bin:${PATH}"
 
 EXPOSE 80
 

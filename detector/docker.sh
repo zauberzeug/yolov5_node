@@ -39,8 +39,8 @@ then
     L4T_RELEASE=$(echo $L4T_VERSION_STRING | cut -f 2 -d ' ' | grep -Po '(?<=R)[^;]+')
     L4T_REVISION=$(echo $L4T_VERSION_STRING | cut -f 2 -d ',' | grep -Po '(?<=REVISION: )[^;]+')
     L4T_VERSION="$L4T_RELEASE.$L4T_REVISION"
-    
-    if [ "$L4T_RELEASE" == "36" ]; then 
+
+    if [ "$L4T_RELEASE" == "36" ]; then
         # L4T R36.x containers can run on other versions of L4T R36.x (JetPack 6.0+)
         echo "Using L4T version 36.4.0 (dusty image for exact version $L4T_VERSION)"
         build_args+=" --build-arg BASE_IMAGE=dustynv/l4t-ml:r36.4.0"
@@ -68,6 +68,8 @@ run_args+=" -e HOST=$LOOP_HOST -e ORGANIZATION=$LOOP_ORGANIZATION -e PROJECT=$LO
 run_args+=" -e USE_BACKDOOR_CONTROLS=$USE_BACKDOOR_CONTROLS"
 run_args+=" --name $DETECTOR_NAME"
 run_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all"
+# Mount the virtual environment separately, so the developer's environment doesn't end up in the container
+run_args+=" --volume /app/.venv"
 run_args+=" -p 8004:80"
 
 # Link Learning Loop Node library if requested
@@ -95,17 +97,17 @@ case $cmd in
         docker build --no-cache . -t $image $build_args $cmd_args
         ;;
     U | update)
-	    docker pull ${image}
-	    ;;
+        docker pull ${image}
+        ;;
     p | push)
         docker push $image
         ;;
     r | run)
         docker run $run_args $image $cmd_args
-	    ;;
+        ;;
     u | up)
         docker run -d --restart always $run_args $image $cmd_args
-	    ;;
+        ;;
     s | stop)
         docker stop $DETECTOR_NAME $cmd_args
         ;;
@@ -120,7 +122,7 @@ case $cmd in
         docker logs -f -n 100 $cmd_args $DETECTOR_NAME
         ;;
     e | exec)
-        docker exec $DETECTOR_NAME $cmd_args 
+        docker exec $DETECTOR_NAME $cmd_args
         ;;
     a | attach)
         docker exec -it $cmd_args $DETECTOR_NAME /bin/bash
