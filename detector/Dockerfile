@@ -34,21 +34,25 @@ RUN cmake \
 ENV PYTHONPATH="${PYTHONPATH:-}:/tensorrtx/yolov5/"
 
 # Install Python dependencies
-ARG NODE_LIB_VERSION
-
-# Copy application code
-ADD ./ /yolov5_node/detector/
-RUN rm -f /yolov5_node/detector/.env
-RUN ln -sf /yolov5_node/detector /app
-
-# Install application dependencies
 WORKDIR /app
-RUN uv sync --locked
 
-# Place executables in environment at the front of the PATH
+# Copy only dependency files first (enables layer caching)
+COPY pyproject.toml uv.lock ./
+
+# Install deps into a project-local venv
+RUN pip install --no-cache-dir uv && \
+    uv venv --system-site-packages && \
+    uv sync --locked
+
+# Now copy the rest of the app
+COPY . /app
+
+# Optional: remove dev-only files
+RUN rm -f /app/.env
+
+# Ensure the venv is first on PATH for CMD/RUN that follow
 ENV PATH="/app/.venv/bin:${PATH}"
 
 EXPOSE 80
-
 ENV TZ=Europe/Amsterdam
-CMD ["/app/start.sh"]
+CMD ["python", "/app/main.py"]
