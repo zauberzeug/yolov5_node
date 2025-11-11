@@ -1,19 +1,18 @@
 """
-Original from https://github.com/wang-xinyu/tensorrtx/blob/7b79de466c7ac2fcf179e65c2fa4718107f236f9/yolov5/yolov5_det_trt.py
+Based on https://github.com/wang-xinyu/tensorrtx/blob/7b79de466c7ac2fcf179e65c2fa4718107f236f9/yolov5/yolov5_det_trt.py
 MIT License
 """
 
 import logging
-import os
 import threading
 import time
 from collections import namedtuple
 
-import cv2
 import numpy as np
 import pycuda.driver as cuda  # type: ignore # pylint: disable=import-error
 import tensorrt as trt  # type: ignore # pylint: disable=import-error
-from pycuda._driver import (  # type: ignore # pylint: disable=import-error
+from PIL import Image
+from pycuda._driver import (  # type: ignore # pylint: disable=import-error, no-name-in-module
     Error as CudaError,
 )
 
@@ -21,21 +20,7 @@ LEN_ALL_RESULT = 38001
 LEN_ONE_RESULT = 38
 
 
-def get_img_path_batches(batch_size, img_dir):
-    ret = []
-    batch = []
-    for root, dirs, files in os.walk(img_dir):
-        for name in files:
-            if len(batch) == batch_size:
-                ret.append(batch)
-                batch = []
-            batch.append(os.path.join(root, name))
-    if len(batch) > 0:
-        ret.append(batch)
-    return ret
-
-
-class YoLov5TRT():
+class YoLov5TRT:
     """
     description: A YOLOv5 class that warps TensorRT ops, preprocess and postprocess ops.
     """
@@ -54,7 +39,7 @@ class YoLov5TRT():
         self.cuda_init_error = False
 
         self.iou_threshold = iou_threshold
-        """a iou threshold to filter detections during nms"""
+        """an iou threshold to filter detections during nms"""
         self.conf_threshold = conf_threshold
         """a confidence threshold to filter detections during nms"""
 
@@ -66,66 +51,77 @@ class YoLov5TRT():
         # Deserialize the engine from file
         with open(engine_file_path, "rb") as f:
             engine = runtime.deserialize_cuda_engine(f.read())
-        if not engine:
+
+        if engine is None:
             raise RuntimeError(
-                f'Could not load engine from file ({engine_file_path}). Try to delete the link & model folder and restart the machine.')
+                f'Failed to deserialize TensorRT engine from {engine_file_path}. '
+                'This is typically caused by a TensorRT version mismatch. '
+                'The engine file needs to be rebuilt with the current TensorRT version.'
+            )
+
         context = engine.create_execution_context()
 
-        host_inputs = []
-        cuda_inputs = []
-        host_outputs = []
-        cuda_outputs = []
-        bindings = []
-
-        for binding in engine:
-            print('binding:', binding, engine.get_binding_shape(binding))
-            size = trt.volume(engine.get_binding_shape(binding))
-            dtype = trt.nptype(engine.get_binding_dtype(binding))
-            # Allocate host and device buffers
-            host_mem = cuda.pagelocked_empty(size, dtype)
-            cuda_mem = cuda.mem_alloc(host_mem.nbytes)
-            # Append the device buffer to device bindings.
-            bindings.append(int(cuda_mem))
-            # Append to the appropriate list.
-            if engine.binding_is_input(binding):
-                self.input_w = engine.get_binding_shape(binding)[-1]
-                self.input_h = engine.get_binding_shape(binding)[-2]
-                host_inputs.append(host_mem)
-                cuda_inputs.append(cuda_mem)
-            else:
-                host_outputs.append(host_mem)
-                cuda_outputs.append(cuda_mem)
+        self._setup_bindings(engine)
 
         # Store
         self.stream = stream
         self.context = context
         self.engine = engine
-        self.host_inputs = host_inputs
-        self.cuda_inputs = cuda_inputs
-        self.host_outputs = host_outputs
-        self.cuda_outputs = cuda_outputs
-        self.bindings = bindings
-        self.batch_size = 1
+        self.batch_size = engine.get_tensor_shape(self.input_binding_names[0])[0]
 
-    def check_cuda_init_error(self):
+    def _setup_bindings(self, engine: trt.ICudaEngine):
+        """
+        Set up TensorRT bindings for input and output tensors.
+
+        :param engine: TensorRT CUDA engine
+        """
+        self.host_inputs = []
+        self.cuda_inputs = []
+        self.host_outputs = []
+        self.cuda_outputs = []
+        self.input_binding_names = []
+        self.output_binding_names = []
+
+        for binding_name in engine:
+            shape = engine.get_tensor_shape(binding_name)
+            print('binding_name:', binding_name, shape)
+            size = trt.volume(shape)
+            dtype = trt.nptype(engine.get_tensor_dtype(binding_name))
+            # Allocate host and device buffers
+            host_mem = cuda.pagelocked_empty(size, dtype)
+            cuda_mem = cuda.mem_alloc(host_mem.nbytes)
+            # Append the device buffer to device bindings.
+            # Append to the appropriate list.
+            if engine.get_tensor_mode(binding_name) == trt.TensorIOMode.INPUT:
+                self.input_binding_names.append(binding_name)
+                self.input_w = shape[-1]
+                self.input_h = shape[-2]
+                self.host_inputs.append(host_mem)
+                self.cuda_inputs.append(cuda_mem)
+            elif engine.get_tensor_mode(binding_name) == trt.TensorIOMode.OUTPUT:
+                self.output_binding_names.append(binding_name)
+                self.host_outputs.append(host_mem)
+                self.cuda_outputs.append(cuda_mem)
+            else:
+                print(f'unknown binding: "{binding_name}"')
+
+    def _check_cuda_init_error(self):
         if self.cuda_init_error:
             raise RuntimeError('cuda.init() failed .. detector cannot be used! Try to restart the machine.')
 
-    def infer(self, image_raw):
-        self.check_cuda_init_error()
-
+    def infer(self, image_raw: np.ndarray):
         threading.Thread.__init__(self)  # type: ignore
         # Make self the active context, pushing it on top of the context stack.
         self.ctx.push()
         # Restore
         stream = self.stream
         context = self.context
-        engine = self.engine
         host_inputs = self.host_inputs
         cuda_inputs = self.cuda_inputs
         host_outputs = self.host_outputs
         cuda_outputs = self.cuda_outputs
-        bindings = self.bindings
+        input_binding_names = self.input_binding_names
+        output_binding_names = self.output_binding_names
         # Do image preprocess
         input_image, origin_h, origin_w = self._preprocess_image(image_raw)
         # Copy input image to host buffer
@@ -134,8 +130,9 @@ class YoLov5TRT():
         # Transfer input data  to the GPU.
         cuda.memcpy_htod_async(cuda_inputs[0], host_inputs[0], stream)
         # Run inference.
-        context.execute_async(batch_size=self.batch_size,
-                              bindings=bindings, stream_handle=stream.handle)
+        context.set_tensor_address(input_binding_names[0], cuda_inputs[0])
+        context.set_tensor_address(output_binding_names[0], cuda_outputs[0])
+        context.execute_async_v3(stream_handle=stream.handle)
         # Transfer predictions back from the GPU.
         cuda.memcpy_dtoh_async(host_outputs[0], cuda_outputs[0], stream)
         # Synchronize the stream
@@ -158,20 +155,78 @@ class YoLov5TRT():
         return detections, end - start
 
     def destroy(self):
-        # Remove any context from the top of the context stack, deactivating it.
-        self.ctx.pop()
+        """
+        Destroy the TRT engine and free up resources.
+
+        Advanced destroy function to clean up TRT objects.
+        This differs from the original implementation in TensorRTX where only the context was popped.
+        We had to apply this modification to avoid a segmentation fault on re-initialization
+        (particularly when setting yolov5=None).
+        """
+
+        # If init failed or already cleaned up, nothing to do
+        if getattr(self, "ctx", None) is None:
+            return
+        # Make sure the owning context is current for all frees
+        self.ctx.push()
+        try:
+            # 1) Stop work
+            if getattr(self, "stream", None) is not None:
+                self.stream.synchronize()
+
+            # 2) Free device buffers
+            for m in getattr(self, "cuda_inputs", []) or []:
+                try:
+                    m.free()
+                except Exception:
+                    pass
+            for m in getattr(self, "cuda_outputs", []) or []:
+                try:
+                    m.free()
+                except Exception:
+                    pass
+            self.cuda_inputs = []
+            self.cuda_outputs = []
+
+            # 3) Destroy TRT objects while context is current
+            try:
+                del self.context
+            except Exception:
+                pass
+            try:
+                del self.engine
+            except Exception:
+                pass
+
+            # 4) Drop stream and host buffers
+            self.stream = None
+            self.host_inputs = []
+            self.host_outputs = []
+        finally:
+            # Remove the push we just did and the original make_context push
+            try:
+                self.ctx.pop()   # pop for this destroy()
+            except Exception:
+                pass
+            try:
+                self.ctx.pop()   # pop for make_context()
+            except Exception:
+                pass
+            try:
+                self.ctx.detach()
+            except Exception:
+                pass
+            self.ctx = None
 
     def get_raw_image_zeros(self, image_path_batch=None):
-        """
-        description: Ready data for warmup
-        """
-        self.check_cuda_init_error()
+        """Data for warmup"""
+        self._check_cuda_init_error()
         return np.zeros([self.input_h, self.input_w, 3], dtype=np.uint8)
 
-    def _preprocess_image(self, image_raw):
+    def _preprocess_image(self, image_raw) -> tuple[np.ndarray, int, int]:
         """
-        description: resize and pad it to target size, normalize to [0,1],
-                     transform to NCHW format.
+        Resize and pad it to target size, normalize to [0,1], transform to NCHW format.
+
         param:
             input_image_path: str, image path
         return:
@@ -195,12 +250,17 @@ class YoLov5TRT():
             tx1 = int((self.input_w - tw) / 2)
             tx2 = self.input_w - tw - tx1
             ty1 = ty2 = 0
-
         # Resize the image with long side while maintaining ratio
-        image = cv2.resize(image_raw, (tw, th))
-        # Pad the short side with (128,128,128)
-        image = cv2.copyMakeBorder(
-            image, ty1, ty2, tx1, tx2, cv2.BORDER_CONSTANT, None, (128, 128, 128))
+        pil_image = Image.fromarray(image_raw)
+        pil_image = pil_image.resize((tw, th), Image.Resampling.BILINEAR)
+        image = np.array(pil_image)
+        # Pad with (128, 128, 128)
+        image = np.pad(
+            image,
+            ((ty1, ty2), (tx1, tx2), (0, 0)),
+            mode='constant',
+            constant_values=128
+        )
         image = image.astype(np.float32)
         image /= 255.0  # Normalize to [0,1]
         image = np.transpose(image, [2, 0, 1])  # HWC to CHW format:
@@ -210,9 +270,9 @@ class YoLov5TRT():
 
         return image, h, w
 
-    def xywh2xyxy(self, origin_h, origin_w, x):
+    def xywh2xyxy(self, origin_h: int, origin_w: int, x: np.ndarray) -> np.ndarray:
         """
-        description:    Convert nx4 boxes from [x, y, w, h] to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
+        Convert nx4 boxes from [x, y, w, h] to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
         param:
             origin_h:   height of original image
             origin_w:   width of original image
@@ -226,27 +286,23 @@ class YoLov5TRT():
         if r_h > r_w:
             y[:, 0] = x[:, 0] - x[:, 2] / 2
             y[:, 2] = x[:, 0] + x[:, 2] / 2
-            y[:, 1] = x[:, 1] - x[:, 3] / 2 - \
-                (self.input_h - r_w * origin_h) / 2
-            y[:, 3] = x[:, 1] + x[:, 3] / 2 - \
-                (self.input_h - r_w * origin_h) / 2
+            y[:, 1] = x[:, 1] - x[:, 3] / 2 - (self.input_h - r_w * origin_h) / 2
+            y[:, 3] = x[:, 1] + x[:, 3] / 2 - (self.input_h - r_w * origin_h) / 2
             y /= r_w
         else:
-            y[:, 0] = x[:, 0] - x[:, 2] / 2 - \
-                (self.input_w - r_h * origin_w) / 2
-            y[:, 2] = x[:, 0] + x[:, 2] / 2 - \
-                (self.input_w - r_h * origin_w) / 2
+            y[:, 0] = x[:, 0] - x[:, 2] / 2 - (self.input_w - r_h * origin_w) / 2
+            y[:, 2] = x[:, 0] + x[:, 2] / 2 - (self.input_w - r_h * origin_w) / 2
             y[:, 1] = x[:, 1] - x[:, 3] / 2
             y[:, 3] = x[:, 1] + x[:, 3] / 2
             y /= r_h
 
         return y
 
-    def _post_process(self, output, origin_h, origin_w):
+    def _post_process(self, output: np.ndarray, origin_h: int, origin_w: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
-        description: postprocess the prediction
+        Postprocess the prediction
         param:
-            output:     A numpy likes [num_boxes,cx,cy,w,h,conf,cls_id, cx,cy,w,h,conf,cls_id, ...] 
+            output:     A numpy likes [num_boxes,cx,cy,w,h,conf,cls_id, cx,cy,w,h,conf,cls_id, ...]
             origin_h:   height of original image
             origin_w:   width of original image
         return:
@@ -266,32 +322,26 @@ class YoLov5TRT():
         result_classid = boxes[:, 5] if len(boxes) else np.array([])
         return result_boxes, result_scores, result_classid
 
-    def bbox_iou(self, box1, box2, x1y1x2y2=True):
+    def bbox_iou(self, box1: np.ndarray, box2: np.ndarray, x1y1x2y2: bool = True) -> np.ndarray:
         """
-        description: compute the IoU of two bounding boxes
+        Compute the IoU of two bounding boxes
         param:
             box1: A box coordinate (can be (x1, y1, x2, y2) or (x, y, w, h))
-            box2: A box coordinate (can be (x1, y1, x2, y2) or (x, y, w, h))            
+            box2: A box coordinate (can be (x1, y1, x2, y2) or (x, y, w, h))
             x1y1x2y2: select the coordinate format
         return:
             iou: computed iou
         """
         if not x1y1x2y2:
             # Transform from center and width to exact coordinates
-            b1_x1, b1_x2 = box1[:, 0] - box1[:, 2] / \
-                2, box1[:, 0] + box1[:, 2] / 2
-            b1_y1, b1_y2 = box1[:, 1] - box1[:, 3] / \
-                2, box1[:, 1] + box1[:, 3] / 2
-            b2_x1, b2_x2 = box2[:, 0] - box2[:, 2] / \
-                2, box2[:, 0] + box2[:, 2] / 2
-            b2_y1, b2_y2 = box2[:, 1] - box2[:, 3] / \
-                2, box2[:, 1] + box2[:, 3] / 2
+            b1_x1, b1_x2 = box1[:, 0] - box1[:, 2] / 2, box1[:, 0] + box1[:, 2] / 2
+            b1_y1, b1_y2 = box1[:, 1] - box1[:, 3] / 2, box1[:, 1] + box1[:, 3] / 2
+            b2_x1, b2_x2 = box2[:, 0] - box2[:, 2] / 2, box2[:, 0] + box2[:, 2] / 2
+            b2_y1, b2_y2 = box2[:, 1] - box2[:, 3] / 2, box2[:, 1] + box2[:, 3] / 2
         else:
             # Get the coordinates of bounding boxes
-            b1_x1, b1_y1, b1_x2, b1_y2 = box1[:,
-                                              0], box1[:, 1], box1[:, 2], box1[:, 3]
-            b2_x1, b2_y1, b2_x2, b2_y2 = box2[:,
-                                              0], box2[:, 1], box2[:, 2], box2[:, 3]
+            b1_x1, b1_y1, b1_x2, b1_y2 = box1[:, 0], box1[:, 1], box1[:, 2], box1[:, 3]
+            b2_x1, b2_y1, b2_x2, b2_y2 = box2[:, 0], box2[:, 1], box2[:, 2], box2[:, 3]
 
         # Get the coordinates of the intersection rectangle
         inter_rect_x1 = np.maximum(b1_x1, b2_x1)
@@ -309,14 +359,15 @@ class YoLov5TRT():
 
         return iou
 
-    def _non_max_suppression(self, prediction, origin_h, origin_w):
+    def _non_max_suppression(self, prediction: np.ndarray, origin_h: int, origin_w: int) -> np.ndarray:
         """
-        description: Removes detections with lower object confidence score than 'conf_thres' and performs
+        Removes detections with lower object confidence score than 'conf_thres' and performs
         Non-Maximum Suppression to further filter detections.
-        param:
-            prediction: detections, (x1, y1, x2, y2, conf, cls_id)
-            origin_h: original image height
-            origin_w: original image width
+
+        param prediction:  detections, (x1, y1, x2, y2, conf, cls_id)
+        param origin_h: original image height
+        param origin_w: original image width
+
         return:
             boxes: output after nms with the shape (x1, y1, x2, y2, conf, cls_id)
         """
@@ -328,6 +379,11 @@ class YoLov5TRT():
         boxes = prediction[prediction[:, 4] >= conf_thres]
         # Trandform bbox from [center_x, center_y, w, h] to [x1, y1, x2, y2]
         boxes[:, :4] = self.xywh2xyxy(origin_h, origin_w, boxes[:, :4])
+        # clip the coordinates
+        boxes[:, 0] = np.clip(boxes[:, 0], 0, origin_w - 1)
+        boxes[:, 2] = np.clip(boxes[:, 2], 0, origin_w - 1)
+        boxes[:, 1] = np.clip(boxes[:, 1], 0, origin_h - 1)
+        boxes[:, 3] = np.clip(boxes[:, 3], 0, origin_h - 1)
         # Object confidence
         confs = boxes[:, 4]
         # Sort by the confs
@@ -335,8 +391,7 @@ class YoLov5TRT():
         # Perform non-maximum suppression
         keep_boxes = []
         while boxes.shape[0]:
-            large_overlap = self.bbox_iou(np.expand_dims(
-                boxes[0, :4], 0), boxes[:, :4]) > nms_thres
+            large_overlap = self.bbox_iou(np.expand_dims(boxes[0, :4], 0), boxes[:, :4]) > nms_thres
             label_match = boxes[0, -1] == boxes[:, -1]
             # Indices of boxes with lower confidence scores, large IOUs and matching labels
             invalid = large_overlap & label_match
@@ -354,4 +409,4 @@ class warmUpThread(threading.Thread):
     def run(self):
         _, use_time = self.yolov5_wrapper.infer(
             self.yolov5_wrapper.get_raw_image_zeros())
-        print('warm_up time->{:.2f}ms'.format(use_time * 1000))
+        print(f'warm_up time->{use_time * 1000:.2f}ms')

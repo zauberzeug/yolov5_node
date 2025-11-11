@@ -28,40 +28,30 @@ fi
 
 # ========================== BUILD CONFIGURATION / IMAGE SELECTION =======================
 
-SEMANTIC_VERSION=0.1.13
-NODE_LIB_VERSION=0.18.0
+SEMANTIC_VERSION=0.2.0
+NODE_LIB_VERSION=$(grep -oP 'learning_loop_node==\K[0-9.]+' pyproject.toml)
 build_args=" --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION"
 
 if [ -f /etc/nv_tegra_release ] # Check if we are on a Jetson device
 then
-    dockerfile="jetson.dockerfile"
-
     # version discovery borrowed from https://github.com/dusty-nv/jetson-containers/blob/master/scripts/l4t_version.sh
     L4T_VERSION_STRING=$(head -n 1 /etc/nv_tegra_release)
     L4T_RELEASE=$(echo $L4T_VERSION_STRING | cut -f 2 -d ' ' | grep -Po '(?<=R)[^;]+')
     L4T_REVISION=$(echo $L4T_VERSION_STRING | cut -f 2 -d ',' | grep -Po '(?<=REVISION: )[^;]+')
     L4T_VERSION="$L4T_RELEASE.$L4T_REVISION"
-    
-    if [ "$L4T_VERSION" == "32.6.1" ]; then
-        # do nothing
-        echo "Using exact L4T version 32.6.1"
-        build_args+=" --build-arg BASE_IMAGE=zauberzeug/l4t-nn-inference-base:OCV4.6.0-L4T32.6.1-PY3.6"
-    elif [ "$L4T_RELEASE" == "35" ]; then 
-        # available versions of the dusty images: 32.7.1, 35.2.1, 35.3.1, 35.4.1
-        # L4T R35.x containers can run on other versions of L4T R35.x (JetPack 5.1+)
-        L4T_VERSION="35.4.1"
-        echo "Using L4T version 35.4.1 (dusty image for exact version $L4T_VERSION)"
-        build_args+=" --build-arg BASE_IMAGE=dustynv/opencv:r$L4T_VERSION"
+
+    if [ "$L4T_RELEASE" == "36" ]; then
+        # L4T R36.x containers can run on other versions of L4T R36.x (JetPack 6.0+)
+        echo "Using L4T version 36.4.0 (dusty image for exact version $L4T_VERSION)"
+        build_args+=" --build-arg BASE_IMAGE=dustynv/l4t-ml:r36.4.0"
     else
         echo "Unsupported L4T version: $L4T_VERSION"
         exit 1
     fi
 
     image="zauberzeug/yolov5-detector:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION-$L4T_VERSION"
-else # ----------------------------------------------------------------------- This is cloud (linux) (python 3.10)
-    dockerfile="cloud.dockerfile"
-
-    build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3"
+else # ----------------------------------------------------------------------- This is cloud (linux) (python 3.12)
+    build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/tensorrt:25.01-py3"
     image="zauberzeug/yolov5-detector:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION-cloud"
 fi
 
@@ -78,6 +68,8 @@ run_args+=" -e HOST=$LOOP_HOST -e ORGANIZATION=$LOOP_ORGANIZATION -e PROJECT=$LO
 run_args+=" -e USE_BACKDOOR_CONTROLS=$USE_BACKDOOR_CONTROLS"
 run_args+=" --name $DETECTOR_NAME"
 run_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all"
+# Mount the virtual environment separately, so the developer's environment doesn't end up in the container
+run_args+=" --volume /app/.venv"
 run_args+=" -p 8004:80"
 
 # Link Learning Loop Node library if requested
@@ -99,23 +91,23 @@ cmd_args=${@:2}
 set -x
 case $cmd in
     b | build)
-        DOCKER_BUILDKIT=0 docker build . -f $dockerfile --target release -t $image $build_args $cmd_args
+        DOCKER_BUILDKIT=0 docker build . -t $image $build_args $cmd_args
         ;;
     bnc | build-no-cache)
-        docker build --no-cache . -f $dockerfile --target release -t $image $build_args $cmd_args
+        docker build --no-cache . -t $image $build_args $cmd_args
         ;;
     U | update)
-	    docker pull ${image}
-	    ;;
+        docker pull ${image}
+        ;;
     p | push)
         docker push $image
         ;;
     r | run)
         docker run $run_args $image $cmd_args
-	    ;;
+        ;;
     u | up)
         docker run -d --restart always $run_args $image $cmd_args
-	    ;;
+        ;;
     s | stop)
         docker stop $DETECTOR_NAME $cmd_args
         ;;
@@ -130,7 +122,7 @@ case $cmd in
         docker logs -f -n 100 $cmd_args $DETECTOR_NAME
         ;;
     e | exec)
-        docker exec $DETECTOR_NAME $cmd_args 
+        docker exec $DETECTOR_NAME $cmd_args
         ;;
     a | attach)
         docker exec -it $cmd_args $DETECTOR_NAME /bin/bash

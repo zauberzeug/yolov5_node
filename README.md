@@ -42,6 +42,8 @@ When using the script it is required to set up a .env file in the training folde
 
 # Detector (Object detection)
 
+GPU Detector is tested with Nvidia Driver Version: 580.95.05 and CUDA Version: 13.0
+
 ## Images
 
 Detector Images are published on https://hub.docker.com/r/zauberzeug/yolov5-detector.

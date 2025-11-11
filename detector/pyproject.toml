@@ -1,0 +1,84 @@
+[project]
+name = "yolov5-detector"
+version = "0.2.0"
+description = "YOLOv5 TensorRT detector node"
+authors = [{ name="Zauberzeug GmbH", email="info@zauberzeug.com" }]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "uvicorn",
+    "async_generator",
+    "aiofiles",
+    "psutil",
+    "pillow",
+    "multidict",
+    "attrs",
+    "yarl",
+    "async_timeout",
+    "idna_ssl",
+    "aiosignal",
+    "numpy",
+    "pyyaml",
+    "pycuda==2025.1.2",
+    "learning_loop_node==0.18.1",
+]
+
+# Note: learning_loop_node is installed separately in Dockerfiles with a specific version
+
+[dependency-groups]
+dev = [
+    {include-group = "types"},
+    "mypy (>=1.18.2, <2.0.0)",
+    "pylint (>=3.3.3, <4.0.0)",
+    "pre-commit (>=4.3.0, <5.0.0)",
+    "ruff (>=0.13.2, <1.0.0)",
+    "autopep8 (>=2.3.2, <3.0.0)",
+]
+
+types = []
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.mypy]
+python_version = "3.12"
+check_untyped_defs = true
+
+[tool.pylint]
+disable = [
+    "C0114", # Missing module docstring
+    "C0116", # Missing function or method docstring
+    "C0301", # Line too long (exceeds character limit)
+]
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "B", # bugbear
+    "E", # pycodestyle
+    "F", # pyflakes
+    "I", # isort
+    "PL", # pylint
+    "RUF", # ruff
+    "UP", # pyupgrade
+    "W", # pycodestyle
+]
+fixable = [
+    "I", # isort
+    "RUF022", # `__all__` is not sorted
+]
+ignore = [
+    "E501", # line too long
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+# NOTE: changing default location of pytest_cache because the uvicorn file watcher somehow triggered too many reloads
+cache_dir = "../.pytest_cache"
+testpaths = [
+    "tests"
+]
