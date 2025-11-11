@@ -41,6 +41,7 @@ class Yolov5Detector(DetectorLogic):
                                           len(self.model_info.categories),
                                           self.model_info.model_size,
                                           f'{self.model_info.model_root_path}/model.wts')
+
         ctypes.CDLL('/tensorrtx/yolov5/build/libmyplugins.so')
         if self.yolov5 is not None:
             self.yolov5.destroy()
@@ -49,22 +50,21 @@ class Yolov5Detector(DetectorLogic):
 
         try:
             self.yolov5 = yolov5.YoLov5TRT(engine_file, self.iou_threshold, self.conf_threshold)
+
         except RuntimeError as e:
             if 'TensorRT version mismatch' in str(e) or 'deserialize' in str(e):
                 self.log.error('TensorRT engine compatibility issue: %s', e)
                 if os.path.isfile(engine_file):
                     self.log.info('Removing incompatible engine file: %s', engine_file)
                     os.remove(engine_file)
-                    raise
-                else:
-                    raise
-            else:
-                raise
+            raise
 
         for _ in range(8):
             warmup = yolov5.warmUpThread(self.yolov5)
             warmup.start()
             warmup.join()
+
+        self.log.info('Yolov5Detector initialized successfully')
 
     @staticmethod
     def clip_box(x1: float, y1: float, width: float, height: float, img_width: int, img_height: int) -> tuple[int, int, int, int]:  # noqa: PLR0913

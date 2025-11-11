@@ -1,5 +1,5 @@
 """
-Original from https://github.com/wang-xinyu/tensorrtx/blob/7b79de466c7ac2fcf179e65c2fa4718107f236f9/yolov5/yolov5_det_trt.py
+Based on https://github.com/wang-xinyu/tensorrtx/blob/7b79de466c7ac2fcf179e65c2fa4718107f236f9/yolov5/yolov5_det_trt.py
 MIT License
 """
 
@@ -155,20 +155,78 @@ class YoLov5TRT:
         return detections, end - start
 
     def destroy(self):
-        # Remove any context from the top of the context stack, deactivating it.
-        self.ctx.pop()
+        """
+        Destroy the TRT engine and free up resources.
+
+        Advanced destroy function to clean up TRT objects.
+        This differs from the original implementation in TensorRTX where only the context was popped.
+        We had to apply this modification to avoid a segmentation fault on re-initialization
+        (particularly when setting yolov5=None).
+        """
+
+        # If init failed or already cleaned up, nothing to do
+        if getattr(self, "ctx", None) is None:
+            return
+        # Make sure the owning context is current for all frees
+        self.ctx.push()
+        try:
+            # 1) Stop work
+            if getattr(self, "stream", None) is not None:
+                self.stream.synchronize()
+
+            # 2) Free device buffers
+            for m in getattr(self, "cuda_inputs", []) or []:
+                try:
+                    m.free()
+                except Exception:
+                    pass
+            for m in getattr(self, "cuda_outputs", []) or []:
+                try:
+                    m.free()
+                except Exception:
+                    pass
+            self.cuda_inputs = []
+            self.cuda_outputs = []
+
+            # 3) Destroy TRT objects while context is current
+            try:
+                del self.context
+            except Exception:
+                pass
+            try:
+                del self.engine
+            except Exception:
+                pass
+
+            # 4) Drop stream and host buffers
+            self.stream = None
+            self.host_inputs = []
+            self.host_outputs = []
+        finally:
+            # Remove the push we just did and the original make_context push
+            try:
+                self.ctx.pop()   # pop for this destroy()
+            except Exception:
+                pass
+            try:
+                self.ctx.pop()   # pop for make_context()
+            except Exception:
+                pass
+            try:
+                self.ctx.detach()
+            except Exception:
+                pass
+            self.ctx = None
 
     def get_raw_image_zeros(self, image_path_batch=None):
-        """
-        description: Ready data for warmup
-        """
+        """Data for warmup"""
         self._check_cuda_init_error()
         return np.zeros([self.input_h, self.input_w, 3], dtype=np.uint8)
 
-    def _preprocess_image(self, image_raw):
+    def _preprocess_image(self, image_raw) -> tuple[np.ndarray, int, int]:
         """
-        description: resize and pad it to target size, normalize to [0,1],
-                     transform to NCHW format.
+        Resize and pad it to target size, normalize to [0,1], transform to NCHW format.
+
         param:
             input_image_path: str, image path
         return:
@@ -212,9 +270,9 @@ class YoLov5TRT:
 
         return image, h, w
 
-    def xywh2xyxy(self, origin_h, origin_w, x):
+    def xywh2xyxy(self, origin_h: int, origin_w: int, x: np.ndarray) -> np.ndarray:
         """
-        description:    Convert nx4 boxes from [x, y, w, h] to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
+        Convert nx4 boxes from [x, y, w, h] to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
         param:
             origin_h:   height of original image
             origin_w:   width of original image
@@ -240,9 +298,9 @@ class YoLov5TRT:
 
         return y
 
-    def _post_process(self, output, origin_h, origin_w):
+    def _post_process(self, output: np.ndarray, origin_h: int, origin_w: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
-        description: postprocess the prediction
+        Postprocess the prediction
         param:
             output:     A numpy likes [num_boxes,cx,cy,w,h,conf,cls_id, cx,cy,w,h,conf,cls_id, ...]
             origin_h:   height of original image
@@ -264,9 +322,9 @@ class YoLov5TRT:
         result_classid = boxes[:, 5] if len(boxes) else np.array([])
         return result_boxes, result_scores, result_classid
 
-    def bbox_iou(self, box1, box2, x1y1x2y2=True):
+    def bbox_iou(self, box1: np.ndarray, box2: np.ndarray, x1y1x2y2: bool = True) -> np.ndarray:
         """
-        description: compute the IoU of two bounding boxes
+        Compute the IoU of two bounding boxes
         param:
             box1: A box coordinate (can be (x1, y1, x2, y2) or (x, y, w, h))
             box2: A box coordinate (can be (x1, y1, x2, y2) or (x, y, w, h))
@@ -301,14 +359,15 @@ class YoLov5TRT:
 
         return iou
 
-    def _non_max_suppression(self, prediction, origin_h, origin_w):
+    def _non_max_suppression(self, prediction: np.ndarray, origin_h: int, origin_w: int) -> np.ndarray:
         """
-        description: Removes detections with lower object confidence score than 'conf_thres' and performs
+        Removes detections with lower object confidence score than 'conf_thres' and performs
         Non-Maximum Suppression to further filter detections.
-        param:
-            prediction: detections, (x1, y1, x2, y2, conf, cls_id)
-            origin_h: original image height
-            origin_w: original image width
+
+        param prediction:  detections, (x1, y1, x2, y2, conf, cls_id)
+        param origin_h: original image height
+        param origin_w: original image width
+
         return:
             boxes: output after nms with the shape (x1, y1, x2, y2, conf, cls_id)
         """
