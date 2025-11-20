@@ -20,7 +20,7 @@ dependencies = [
     "numpy",
     "pyyaml",
     "pycuda==2025.1.2",
-    "learning_loop_node==0.18.1",
+    "learning_loop_node==0.18.2",
 ]
 
 # Note: learning_loop_node is installed separately in Dockerfiles with a specific version
