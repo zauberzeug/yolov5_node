@@ -28,7 +28,7 @@ fi
 
 # ========================== BUILD CONFIGURATION / IMAGE SELECTION =======================
 
-SEMANTIC_VERSION=0.2.0
+SEMANTIC_VERSION=$(grep -oP '^version\s*=\s*"\K[0-9.]+' pyproject.toml)
 NODE_LIB_VERSION=$(grep -oP 'learning_loop_node==\K[0-9.]+' pyproject.toml)
 build_args=" --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION"
 
@@ -61,15 +61,13 @@ fi
 . .env || echo "you should provide an .env file to configure the detector"
 
 run_args="-it" 
-# run_args+=" -v $(pwd)/../:/yolov5_node"
-run_args+=" -v $HOME/node_data/$DETECTOR_NAME:/data"
+# run_args+=" -v $(pwd)/../:/app"
+# run_args+=" -v $HOME/node_data/$DETECTOR_NAME:/data"
 run_args+=" -h ${HOSTNAME}_DEV"
 run_args+=" -e HOST=$LOOP_HOST -e ORGANIZATION=$LOOP_ORGANIZATION -e PROJECT=$LOOP_PROJECT"
 run_args+=" -e USE_BACKDOOR_CONTROLS=$USE_BACKDOOR_CONTROLS"
 run_args+=" --name $DETECTOR_NAME"
-run_args+=" --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all"
-# Mount the virtual environment separately, so the developer's environment doesn't end up in the container
-run_args+=" --volume /app/.venv"
+run_args+=" --gpus all"
 run_args+=" -p 8004:80"
 
 # Link Learning Loop Node library if requested
@@ -77,9 +75,10 @@ if [ "$LINKLL" == "TRUE" ]; then
     SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
     if [ -f /etc/nv_tegra_release ]
     then
+        # TODO: check that this is correct for new jetson versions
         run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.8/dist-packages/learning_loop_node"
     else
-        run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.10/dist-packages/learning_loop_node"
+        run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/uv_env/.venv/lib/python3.12/dist-packages/learning_loop_node"
     fi
     echo "Linking Learning Loop from $SCRIPT_DIR/../../learning_loop_node"
 fi
@@ -91,7 +90,7 @@ cmd_args=${@:2}
 set -x
 case $cmd in
     b | build)
-        DOCKER_BUILDKIT=0 docker build . -t $image $build_args $cmd_args
+        docker build . -t $image $build_args $cmd_args
         ;;
     bnc | build-no-cache)
         docker build --no-cache . -t $image $build_args $cmd_args
