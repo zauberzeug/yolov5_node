@@ -6,7 +6,6 @@
 # USERNAME=<loop username>
 # PASSWORD=<loop password>
 # HOST=<host ip or url>
-# YOLOV5_MODE=<yolo mode / DETECTION or CLASSIFICATION>
 # TRAINER_NAME=dennis_test_trainer
 # LINKLL=<FALSE/TRUE> (default: FALSE)
 # UVICORN_RELOAD=<FALSE/TRUE/0/1> (default: FALSE)
@@ -22,7 +21,6 @@ then
     echo "  `basename $0` (bnc | build-no-cache) Build or rebuild without cache"
     echo "  `basename $0` (p | push)             Push image"
     echo "  ------------------------------"
-    echo "  `basename $0` (d | debug)            Start in debug mode"
     echo "  `basename $0` (r | run)              Run"
     echo "  `basename $0` (u | up)               Start detached"
     echo "  `basename $0` (s | stop)             Stop"
@@ -103,9 +101,6 @@ case $cmd in
         ;;
     bnc | build-no-cache)
         docker build --no-cache . -t $image $build_args $cmd_args
-        ;;
-    d | debug)
-        docker run $run_args $image /app/start.sh debug
         ;;
     p | push)
         docker push $image

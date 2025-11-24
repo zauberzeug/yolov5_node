@@ -59,7 +59,7 @@ def _create_set(training: Training, set_name: str) -> int:
                 yolo_boxes.append(c_id + ' ' + ' '.join([f"{c:.6f}" for c in coords]) + '\n')
 
             for point in image['point_annotations']:
-                size = [c for c in training.categories if c.id == point['category_id']][0].point_size or 20
+                size = next(c for c in training.categories if c.id == point['category_id']).point_size or 20
                 coords = [
                     point['x']/width,
                     point['y']/height,
@@ -75,41 +75,6 @@ def _create_set(training: Training, set_name: str) -> int:
     return img_count
 
 
-def _create_set_cla(training: Training, set_name: str) -> None:
-    training_path = training.training_folder
-    images_path = f'{training_path}/{set_name}'
-
-    shutil.rmtree(images_path, ignore_errors=True)
-    os.makedirs(images_path, exist_ok=True)
-    for category in category_lookup_from_training(training).keys():
-        os.makedirs(f'{images_path}/{category}', exist_ok=True)
-
-    # classification format:
-        # dataset
-        # ├── train
-        # │   ├── class1
-        # │   │   ├── image1.jpg
-        # |── test
-        # │   ├── class1
-        # │   │   ├── image2.jpg
-
-    count = 0
-    assert training.image_data is not None, 'Training should have image data'
-    for image in training.image_data:
-        if image['set'] == set_name:
-            image_name = image['id'] + '.jpg'
-            classification = image['classification_annotation']
-            if classification:
-                count += 1
-                category = classification['category_id']
-                category_name = [c for c in training.categories if c.id == category][0].name
-                image_path = f"{images_path}/{category_name}/{image_name}"
-                # logging.info('linking %s to %s', image_name, image_path)
-                os.symlink(f'{os.path.abspath(training.images_folder)}/{image_name}', image_path)
-
-    logging.info('Created %d image links', count)
-
-
 def create_dataset_yaml(training: Training) -> None:
     categories = category_lookup_from_training(training)
     path = training.training_folder
@@ -123,15 +88,6 @@ def create_dataset_yaml(training: Training) -> None:
     logging.info('ordered names: %s', data['names'])
     with open(f'{path}/dataset.yaml', 'w') as f:
         yaml.dump(data, f)
-
-
-def create_file_structure_cla(training: Training) -> None:
-    path = training.training_folder
-    assert path is not None, 'Training should have a path'
-    Path(path).mkdir(parents=True, exist_ok=True)
-
-    _create_set_cla(training, 'test')
-    _create_set_cla(training, 'train')
 
 
 def create_file_structure(training: Training) -> None:
@@ -153,7 +109,7 @@ def set_hyperparameters_in_file(yaml_path: str, hyperparameter: dict[str, Any]) 
     """Override the hyperparameters in the yaml file used by the yolov5 trainer with the ones from the hyperparameter dict (coming from the loop configuration).
     The yaml file is modified in place."""
 
-    with open(yaml_path, 'r') as f:
+    with open(yaml_path) as f:
         content = yaml.load(f)
 
     if 'flip_rl' in hyperparameter:

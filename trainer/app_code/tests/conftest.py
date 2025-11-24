@@ -3,11 +3,10 @@ import logging
 import os
 import shutil
 import subprocess
-from typing import Dict
 
-import icecream
 import pytest
 from _pytest.fixtures import SubRequest
+
 # from dotenv import load_dotenv
 from learning_loop_node.data_classes import Context
 from learning_loop_node.data_exchanger import DataExchanger
@@ -15,7 +14,6 @@ from learning_loop_node.loop_communication import LoopCommunicator
 
 # pylint: disable=unused-argument,redefined-outer-name
 
-icecream.install()
 logging.basicConfig(level=logging.INFO)
 
 # load_dotenv()
@@ -55,13 +53,12 @@ async def check_marks(request: SubRequest, glc: LoopCommunicator):  # pylint: di
         marker = markers[0]
         os.environ['LOOP_ORGANIZATION'] = marker.kwargs['organization']
         os.environ['LOOP_PROJECT'] = marker.kwargs['project']
-        os.environ['YOLOV5_MODE'] = marker.kwargs['mode']
 
     markers = list(request.node.iter_markers('generate_project'))
     assert len(markers) <= 1, 'Only one generate_project marker allowed'
     if len(markers) == 1:
         marker = markers[0]
-        configuration: Dict = marker.kwargs['configuration']
+        configuration: dict = marker.kwargs['configuration']
         project = configuration['project_name']
         # May not return 200 if project does not exist
         await glc.delete(f"/zauberzeug/projects/{project}?keep_images=true")

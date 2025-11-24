@@ -3,7 +3,7 @@ import logging
 import os
 
 import torch
-import yaml  # type: ignore
+import yaml
 from learning_loop_node.helpers.misc import get_free_memory_mb
 from learning_loop_node.trainer.exceptions import CriticalError
 from torch.multiprocessing import Process, Queue, set_start_method
