@@ -56,4 +56,4 @@ WORKDIR /app
 
 EXPOSE 80
 ENV TZ=Europe/Amsterdam
-CMD ["/app/start.sh"]
+CMD ["python", "/app/main.py"]
