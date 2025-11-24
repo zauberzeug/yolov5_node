@@ -38,28 +38,14 @@ fi
 
 # ========================== BUILD CONFIGURATION / IMAGE SELECTION =======================
 
-# NODE_LIB_VERSION should only be used, to build the corresponding version and deploy to docker
-# make sure the remote repository always has the 'latest' tag (otherwise the CI tests will fail)
-
-SEMANTIC_VERSION=0.1.15
-NODE_LIB_VERSION=0.14.0
+SEMANTIC_VERSION=$(grep -oP '^version\s*=\s*"\K[0-9.]+' pyproject.toml)
+NODE_LIB_VERSION=$(grep -oP 'learning_loop_node==\K[0-9.]+' pyproject.toml)
 
 if [ "$2" = "test_latest" ]; then
     image="zauberzeug/yolov5-trainer:latest"
 else
     image="zauberzeug/yolov5-trainer:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION"
 fi
-
-build_args=" --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION"
-
-# this is python 3.10 with pytorch 2.1.0 (https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel-23-07.html)
-# Requires Driver 530+
-build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" 
-
-# this is python 3.10 with pytorch 2.3.0
-# Requires Driver 545+
-# build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:24.02-py3" 
-# (cf. https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html#framework-matrix-2023)
 
 
 # ========================== RUN CONFIGURATION =========================================
@@ -97,10 +83,10 @@ else
 fi
 case $cmd in
     b | build)
-        docker build . -t $image $build_args $cmd_args
+        docker build . -t $image $cmd_args
         ;;
     bnc | build-no-cache)
-        docker build --no-cache . -t $image $build_args $cmd_args
+        docker build --no-cache . -t $image $cmd_args
         ;;
     p | push)
         docker push $image
