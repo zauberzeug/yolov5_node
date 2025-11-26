@@ -1,0 +1,146 @@
+[project]
+name = "yolov5-trainer-node"
+version = "0.1.15"
+description = "Yolov5 trainer node"
+authors = [{ name="Zauberzeug GmbH", email="info@zauberzeug.com" }]
+readme = "README.md"
+requires-python = ">=3.12"
+
+
+
+# python-dateutil==2.8.2
+# python-dotenv==1.0.0
+# python-engineio==4.8.0
+# python-multipart==0.0.6
+# python-socketio==5.10.0
+
+# torch==2.1.2
+# torchvision==0.16.2
+# numpy==1.26.3
+# Pillow==10.2.0
+
+# uvloop==0.19.0
+# seaborn==0.13.1
+# thop==0.1.1.post2209072238
+# coremltools==7.1
+# onnx==1.14.0
+# gsutil==5.27
+# notebook==6.4.10
+# wandb==0.16.2
+# torchinfo==1.8.0
+# python-dotenv==1.0.0
+# httptools==0.6.1
+# dacite==1.8.1
+# autopep8==2.0.4
+# debugpy==1.6.7
+# gunicorn==21.2.0
+# pyaml==23.12.0
+# ruamel.yaml==0.18.5
+
+
+# # Install requirements
+# RUN pip install --upgrade pip
+# RUN pip install opencv-python==4.5.5.64
+# RUN pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof
+# RUN pip install --no-cache -r yolov5_node/trainer/requirements.txt
+
+
+
+
+dependencies = [
+    "onnx==1.16.0",
+    "ruamel.yaml",
+    "learning_loop_node==0.18.2",
+    "torchinfo>=1.8.0",
+]
+
+# Note: learning_loop_node is installed separately in Dockerfiles with a specific version
+[dependency-groups]
+dev = [
+    {include-group = "types"},
+    "mypy (>=1.18.2, <2.0.0)",
+    "pylint (>=3.3.3, <4.0.0)",
+    "pre-commit (>=4.3.0, <5.0.0)",
+    "ruff (>=0.13.2, <1.0.0)",
+    "autopep8 (>=2.3.2, <3.0.0)",
+    "pytest (>=8.2.0,<9.0.0)",
+    "pytest-asyncio (>=0.23.6)",  # important bit
+    "pytest-mock",
+    "pytest-xdist",
+    "pytest-watch",
+]
+
+yolo = [
+    "pandas>=1.1.4",
+    "seaborn>=0.11.0",
+    "albumentations>=1.0.3",
+    "gitpython",
+    "ipython",  # interactive notebook
+    "matplotlib>=3.2.2",
+    "numpy>=1.18.5",
+    "opencv-python>=4.1.1,<=4.8.0.74",
+    "opencv-python-headless<=4.8.0.74",
+    "Pillow>=7.1.2",
+    "psutil",  # system resources
+    "PyYAML>=5.3.1",
+    "requests>=2.23.0",
+    "scipy>=1.4.1",
+    "thop>=0.1.1",  # FLOPs computation
+    "torch>=1.7.0",  # see https://pytorch.org/get-started/locally (recommended)
+    "torchvision>=0.8.1",
+    "tqdm>=4.64.0",
+]
+
+types = []
+
+[tool.uv]
+default-groups = ["dev", "yolo"]
+
+[tool.mypy]
+python_version = "3.12"
+check_untyped_defs = true
+
+[tool.pylint]
+disable = [
+    "C0114", # Missing module docstring
+    "C0116", # Missing function or method docstring
+    "C0301", # Line too long (exceeds character limit)
+]
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "B", # bugbear
+    "E", # pycodestyle
+    "F", # pyflakes
+    "I", # isort
+    "PL", # pylint
+    "RUF", # ruff
+    "UP", # pyupgrade
+    "W", # pycodestyle
+]
+fixable = [
+    "I", # isort
+    "RUF022", # `__all__` is not sorted
+]
+ignore = [
+    "E501", # line too long
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+# NOTE: changing default location of pytest_cache because the uvicorn file watcher somehow triggered too many reloads
+cache_dir = "/tmp/.pytest_cache"
+testpaths = [
+    "app_code/tests"
+]
+filterwarnings = [
+    "ignore:distutils Version classes are deprecated:DeprecationWarning:thop.profile",
+    "ignore:pkg_resources is deprecated:UserWarning"
+]

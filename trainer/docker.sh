@@ -6,7 +6,6 @@
 # USERNAME=<loop username>
 # PASSWORD=<loop password>
 # HOST=<host ip or url>
-# YOLOV5_MODE=<yolo mode / DETECTION or CLASSIFICATION>
 # TRAINER_NAME=dennis_test_trainer
 # LINKLL=<FALSE/TRUE> (default: FALSE)
 # UVICORN_RELOAD=<FALSE/TRUE/0/1> (default: FALSE)
@@ -22,7 +21,6 @@ then
     echo "  `basename $0` (bnc | build-no-cache) Build or rebuild without cache"
     echo "  `basename $0` (p | push)             Push image"
     echo "  ------------------------------"
-    echo "  `basename $0` (d | debug)            Start in debug mode"
     echo "  `basename $0` (r | run)              Run"
     echo "  `basename $0` (u | up)               Start detached"
     echo "  `basename $0` (s | stop)             Stop"
@@ -40,28 +38,14 @@ fi
 
 # ========================== BUILD CONFIGURATION / IMAGE SELECTION =======================
 
-# NODE_LIB_VERSION should only be used, to build the corresponding version and deploy to docker
-# make sure the remote repository always has the 'latest' tag (otherwise the CI tests will fail)
-
-SEMANTIC_VERSION=0.1.15
-NODE_LIB_VERSION=0.14.0
+SEMANTIC_VERSION=$(grep -oP '^version\s*=\s*"\K[0-9.]+' pyproject.toml)
+NODE_LIB_VERSION=$(grep -oP 'learning_loop_node==\K[0-9.]+' pyproject.toml)
 
 if [ "$2" = "test_latest" ]; then
     image="zauberzeug/yolov5-trainer:latest"
 else
     image="zauberzeug/yolov5-trainer:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION"
 fi
-
-build_args=" --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION"
-
-# this is python 3.10 with pytorch 2.1.0 (https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel-23-07.html)
-# Requires Driver 530+
-build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3" 
-
-# this is python 3.10 with pytorch 2.3.0
-# Requires Driver 545+
-# build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:24.02-py3" 
-# (cf. https://docs.nvidia.com/deeplearning/frameworks/support-matrix/index.html#framework-matrix-2023)
 
 
 # ========================== RUN CONFIGURATION =========================================
@@ -70,7 +54,7 @@ build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/pytorch:23.07-py3"
 . .env || echo "you should provide an .env file for the trainer"
 
 run_args="-it" 
-run_args+=" -v $(pwd)/../:/yolov5_node/"
+#run_args+=" -v $(pwd)/:/app/"
 run_args+=" -v $HOME/trainer_nodes_data:/data"
 run_args+=" -h ${HOSTNAME}_DEV"
 run_args+=" -e HOST=$HOST -e USERNAME=$USERNAME -e PASSWORD=$PASSWORD -e LOOP_SSL_CERT_PATH=$LOOP_SSL_CERT_PATH"
@@ -85,7 +69,7 @@ run_args+=" -p 7443:80"
 # Link Learning Loop Node library if requested
 if [ "$LINKLL" == "TRUE" ]; then
     SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-    run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.10/dist-packages/learning_loop_node"
+    run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/uv_env/.venv/lib/python3.12/dist-packages/learning_loop_node"
     echo "Linked Learning Loop from $SCRIPT_DIR/../../learning_loop_node"
 fi
 
@@ -99,13 +83,10 @@ else
 fi
 case $cmd in
     b | build)
-        docker build . -t $image $build_args $cmd_args
+        docker build . -t $image $cmd_args
         ;;
     bnc | build-no-cache)
-        docker build --no-cache . -t $image $build_args $cmd_args
-        ;;
-    d | debug)
-        docker run $run_args $image /app/start.sh debug
+        docker build --no-cache . -t $image $cmd_args
         ;;
     p | push)
         docker push $image

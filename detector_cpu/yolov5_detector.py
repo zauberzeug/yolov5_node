@@ -3,7 +3,7 @@ import os
 import time
 from typing import List, Tuple
 
-import cv2
+import cv2  # type: ignore # pylint: disable=import-error
 import numpy as np
 import torch  # type: ignore # pylint: disable=import-error
 from learning_loop_node.data_classes import (

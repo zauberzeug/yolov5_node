@@ -7,11 +7,17 @@ import shutil
 from dataclasses import asdict
 from pathlib import Path
 
-import cv2
+import cv2  # type: ignore # pylint: disable=import-error
 import yaml  # type: ignore
 from fastapi.encoders import jsonable_encoder
-from learning_loop_node.data_classes import (BoxDetection, ClassificationDetection, Detections, ModelInformation,
-                                             PointDetection, PretrainedModel, TrainingStateData)
+from learning_loop_node.data_classes import (
+    BoxDetection,
+    Detections,
+    ModelInformation,
+    PointDetection,
+    PretrainedModel,
+    TrainingStateData,
+)
 from learning_loop_node.enums import CategoryType
 from learning_loop_node.trainer import trainer_logic
 from learning_loop_node.trainer.exceptions import CriticalError, NodeNeedsRestartError
@@ -23,12 +29,9 @@ from . import batch_size_calculation, model_files, yolov5_format
 class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
     def __init__(self) -> None:
-        self.is_cla = os.getenv('YOLOV5_MODE') == 'CLASSIFICATION'
-        if not self.is_cla:
-            assert os.getenv('YOLOV5_MODE') == 'DETECTION', 'YOLOV5_MODE should be `DETECTION` or `CLASSIFICATION`'
-        super().__init__(model_format='yolov5_pytorch' if not self.is_cla else 'yolov5_cla_pytorch')
+        super().__init__(model_format='yolov5_pytorch')
 
-        logging.info('------ STARTING YOLOV5 TRAINER LOGIC WITH MODE %s ------', os.getenv('YOLOV5_MODE'))
+        logging.info('------ STARTING YOLOV5 TRAINER LOGIC ------')
         self.latest_epoch = 0
         self.patience = 300
         self.inference_batch_size = 100  # yolo processes images one by one
@@ -48,20 +51,14 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     def training_progress(self) -> float | None:
         if self._executor is None:
             return None
-        if self.is_cla:
-            return self._get_progress_from_log_cla()
         return self._get_progress_from_log()
 
     @property
     def model_architecture(self) -> str:
-        return 'yolov5_cls' if self.is_cla else 'yolov5'
+        return 'yolov5'
 
     @property
     def provided_pretrained_models(self) -> list[PretrainedModel]:
-        if self.is_cla:
-            return [PretrainedModel(name='s-cls', label='YOLO v5 small', description='~5fps on Jetson Nano'),
-                    PretrainedModel(name='x-cls', label='YOLO v5 large', description='~5fps on Jetson Nano'),]
-
         return [PretrainedModel(name='s', label='YOLO v5 640 small', description=''),
                 PretrainedModel(name='m', label='YOLO v5 640 medium', description=''),
                 PretrainedModel(name='s6', label='YOLO v5 1280 small', description='~5 fps on Jetson Nano'), ]
@@ -96,18 +93,11 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         return None
 
     def _get_new_best_training_state(self) -> TrainingStateData | None:
-        if self.is_cla:
-            weightfile = model_files.get_best(self.training.training_folder_path)
-        else:
-            weightfile = model_files.get_new(self.training.training_folder_path)
+        weightfile = model_files.get_new(self.training.training_folder_path)
         if not weightfile:
             return None
 
-        if self.is_cla:
-            epoch = None
-        else:
-            epoch = model_files.epoch_from_weightfile(weightfile)
-
+        epoch = model_files.epoch_from_weightfile(weightfile)
         weightfile_str = str(weightfile.absolute())
         logging.info('found new best model at %s', weightfile_str)
 
@@ -138,9 +128,6 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         shutil.copy(weightfile, '/tmp/model.pt')
         training_path = '/'.join(str(weightfile).split('/')[:-4])
 
-        if self.is_cla:
-            return {self.model_format: ['/tmp/model.pt', f'{training_path}/result/opt.yaml']}
-
         executor = Executor(self.training.training_folder, 'wts-converter.log')
         await executor.start('python /app/generate_wts.py -w /tmp/model.pt -o /tmp/model.wts')
         if await executor.wait() != 0:
@@ -168,12 +155,8 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         executor = Executor(self.training.training_folder, 'detect.log')
         img_size = model_information.resolution
 
-        if self.is_cla:
-            cmd = 'python /app/pred_cla.py'
-            cmd += f' --weights {model_folder}/model.pt --source {images_folder} --img-size {img_size}  --save-txt'
-        else:
-            cmd = f'python /app/pred_det.py --weights {model_folder}/model.pt --source {images_folder}'
-            cmd += f' --img-size {img_size} --conf-thres {self.detect_nms_conf_thres} --iou-thres {self.detect_nms_iou_thres}'
+        cmd = f'python /app/pred_det.py --weights {model_folder}/model.pt --source {images_folder}'
+        cmd += f' --img-size {img_size} --conf-thres {self.detect_nms_conf_thres} --iou-thres {self.detect_nms_iou_thres}'
 
         await executor.start(cmd)
         if await executor.wait() != 0:
@@ -185,16 +168,13 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             raise Exception('Error during detecting')
 
         logging.info('Start parsing detections')
-        labels_path = '/app/app_code/yolov5/runs/predict-cls/exp/labels' if self.is_cla else '/app/app_code/yolov5/runs/detect/exp/labels'
+        labels_path = '/app/app_code/yolov5/runs/detect/exp/labels'
 
         # NOTE: parse function is blocking by IO operations, so we need to run it in a separate thread (default executor is ThreadPoolExecutor)
         return await asyncio.get_event_loop().run_in_executor(None, self._parse, labels_path, images_folder, model_information)
 
     async def _clear_training_data(self, training_folder: str) -> None:
-        if self.is_cla:        # Note: Keep best.pt in case uploaded model was not best.
-            keep_files = ['last.pt']
-        else:
-            keep_files = ['hyp.yaml', 'dataset.yaml', 'best.pt']
+        keep_files = ['hyp.yaml', 'dataset.yaml', 'best.pt']
         keep_dirs = ['result', 'weights']
         for root, dirs, files in os.walk(training_folder, topdown=False):
             for file in files:
@@ -207,17 +187,10 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     # ---------------------------------------- ADDITIONAL METHODS ----------------------------------------
 
     async def _start_training_from_model(self, model: str) -> None:
+        yolov5_format.create_file_structure(self.training)
+        additional_params = ' --clear'
 
-        if self.is_cla:
-            yolov5_format.create_file_structure_cla(self.training)
-            if model == 'model.pt':
-                model = f'{self.training.training_folder}/model.pt'
-            additional_params = ''
-        else:
-            yolov5_format.create_file_structure(self.training)
-            additional_params = ' --clear'
-
-        base_hyp_path = Path(__file__).resolve().parents[1] / ('hyp_cla.yaml' if self.is_cla else 'hyp_det.yaml')
+        base_hyp_path = Path(__file__).resolve().parents[1] / ('hyp_det.yaml')
         assert (base_hyp_path).exists(), f'Hyperparameter file not found at "{base_hyp_path}"'
         shutil.copy(base_hyp_path, self.hyperparameter_path)
         yolov5_format.set_hyperparameters_in_file(self.hyperparameter_path, self.hyperparameters)
@@ -229,45 +202,39 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
         self._save_additional_hyperparameters()
 
-        if self.is_cla:
-            cmd = f'python /app/train_cla.py --exist-ok --img {resolution} \
-                --data {self.training.training_folder} --model {model} \
-                --project {self.training.training_folder} --name result \
-                --hyp {self.hyperparameter_path} --optimizer SGD {additional_parameters}'
-        else:
-            try:
-                batch_size = await batch_size_calculation.calc(self.training.training_folder, model, self.hyperparameter_path,
-                                                               f'{self.training.training_folder}/dataset.yaml', resolution)
-            except Exception as e:
-                logging.exception('Error during batch size calculation:')
-                raise NodeNeedsRestartError() from e
+        try:
+            batch_size = await batch_size_calculation.calc(self.training.training_folder, model, self.hyperparameter_path,
+                                                           f'{self.training.training_folder}/dataset.yaml', resolution)
+        except Exception as e:
+            logging.exception('Error during batch size calculation:')
+            raise NodeNeedsRestartError() from e
 
-            p_sizes_by_id = ""
+        p_sizes_by_id = ""
+        for i, category in enumerate(self.training.categories):
+            if category.type == CategoryType.Point:
+                size = self.point_sizes_by_uuid.get(category.id, 0.03)
+                p_sizes_by_id += f"{i}:{size},"
+
+        flip_label_pairs = ""
+        for uuid_i, uuid_j in self.flip_label_uuid_pairs:
+            id_i = None
+            id_j = None
             for i, category in enumerate(self.training.categories):
-                if category.type == CategoryType.Point:
-                    size = self.point_sizes_by_uuid.get(category.id, 0.03)
-                    p_sizes_by_id += f"{i}:{size},"
+                if category.id == uuid_i:
+                    id_i = i
+                if category.id == uuid_j:
+                    id_j = i
+            if id_i is not None and id_j is not None:
+                flip_label_pairs += f"{id_i}:{id_j},"
 
-            flip_label_pairs = ""
-            for uuid_i, uuid_j in self.flip_label_uuid_pairs:
-                id_i = None
-                id_j = None
-                for i, category in enumerate(self.training.categories):
-                    if category.id == uuid_i:
-                        id_i = i
-                    if category.id == uuid_j:
-                        id_j = i
-                if id_i is not None and id_j is not None:
-                    flip_label_pairs += f"{id_i}:{id_j},"
-
-            cmd = f'python /app/train_det.py --exist-ok --patience {self.patience} \
-                --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} \
-                --project {self.training.training_folder} --name result --hyp {self.hyperparameter_path} \
-                --epochs {self.epochs} {additional_parameters}'
-            if p_sizes_by_id:
-                cmd += f' --point_sizes_by_id {p_sizes_by_id[:-1]}'
-            if flip_label_pairs:
-                cmd += f' --flip_label_pairs {flip_label_pairs[:-1]}'
+        cmd = f'python /app/train_det.py --exist-ok --patience {self.patience} \
+            --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} \
+            --project {self.training.training_folder} --name result --hyp {self.hyperparameter_path} \
+            --epochs {self.epochs} {additional_parameters}'
+        if p_sizes_by_id:
+            cmd += f' --point_sizes_by_id {p_sizes_by_id[:-1]}'
+        if flip_label_pairs:
+            cmd += f' --flip_label_pairs {flip_label_pairs[:-1]}'
 
         await self.executor.start(cmd, env={'WANDB_MODE': 'disabled'})
 
@@ -311,25 +278,10 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         if os.path.exists(labels_path):
             for filename in os.scandir(labels_path):
                 uuid = os.path.splitext(os.path.basename(filename.path))[0]
-                if self.is_cla:
-                    classification_detections = self._parse_file_cla(model_information, filename.path)
-                    detections.append(Detections(classification_detections=classification_detections, image_id=uuid))
-                else:
-                    box_detections, point_detections = self._parse_file(model_information, images_folder, filename.path)
-                    detections.append(Detections(box_detections=box_detections,
-                                      point_detections=point_detections, image_id=uuid))
+                box_detections, point_detections = self._parse_file(model_information, images_folder, filename.path)
+                detections.append(Detections(box_detections=box_detections,
+                                  point_detections=point_detections, image_id=uuid))
         return detections
-
-    def _get_progress_from_log_cla(self) -> float:
-        if self.epochs == 0:
-            return 0.0
-        lines = list(reversed(self.executor.get_log_by_lines()))
-        for line in lines:
-            if re.search(f'/{self.epochs}', line):
-                found_line = line.split('/')
-                if found_line:
-                    return float(found_line[0]) / float(self.epochs)
-        return 0.0
 
     def _get_progress_from_log(self) -> float:
         if self.epochs == 1:
@@ -350,28 +302,6 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         return progress
 
     # ---------------------------------------- HELPER METHODS ----------------------------------------
-
-    @staticmethod
-    def _parse_file_cla(model_info: ModelInformation, filepath: str) -> list[ClassificationDetection]:
-        with open(filepath, 'r') as f:
-            content = f.readlines()
-        classification_detections = []
-
-        for line in content:
-            probability_str, c = line.split(' ', maxsplit=1)
-            c = c.strip()
-            probability = float(probability_str) * 100
-            if probability < 20:
-                continue
-            categories = [category for category in model_info.categories if category.name == c]
-            if categories:
-                category = categories[0]
-                classification_detection = ClassificationDetection(
-                    category_name=category.name, model_name=model_info.version, confidence=probability,
-                    category_id=category.id)
-
-                classification_detections.append(classification_detection)
-        return classification_detections
 
     @staticmethod
     def clip_box(x: float, y: float, width: float, height: float, img_width: int, img_height: int

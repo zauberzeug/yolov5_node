@@ -3,16 +3,6 @@ import os
 from pathlib import Path
 
 
-def get_best(training_path: Path) -> Path | None:
-    path = training_path / 'result/weights'
-    if not path.exists():
-        return None
-    weightfiles = [path / f for f in os.listdir(path) if 'best' in f and f.endswith('.pt')]
-    if len(weightfiles) == 0:
-        return None
-    return weightfiles[0]
-
-
 def get_all_weightfiles(training_path: Path) -> list[Path]:
     path = (training_path / 'result/weights').absolute()
     if not path.exists():
@@ -49,7 +39,7 @@ def _try_remove(file: Path) -> None:
     try:
         os.remove(file)
     except Exception:
-        logging.exception(f'could not remove {file}')
+        logging.exception('could not remove %s', file)
 
 
 def get_new(training_path: Path) -> Path | None:

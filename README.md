@@ -3,13 +3,14 @@
 Learning Loop Trainer and Detector Node for Yolov5 (object detection and classification of images). The DL part is based on https://github.com/ultralytics/yolov5
 This repository is an implementation of Nodes that interact with the Zauberzeug Learning Loop using the [Zauberzeug Learning Loop Node Library](https://github.com/zauberzeug/learning_loop_node).
 
-# Trainer
+# Trainer Node
 
-This node is used to train Yolov5 Models in the Learning Loop. It is based on [this image](https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel-23-07.html) running Python 3.10.
+This node is used to train Yolov5 Models in the Learning Loop. It is based on [this image](https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/rel-25-01.html) running Python 3.12.
+Trainer is tested with Nvidia Driver Version: 580.95.05 and CUDA Version: 13.0. Olders versions may not work.
 
 ## Hyperparameters
 
-We support all native hyperparameters of YOLOv5 (cf. `hyp_det.yaml` / `hyp_cla.yaml` for reference).
+We support all native hyperparameters of YOLOv5 (cf. `hyp_det.yaml` for reference).
 In addition, we support the following hyperparameters:
 
 - `epochs`: The number of epochs to train the model.
@@ -26,23 +27,24 @@ Further, we support the following hyperparameters for point detection:
 
 Trainer Docker-Images are published on https://hub.docker.com/r/zauberzeug/yolov5-trainer
 
-New images can be pulled with `docker pull zauberzeug/yolov5-trainer:nlvX.Y.Z`, where `X.Y.Z` is the version of the node-lib used.
+New images can be pulled with `docker pull zauberzeug/yolov5-trainer:A.B.C-nlvX.Y.Z`, where `A.B.C` is the version of the trainer node and `X.Y.Z` is the version of the learning loop node library.
 
 During development, i.e. when building the container from code it is recommended to use the script `docker.sh` in the folder `training` to build/start/interact with the image.
 When using the script it is required to set up a .env file in the training folder that contains the loop-related configuration. The following variables should be set (note that some are inherited from the [Zauberzeug Learning Loop Node Library](https://github.com/zauberzeug/learning_loop_node) ):
 
-| Name                   | Purpose                                              | Value                       | Default | Requi. only with ./docker.sh |
-| ---------------------- | ---------------------------------------------------- | --------------------------- | ------- | ---------------------------- |
-| YOLOV5_MODE            | Mode of the trainer                                  | CLASSIFICATION or DETECTION | -       | No                           |
-| TRAINER_NAME           | Will be the name of the container                    | String                      | -       | Yes                          |
-| LINKLL                 | Link the node library into the container?            | TRUE/FALSE                  | FALSE   | Yes                          |
-| UVICORN_RELOAD         | Enable hot-reload                                    | TRUE/FALSE/0/1              | FALSE   | No                           |
-| RESTART_AFTER_TRAINING | Auto-restart after training                          | TRUE/FALSE/0/1              | FALSE   | No                           |
-| KEEP_OLD_TRAININGS     | Do not remove old trainings, when starting a new one | TRUE/FALSE/0/1              | FALSE   | No                           |
+| Name                        | Purpose                                              | Value          | Default | Requi. only with ./docker.sh |
+| --------------------------- | ---------------------------------------------------- | -------------- | ------- | ---------------------------- |
+| CLASSIFICATION or DETECTION | -                                                    | No             |
+| TRAINER_NAME                | Will be the name of the container                    | String         | -       | Yes                          |
+| LINKLL                      | Link the node library into the container?            | TRUE/FALSE     | FALSE   | Yes                          |
+| UVICORN_RELOAD              | Enable hot-reload                                    | TRUE/FALSE/0/1 | FALSE   | No                           |
+| RESTART_AFTER_TRAINING      | Auto-restart after training                          | TRUE/FALSE/0/1 | FALSE   | No                           |
+| KEEP_OLD_TRAININGS          | Do not remove old trainings, when starting a new one | TRUE/FALSE/0/1 | FALSE   | No                           |
 
-# Detector (Object detection)
+# Detector Node
 
-GPU Detector is tested with Nvidia Driver Version: 580.95.05 and CUDA Version: 13.0
+This node is used to run Yolov5 Models for object detection.
+GPU Detector is tested with Nvidia Driver Version: 580.95.05 and CUDA Version: 13.0. Olders versions may not work.
 
 ## Images
 
@@ -63,46 +65,32 @@ Besides, the following parameters may be set:
 | IOU_THRESHOLD  | IoU threshold for NMS                     | Float                     | 0.45    | No                             |
 | CONF_THRESHOLD | Confidence threshold for NMS              | Float                     | 0.2     | No                             |
 
-### Cloud-Detector
-
-New images can be pulled with `docker pull zauberzeug/yolov5-detector:nlvX.Y.Z-cloud`, where `X.Y.Z` is the version of the node-lib used.
-Legacy images can be pulled with `docker pull zauberzeug/yolov5-detector:cloud`.
-
 Pulled images can be run with the `docker.sh` script by calling `./docker.sh run-image`.
 Local builds can be run with `./docker.sh run`.
-If the container does not use the GPU, try `./docker.sh d`.
+
+### Cloud-Detector (For Linux computers with Nvidia GPU)
+
+Images can be pulled with `docker pull zauberzeug/yolov5-detector:A.B.C-nlvX.Y.Z-cloud`, where `A.B.C` is the version of the detector node and `X.Y.Z` is the version of the learning loop node library.
+
+### Cloud-CPU-Detector (For Linux computers without Nvidia GPU)
+
+Images can be pulled with `docker pull zauberzeug/yolov5-detector:A.B.C-nlvX.Y.Z-cloud-cpu`, where `A.B.C` is the version of the detector node and `X.Y.Z` is the version of the learning loop node library.
 
 ### L4T-Detector
 
-New images will be published to `docker pull zauberzeug/yolov5-detector:nlvX.Y.Z-A.B.C`, where `X.Y.Z` is the version of the node-lib used and `A.B.C` is the L4T version. Right now, the newer detector images DO NOT SUPPORT L4T.
-
-Legacy images can be pulled with `docker pull zauberzeug/yolov5-detector:32.6.1`, where `32.6.1` is the used `Tag` (see https://hub.docker.com/r/zauberzeug/yolov5-detector/tags). It corresponds to the L4T version. Right now, `32.6.1` and `32.5.0` are supported.
-
-# Detector (Classification)
-
-This variant is currently in a separate subfolder yolov5_node/detector_cla. This detector is not maintained at the moment. However, the last images should work on a Linux PC.
-
-# Publish a new release
-
-```
-# build docker image
-./docker.sh b
-
-# publish docker image
-./docker.sh p
-```
+Images can be pulled with `docker pull zauberzeug/yolov5-detector:A.B.C-nlvX.Y.Z-L.4.T`, where `A.B.C` is the version of the detector node, `X.Y.Z` is the version of the node-lib used and `L.4.T` is the L4T version.
 
 ## Get Detections
 
 ### Curl
 
-```
+```bash
 curl --request POST -H 'mac: FF:FF:FF:FF:FF' -F 'file=@test.jpg' http://localhost:8004/detect
 ```
 
 ### Python
 
-```
+```python
 headers = {'mac': '0:0:0:0', 'tags':  'some_tag'}
 with open('test.jpg', 'rb') as f:
         data = [('file', f)]

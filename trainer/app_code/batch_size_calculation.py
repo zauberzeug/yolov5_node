@@ -3,7 +3,7 @@ import logging
 import os
 
 import torch
-import yaml  # type: ignore
+import yaml
 from learning_loop_node.helpers.misc import get_free_memory_mb
 from learning_loop_node.trainer.exceptions import CriticalError
 from torch.multiprocessing import Process, Queue, set_start_method
@@ -35,9 +35,9 @@ async def calc(training_path: str, model_file: str, hyp_path: str, dataset_path:
     free_mem_mb *= fraction
 
     try:
-        ckpt = torch.load(model_file, map_location=device)
+        ckpt = torch.load(model_file, map_location=device, weights_only=False)
     except FileNotFoundError:
-        ckpt = torch.load(f'{training_path}/{model_file}', map_location=device)
+        ckpt = torch.load(f'{training_path}/{model_file}', map_location=device, weights_only=False)
 
     model = Model(ckpt['model'].yaml, ch=3, nc=dataset.get('nc'), anchors=hyp.get('anchors')).to(device)  # create
 

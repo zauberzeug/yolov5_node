@@ -28,16 +28,15 @@ fi
 
 # ========================== BUILD CONFIGURATION / IMAGE SELECTION =======================
 
-SEMANTIC_VERSION=0.1.13
-NODE_LIB_VERSION=0.18.0
-build_args=" --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION"
+TRAINER_VERSION=$(grep -oP '^version\s*=\s*"\K[0-9.]+' pyproject.toml)
+NODE_LIB_VERSION=$(grep -oP 'learning_loop_node==\K[0-9.]+' pyproject.toml)
 
 
-dockerfile="cloud_cpu.dockerfile"
+dockerfile="Dockerfile"
 if [ "$2" = "test_latest" ]; then
-    image="zauberzeug/yolov5-detector:latest-cpu"
+    image="zauberzeug/yolov5-detector:latest-cpu" #TODO why is this required?
 else
-    image="zauberzeug/yolov5-detector:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION-cloud-cpu"
+    image="zauberzeug/yolov5-detector:$TRAINER_VERSION-nlv$NODE_LIB_VERSION-cloud-cpu"
 fi
 
 
@@ -47,7 +46,7 @@ fi
 . .env || echo "you should provide an .env file to configure the detector"
 
 run_args="-it" 
-# run_args+=" -v $(pwd)/../:/yolov5_node"
+# run_args+=" -v $(pwd)/:/app"
 run_args+=" -v $HOME/node_data/$DETECTOR_NAME:/data"
 run_args+=" -h ${HOSTNAME}_DEV"
 run_args+=" -e HOST=$LOOP_HOST -e ORGANIZATION=$LOOP_ORGANIZATION -e PROJECT=$LOOP_PROJECT"
@@ -73,10 +72,10 @@ fi
 set -x
 case $cmd in
     b | build)
-        DOCKER_BUILDKIT=0 docker build .. -f $dockerfile -t $image $build_args $cmd_args
+        docker build .. -f $dockerfile -t $image $cmd_args
         ;;
     bnc | build-no-cache)
-        docker build --no-cache . -f $dockerfile -t $image $build_args $cmd_args
+        docker build --no-cache . -f $dockerfile -t $image $cmd_args
         ;;
     U | update)
 	    docker pull ${image}
