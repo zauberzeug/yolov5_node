@@ -63,10 +63,11 @@ dev = [
     "pre-commit (>=4.3.0, <5.0.0)",
     "ruff (>=0.13.2, <1.0.0)",
     "autopep8 (>=2.3.2, <3.0.0)",
-    "pytest==9.0.1",
-    "pytest-asyncio==0.21.1",
-    "pytest-mock==3.6.1",
-    "pytest-watch==4.2.0",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-mock",
+    "pytest-xdist",
+    "pytest-watch",
 ]
 
 yolo = [
