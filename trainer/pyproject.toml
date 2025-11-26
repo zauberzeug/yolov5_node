@@ -7,10 +7,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 
 
-# pytest==7.4.3
-# pytest-asyncio==0.21.1
-# pytest-mock==3.6.1
-# pytest-watch==4.2.0
+
 # python-dateutil==2.8.2
 # python-dotenv==1.0.0
 # python-engineio==4.8.0
@@ -66,12 +63,37 @@ dev = [
     "pre-commit (>=4.3.0, <5.0.0)",
     "ruff (>=0.13.2, <1.0.0)",
     "autopep8 (>=2.3.2, <3.0.0)",
+    "pytest==9.0.1",
+    "pytest-asyncio==0.21.1",
+    "pytest-mock==3.6.1",
+    "pytest-watch==4.2.0",
+]
+
+yolo = [
+     "pandas>=1.1.4",
+    "seaborn>=0.11.0",
+    "albumentations>=1.0.3",
+    "gitpython",
+    "ipython",  # interactive notebook
+    "matplotlib>=3.2.2",
+    "numpy>=1.18.5",
+    "opencv-python>=4.1.1,<=4.8.0.74",
+    "opencv-python-headless<=4.8.0.74",
+    "Pillow>=7.1.2",
+    "psutil",  # system resources
+    "PyYAML>=5.3.1",
+    "requests>=2.23.0",
+    "scipy>=1.4.1",
+    "thop>=0.1.1",  # FLOPs computation
+    "torch>=1.7.0",  # see https://pytorch.org/get-started/locally (recommended)
+    "torchvision>=0.8.1",
+    "tqdm>=4.64.0",
 ]
 
 types = []
 
 [tool.uv]
-default-groups = ["dev"]
+default-groups = ["dev", "yolo"]
 
 [tool.mypy]
 python_version = "3.12"

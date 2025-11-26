@@ -41,9 +41,9 @@ RUN uv sync --locked
 # Ensure the venv is first on PATH for CMD/RUN that follow
 ENV PATH="/uv_env/.venv/bin:${PATH}"
 
-# Install YOLOv5 dependencies
-ADD /app_code/yolov5 /app/app_code/yolov5
-RUN uv pip install -r /app/app_code/yolov5/requirements.txt
+# # Install YOLOv5 dependencies
+# ADD /app_code/yolov5 /app/app_code/yolov5
+# RUN uv pip install -r /app/app_code/yolov5/requirements.txt
 
 # 3. Copy the app --------------------------------------------------------------
 COPY . /app

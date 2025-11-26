@@ -54,7 +54,7 @@ fi
 . .env || echo "you should provide an .env file for the trainer"
 
 run_args="-it" 
-run_args+=" -v $(pwd)/../:/yolov5_node/"
+run_args+=" -v $(pwd)/../:/app/"
 run_args+=" -v $HOME/trainer_nodes_data:/data"
 run_args+=" -h ${HOSTNAME}_DEV"
 run_args+=" -e HOST=$HOST -e USERNAME=$USERNAME -e PASSWORD=$PASSWORD -e LOOP_SSL_CERT_PATH=$LOOP_SSL_CERT_PATH"
