@@ -46,7 +46,7 @@ fi
 . .env || echo "you should provide an .env file to configure the detector"
 
 run_args="-it" 
-# run_args+=" -v $(pwd)/../:/yolov5_node"
+# run_args+=" -v $(pwd)/:/app"
 run_args+=" -v $HOME/node_data/$DETECTOR_NAME:/data"
 run_args+=" -h ${HOSTNAME}_DEV"
 run_args+=" -e HOST=$LOOP_HOST -e ORGANIZATION=$LOOP_ORGANIZATION -e PROJECT=$LOOP_PROJECT"
