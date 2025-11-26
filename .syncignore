@@ -8,3 +8,8 @@ __pycache__/
 detector/.mypy_cache
 trainer/.mypy_cache
 trainer/app_code/yolov5/runs
+trainer/.venv
+trainer/.env
+detector/.venv
+detector_cpu/.venv
+.venv
