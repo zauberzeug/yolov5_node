@@ -22,15 +22,6 @@ logging.basicConfig(level=logging.INFO)
 
 
 @pytest.fixture(scope="session")
-def event_loop():
-    """Overrides pytest default function scoped event loop"""
-    policy = asyncio.get_event_loop_policy()
-    loop = policy.new_event_loop()
-    yield loop
-    loop.close()
-
-
-@pytest.fixture(scope="session")
 def prepare_model():
     """Download model for testing"""
     if not os.path.exists('app_code/tests/test_data/model.pt'):

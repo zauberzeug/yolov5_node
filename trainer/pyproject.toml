@@ -133,8 +133,14 @@ ignore = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 # NOTE: changing default location of pytest_cache because the uvicorn file watcher somehow triggered too many reloads
 cache_dir = "/tmp/.pytest_cache"
 testpaths = [
-    "tests"
+    "app_code/tests"
+]
+filterwarnings = [
+    "ignore:distutils Version classes are deprecated:DeprecationWarning:thop.profile",
+    "ignore:pkg_resources is deprecated:UserWarning"
 ]
