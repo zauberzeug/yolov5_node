@@ -34,7 +34,7 @@ NODE_LIB_VERSION=$(grep -oP 'learning_loop_node==\K[0-9.]+' pyproject.toml)
 
 dockerfile="Dockerfile"
 if [ "$2" = "test_latest" ]; then
-    image="zauberzeug/yolov5-detector:latest-cpu"
+    image="zauberzeug/yolov5-detector:latest-cpu" #TODO why is this required?
 else
     image="zauberzeug/yolov5-detector:$TRAINER_VERSION-nlv$NODE_LIB_VERSION-cloud-cpu"
 fi

@@ -37,6 +37,8 @@ dev = [
     "pre-commit (>=4.3.0, <5.0.0)",
     "ruff (>=0.13.2, <1.0.0)",
     "autopep8 (>=2.3.2, <3.0.0)",
+    "pytest==9.0.1",
+    "pytest-asyncio==0.21.1",
 ]
 
 types = []
