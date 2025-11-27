@@ -88,6 +88,7 @@ class YoLov5TRT:
             )
 
         self._setup_bindings(engine)
+        assert self.batch_size == 1
         self.inference_slots: list[InferenceSlot] = []
 
         # Store
@@ -150,54 +151,77 @@ class YoLov5TRT:
         if self.cuda_init_error:
             raise RuntimeError('cuda.init() failed .. detector cannot be used! Try to restart the machine.')
 
+    def _dispatch_gpu_inference(self, inference_slot: InferenceSlot):
+        # Transfer input data  to the GPU.
+        cuda.memcpy_htod_async(inference_slot.device_input, inference_slot.host_input, self.stream)
+        # Run inference.
+        context = inference_slot.context
+        context.set_tensor_address(self.input_binding.name, inference_slot.device_input)
+        context.set_tensor_address(self.output_binding.name, inference_slot.device_output)
+        context.execute_async_v3(stream_handle=self.stream.handle)
+        # Transfer predictions back from the GPU.
+        cuda.memcpy_dtoh_async(inference_slot.host_output, inference_slot.device_output, self.stream)
+
     def infer(self, image_raw: np.ndarray) -> tuple[list[Detection], float]:
         threading.Thread.__init__(self)  # type: ignore
         # Make self the active context, pushing it on top of the context stack.
         self.ctx.push()
         inference_slot = self.inference_slots.pop() if self.inference_slots else self._create_inference_slot()
 
-        # Restore
-        stream = self.stream
-        context = inference_slot.context
         # Do image preprocess
         input_image, origin_h, origin_w = self._preprocess_image(image_raw)
         # Copy input image to host buffer
         np.copyto(inference_slot.host_input, input_image.ravel())
+
+        # Run inference
         start = time.time()
-        # Transfer input data  to the GPU.
-        cuda.memcpy_htod_async(inference_slot.device_input, inference_slot.host_input, stream)
-        # Run inference.
-        context.set_tensor_address(self.input_binding.name, inference_slot.device_input)
-        context.set_tensor_address(self.output_binding.name, inference_slot.device_output)
-        context.execute_async_v3(stream_handle=stream.handle)
-        # Transfer predictions back from the GPU.
-        cuda.memcpy_dtoh_async(inference_slot.host_output, inference_slot.device_output, stream)
+        self._dispatch_gpu_inference(inference_slot)
         # Synchronize the stream
-        stream.synchronize()
+        self.stream.synchronize()
         end = time.time()
 
-        self.inference_slots.append(inference_slot)
         # Remove any context from the top of the context stack, deactivating it.
         self.ctx.pop()
-        # Here we use the first row of output in that batch_size = 1
-        assert self.batch_size == 1
-        output = inference_slot.host_output
+
         # Do postprocess
-        detections = []
-        result_boxes, result_scores, result_classid = self._post_process(output[0:LEN_ALL_RESULT], origin_h, origin_w)
-        for j, box in enumerate(result_boxes):
-            x, y, br_x, br_y = box
-            w = br_x - x
-            h = br_y - y
-            detections.append(Detection(int(x), int(y), int(w), int(h),
-                                        int(result_classid[j]), round(float(result_scores[j]), 2)))
+        post_process_results = self._post_process(inference_slot.host_output[0:LEN_ALL_RESULT], origin_h, origin_w)
+        detections = _pack_detection_results(*post_process_results)
+
+        self.inference_slots.append(inference_slot)
         return detections, end - start
 
-    def infer_batch(self, images_raw: list[np.ndarray]) -> list[tuple[list[Detection], float]]:
+    def infer_batch(self, images: list[np.ndarray]) -> tuple[list[list[Detection]], float]:
+        threading.Thread.__init__(self)  # type: ignore
+
+        self.ctx.push()
+        inference_slots = [self.inference_slots.pop() if self.inference_slots else self._create_inference_slot()
+                           for _ in images]
+
+        start = time.time()
+        for image, inference_slot in zip(images, inference_slots, strict=True):
+            input_image, _, _ = self._preprocess_image(image)
+            # Copy input image to host buffer
+            np.copyto(inference_slot.host_input, input_image.ravel())
+
+            # Run inference
+            self._dispatch_gpu_inference(inference_slot)
+
+        # Synchronize the stream
+        self.stream.synchronize()
+        end = time.time()
+
+        # Remove any context from the top of the context stack, deactivating it.
+        self.ctx.pop()
+
         results = []
-        for image_raw in images_raw:
-            results.append(self.infer(image_raw))
-        return results
+        for image, inference_slot in zip(images, inference_slots, strict=True):
+            h, w, _ = image.shape
+            post_process_results = self._post_process(inference_slot.host_output[0:LEN_ALL_RESULT], h, w)
+            detections = _pack_detection_results(*post_process_results)
+            results.append(detections)
+            self.inference_slots.append(inference_slot)
+
+        return results, end - start
 
     def destroy(self) -> None:
         """
@@ -451,3 +475,14 @@ class warmUpThread(threading.Thread):
         _, use_time = self.yolov5_wrapper.infer(
             self.yolov5_wrapper.get_raw_image_zeros())
         print(f'warm_up time->{use_time * 1000:.2f}ms')
+
+
+def _pack_detection_results(result_boxes: np.ndarray, result_scores: np.ndarray, result_classid: np.ndarray) -> list[Detection]:
+    detections = []
+    for j, box in enumerate(result_boxes):
+        x, y, br_x, br_y = box
+        w = br_x - x
+        h = br_y - y
+        detections.append(Detection(int(x), int(y), int(w), int(h),
+                                    int(result_classid[j]), round(float(result_scores[j]), 2)))
+    return detections
