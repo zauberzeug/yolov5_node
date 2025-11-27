@@ -288,7 +288,7 @@ class YoLov5TRT:
         self._check_cuda_init_error()
         return np.zeros([self.input_h, self.input_w, 3], dtype=np.uint8)
 
-    def _preprocess_image(self, image_raw) -> tuple[np.ndarray, int, int]:
+    def _preprocess_image(self, image_raw: np.ndarray) -> tuple[np.ndarray, int, int]:
         """
         Resize and pad it to target size, normalize to [0,1], transform to NCHW format.
 
@@ -316,16 +316,20 @@ class YoLov5TRT:
             tx2 = self.input_w - tw - tx1
             ty1 = ty2 = 0
         # Resize the image with long side while maintaining ratio
-        pil_image = Image.fromarray(image_raw)
-        pil_image = pil_image.resize((tw, th), Image.Resampling.BILINEAR)
-        image = np.array(pil_image)
+        if tw == w and th == h:
+            image = image_raw
+        else:
+            pil_image = Image.fromarray(image_raw)
+            pil_image = pil_image.resize((tw, th), Image.Resampling.BILINEAR)
+            image = np.array(pil_image)
         # Pad with (128, 128, 128)
-        image = np.pad(
-            image,
-            ((ty1, ty2), (tx1, tx2), (0, 0)),
-            mode='constant',
-            constant_values=128
-        )
+        if tx1 != 0 or tx2 != 0 or ty1 != 0 or ty2 != 0:
+            image = np.pad(
+                image,
+                ((ty1, ty2), (tx1, tx2), (0, 0)),
+                mode='constant',
+                constant_values=128
+            )
         image = image.astype(np.float32)
         image /= 255.0  # Normalize to [0,1]
         image = np.transpose(image, [2, 0, 1])  # HWC to CHW format:
