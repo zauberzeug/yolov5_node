@@ -1,5 +1,5 @@
 # Linux with python 3.12
-FROM nvcr.io/nvidia/pytorch:25.01-py3 
+FROM nvcr.io/nvidia/cuda:13.0.1-devel-ubuntu24.04
 ENV LD_LIBRARY_PATH=/opt/hpcx/ucx/lib:/opt/hpcx/ucc/lib:${LD_LIBRARY_PATH}
 
 # 1. Install system dependencies -----------------------------------------------
@@ -17,7 +17,8 @@ ARG MAKEFLAGS=-j$(nproc)
 
 RUN apt update && \
     apt purge -y hwloc-nox libhwloc-dev libhwloc-plugins && \
-    apt install -y zip nano htop screen libgl1 libmpich-dev jpeginfo && \
+    apt install -y zip nano htop screen libgl1 libmpich-dev jpeginfo pipx && \
+    apt install -y python3-dev python3-venv python3-pip build-essential && \
     rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -34,12 +35,14 @@ WORKDIR /uv_env
 COPY pyproject.toml uv.lock ./
 
 # Install deps into a project-local venv
-RUN pip install --no-cache-dir uv 
+RUN pipx install uv 
 RUN uv venv --system-site-packages 
 RUN uv sync --locked
 
 # Ensure the venv is first on PATH for CMD/RUN that follow
 ENV PATH="/uv_env/.venv/bin:${PATH}"
+
+RUN python -m pip install --no-deps learning_loop_node==0.18.2 
 
 # # Install YOLOv5 dependencies
 # ADD /app_code/yolov5 /app/app_code/yolov5

@@ -4,53 +4,13 @@ version = "0.1.15"
 description = "Yolov5 trainer node"
 authors = [{ name="Zauberzeug GmbH", email="info@zauberzeug.com" }]
 readme = "README.md"
-requires-python = ">=3.12"
-
-
-
-# python-dateutil==2.8.2
-# python-dotenv==1.0.0
-# python-engineio==4.8.0
-# python-multipart==0.0.6
-# python-socketio==5.10.0
-
-# torch==2.1.2
-# torchvision==0.16.2
-# numpy==1.26.3
-# Pillow==10.2.0
-
-# uvloop==0.19.0
-# seaborn==0.13.1
-# thop==0.1.1.post2209072238
-# coremltools==7.1
-# onnx==1.14.0
-# gsutil==5.27
-# notebook==6.4.10
-# wandb==0.16.2
-# torchinfo==1.8.0
-# python-dotenv==1.0.0
-# httptools==0.6.1
-# dacite==1.8.1
-# autopep8==2.0.4
-# debugpy==1.6.7
-# gunicorn==21.2.0
-# pyaml==23.12.0
-# ruamel.yaml==0.18.5
-
-
-# # Install requirements
-# RUN pip install --upgrade pip
-# RUN pip install opencv-python==4.5.5.64
-# RUN pip uninstall -y nvidia-tensorboard nvidia-tensorboard-plugin-dlprof
-# RUN pip install --no-cache -r yolov5_node/trainer/requirements.txt
-
-
-
+requires-python = "==3.13.*"
 
 dependencies = [
-    "onnx==1.16.0",
+    # "onnx==1.16.0",
     "ruamel.yaml",
-    "learning_loop_node==0.18.2",
+    # "learning_loop_node==0.18.2",
+    "torch==2.9.1+cu130",
     "torchinfo>=1.8.0",
 ]
 
@@ -95,6 +55,12 @@ types = []
 
 [tool.uv]
 default-groups = ["dev", "yolo"]
+required-environments = ['sys_platform == "linux" and platform_machine == "aarch64"']
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu130"
+
 
 [tool.mypy]
 python_version = "3.12"
