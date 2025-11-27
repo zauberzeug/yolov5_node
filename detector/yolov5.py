@@ -193,6 +193,12 @@ class YoLov5TRT:
                                         int(result_classid[j]), round(float(result_scores[j]), 2)))
         return detections, end - start
 
+    def infer_batch(self, images_raw: list[np.ndarray]) -> list[tuple[list[Detection], float]]:
+        results = []
+        for image_raw in images_raw:
+            results.append(self.infer(image_raw))
+        return results
+
     def destroy(self) -> None:
         """
         Destroy the TRT engine and free up resources.

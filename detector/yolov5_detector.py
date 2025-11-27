@@ -105,52 +105,79 @@ class Yolov5Detector(DetectorLogic):
         if self.model_info is None:
             raise RuntimeError('model_info must be set before calling evaluate()')
 
-        image_metadata = ImageMetadata()
-
         try:
             t = time.time()
-            im_height, im_width, _ = image.shape
             results, inference_ms = self.yolov5.infer(image)
-            skipped_detections = []
             self.log.debug('took %f s, overall %f s', inference_ms, time.time() - t)
-            for detection in results:
-                x, y, w, h, category_idx, probability = detection
-                category = self.model_info.categories[category_idx]
-                if w <= self.MIN_BOX_SIZE or h <= self.MIN_BOX_SIZE:  # skip very small boxes.
-                    skipped_detections.append((category.name, detection))
-                    continue
-                if category.type == CategoryType.Box:
-                    clipped_x1, clipped_y1, clipped_w, clipped_h = self.clip_box(
-                        x, y, w, h, im_width, im_height)
-                    image_metadata.box_detections.append(
-                        BoxDetection(category_name=category.name,
-                                     x=clipped_x1,
-                                     y=clipped_y1,
-                                     width=clipped_w,
-                                     height=clipped_h,
-                                     category_id=category.id,
-                                     model_name=self.model_info.version,
-                                     confidence=probability))
-                elif category.type == CategoryType.Point:
-                    cx, cy = x + w/2, y + h/2
-                    cx, cy = self.clip_point(cx, cy, im_width, im_height)
-                    image_metadata.point_detections.append(
-                        PointDetection(category_name=category.name,
-                                       x=cx,
-                                       y=cy,
-                                       category_id=category.id,
-                                       model_name=self.model_info.version,
-                                       confidence=probability))
-            if skipped_detections:
-                log_msg = '\n'.join([str(d) for d in skipped_detections])
-                self.log.warning('Removed %d small detections from result: \n%s', len(skipped_detections), log_msg)
-            return image_metadata
+            return self._collect_detections(results, image.shape[0], image.shape[1])
 
         except Exception as e:
             raise RuntimeError('Error during inference') from e
 
     def batch_evaluate(self, images: list[np.ndarray]) -> ImagesMetadata:
-        raise NotImplementedError('batch_evaluate is not implemented for Yolov5Detector')
+        if self.yolov5 is None:
+            raise RuntimeError('init() must be executed first. Maybe loading the engine failed?!')
+        if self.model_info is None:
+            raise RuntimeError('model_info must be set before calling evaluate()')
+
+        if len(images) == 0:
+            return []
+
+        shape = images[0].shape
+
+        try:
+            t = time.time()
+            results = self.yolov5.infer_batch(images)
+
+            total_ms = 0
+            detections = []
+            for result, inference_ms in results:
+                total_ms += inference_ms
+                detections.append(self._collect_detections(result, shape[0], shape[1]))
+
+            self.log.debug('batch infer took %f s, overall %f s', total_ms, time.time() - t)
+            return ImagesMetadata(items=detections)
+
+        except Exception as e:
+            raise RuntimeError('Error during inference') from e
+
+    def _collect_detections(self, detections: list[yolov5.Detection], im_height: int, im_width: int) -> ImageMetadata:
+        image_metadata = ImageMetadata()
+        skipped_detections = []
+
+        for detection in detections:
+            x, y, w, h, category_idx, probability = detection
+            category = self.model_info.categories[category_idx]
+            if w <= self.MIN_BOX_SIZE or h <= self.MIN_BOX_SIZE:  # skip very small boxes.
+                skipped_detections.append((category.name, detection))
+                continue
+            if category.type == CategoryType.Box:
+                clipped_x1, clipped_y1, clipped_w, clipped_h = self.clip_box(
+                    x, y, w, h, im_width, im_height)
+                image_metadata.box_detections.append(
+                    BoxDetection(category_name=category.name,
+                                 x=clipped_x1,
+                                 y=clipped_y1,
+                                 width=clipped_w,
+                                 height=clipped_h,
+                                 category_id=category.id,
+                                 model_name=self.model_info.version,
+                                 confidence=probability))
+            elif category.type == CategoryType.Point:
+                cx, cy = x + w/2, y + h/2
+                cx, cy = self.clip_point(cx, cy, im_width, im_height)
+                image_metadata.point_detections.append(
+                    PointDetection(category_name=category.name,
+                                   x=cx,
+                                   y=cy,
+                                   category_id=category.id,
+                                   model_name=self.model_info.version,
+                                   confidence=probability))
+        if skipped_detections:
+            log_msg = '\n'.join([str(d) for d in skipped_detections])
+            self.log.warning('Removed %d small detections from result: \n%s', len(skipped_detections), log_msg)
+
+        return image_metadata
 
     def _create_engine(self, resolution: int, cat_count: int, model_variant: str | None, wts_file: str) -> str:
         engine_file = os.path.dirname(wts_file) + '/model.engine'
