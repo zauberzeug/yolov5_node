@@ -3,6 +3,7 @@ Based on https://github.com/wang-xinyu/tensorrtx/blob/7b79de466c7ac2fcf179e65c2f
 MIT License
 """
 
+from pycuda.compiler import SourceModule
 import logging
 import threading
 import time
@@ -333,12 +334,12 @@ class YoLov5TRT:
                 mode='constant',
                 constant_values=128
             )
-        image = np.transpose(image, [2, 0, 1])  # HWC to CHW format:
-        image = np.ascontiguousarray(image)
         gpu_image = gpuarray.to_gpu_async(image, stream=stream)
+        tmp = gpuarray.empty(shape=output.shape, dtype=gpu_image.dtype)
+        convert_hwc_to_nchw(gpu_image, tmp, stream=stream)
         assert gpu_image.dtype == np.uint8
         assert output.dtype == np.float32
-        rescale_float_kernel(gpu_image, output, stream=stream)
+        rescale_float_kernel(tmp, output, stream=stream)
         # image = image.astype(np.float32)
         # image /= 255.0  # Normalize to [0,1]
         # image = np.expand_dims(image, axis=0)  # CHW to NCHW format
@@ -498,3 +499,41 @@ def _pack_detection_results(result_boxes: np.ndarray, result_scores: np.ndarray,
         detections.append(Detection(int(x), int(y), int(w), int(h),
                                     int(result_classid[j]), round(float(result_scores[j]), 2)))
     return detections
+
+
+hwc_to_nchw_kernel: None | SourceModule = None
+
+
+def convert_hwc_to_nchw(src: GPUArray, dst: GPUArray, stream=None):
+    global hwc_to_nchw_kernel
+    if hwc_to_nchw_kernel is None:
+        hwc_to_nchw_kernel = SourceModule("""
+        __global__ void hwc_to_nchw(unsigned char *src, unsigned char *dst,
+                                    int H, int W, int C)
+        {
+            int h = blockIdx.y * blockDim.y + threadIdx.y;
+            int w = blockIdx.x * blockDim.x + threadIdx.x;
+            if (h < H && w < W)
+            {
+                for(int c = 0; c < C; ++c)
+                {
+                    int src_idx = h*W*C + w*C + c;     // NHWC
+                    int dst_idx = c*H*W + h*W + w;     // NCHW
+                    dst[dst_idx] = src[src_idx];
+                }
+            }
+        }
+        """)
+
+    H, W, C = src.shape
+    func = hwc_to_nchw_kernel.get_function("hwc_to_nchw")
+
+    block = (16, 16, 1)
+    grid = ((W + 15)//16, (H + 15)//16)
+
+    func(
+        src.gpudata,
+        dst.gpudata,
+        np.int32(H), np.int32(W), np.int32(C),
+        block=block, grid=grid, stream=stream
+    )
