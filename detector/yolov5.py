@@ -27,6 +27,7 @@ LEN_ONE_RESULT = 38
 
 @dataclass(slots=True, kw_only=True)
 class InferenceSlot:
+    stream: cuda.Stream
     context: Any  # TODO
     host_input: np.ndarray
     host_output: np.ndarray
@@ -99,7 +100,6 @@ class YoLov5TRT:
         self.inference_slots: list[InferenceSlot] = []
 
         # Store
-        self.stream = stream
         self.engine = engine
 
     def _create_inference_slot(self) -> InferenceSlot:
@@ -107,6 +107,7 @@ class YoLov5TRT:
         output_host, output_device = self.output_binding.alloc_buffers()
 
         return InferenceSlot(
+            stream=cuda.Stream(),
             context=self.engine.create_execution_context(),
             host_input=input_host,
             host_output=output_host,
@@ -159,15 +160,13 @@ class YoLov5TRT:
             raise RuntimeError('cuda.init() failed .. detector cannot be used! Try to restart the machine.')
 
     def _dispatch_gpu_inference(self, inference_slot: InferenceSlot):
-        # Transfer input data  to the GPU.
-        # cuda.memcpy_htod_async(inference_slot.device_input, inference_slot.host_input, self.stream)
         # Run inference.
         context = inference_slot.context
         context.set_tensor_address(self.input_binding.name, inference_slot.device_input.ptr)
         context.set_tensor_address(self.output_binding.name, inference_slot.device_output.ptr)
-        context.execute_async_v3(stream_handle=self.stream.handle)
+        context.execute_async_v3(stream_handle=inference_slot.stream.handle)
         # Transfer predictions back from the GPU.
-        cuda.memcpy_dtoh_async(inference_slot.host_output, inference_slot.device_output.ptr, self.stream)
+        cuda.memcpy_dtoh_async(inference_slot.host_output, inference_slot.device_output.ptr, inference_slot.stream)
 
     def infer(self, image_raw: np.ndarray) -> tuple[list[Detection], float]:
         threading.Thread.__init__(self)  # type: ignore
@@ -177,13 +176,13 @@ class YoLov5TRT:
 
         # Do image preprocess
         origin_h, origin_w, _ = image_raw.shape
-        self._preprocess_image(image_raw, inference_slot.device_input, self.stream)
+        self._preprocess_image(image_raw, inference_slot.device_input, inference_slot.stream)
 
         # Run inference
         start = time.time()
         self._dispatch_gpu_inference(inference_slot)
         # Synchronize the stream
-        self.stream.synchronize()
+        inference_slot.stream.synchronize()
         end = time.time()
 
         # Remove any context from the top of the context stack, deactivating it.
@@ -205,25 +204,24 @@ class YoLov5TRT:
 
         start = time.time()
         for image, inference_slot in zip(images, inference_slots, strict=True):
-            self._preprocess_image(image, inference_slot.device_input, self.stream)
+            self._preprocess_image(image, inference_slot.device_input, inference_slot.stream)
 
             # Run inference
             self._dispatch_gpu_inference(inference_slot)
 
-        # Synchronize the stream
-        self.stream.synchronize()
         end = time.time()
-
-        # Remove any context from the top of the context stack, deactivating it.
-        self.ctx.pop()
 
         results = []
         for image, inference_slot in zip(images, inference_slots, strict=True):
+            inference_slot.stream.synchronize()
             h, w, _ = image.shape
             post_process_results = self._post_process(inference_slot.host_output, h, w)
             detections = _pack_detection_results(*post_process_results)
             results.append(detections)
             self.inference_slots.append(inference_slot)
+
+        # Remove any context from the top of the context stack, deactivating it.
+        self.ctx.pop()
 
         return results, end - start
 
@@ -243,12 +241,9 @@ class YoLov5TRT:
         # Make sure the owning context is current for all frees
         self.ctx.push()
         try:
-            # 1) Stop work
-            if getattr(self, "stream", None) is not None:
-                self.stream.synchronize()
-
-            # 2) Free device buffers
+            # 1) Free device buffers
             for slot in getattr(self, "inference_slots", []):
+                slot.stream.synchronize()
                 try:
                     slot.device_input.free()
                 except Exception:
@@ -261,16 +256,15 @@ class YoLov5TRT:
                     del slot.context
                 except Exception:
                     pass
-            self.inference_slots = []
 
-            # 3) Destroy TRT objects while context is current
+            # 2) Destroy TRT objects while context is current
             try:
                 del self.engine
             except Exception:
                 pass
 
-            # 4) Drop stream
-            self.stream = None
+            # 3) Drop slots and associated ressources
+            self.inference_slots = []
         finally:
             # Remove the push we just did and the original make_context push
             try:
@@ -504,7 +498,7 @@ def _pack_detection_results(result_boxes: np.ndarray, result_scores: np.ndarray,
 hwc_to_nchw_kernel: None | SourceModule = None
 
 
-def convert_hwc_to_nchw(src: GPUArray, dst: GPUArray, stream=None):
+def convert_hwc_to_nchw(src: gpuarray.GPUArray, dst: gpuarray.GPUArray, stream: cuda.Stream):
     global hwc_to_nchw_kernel
     if hwc_to_nchw_kernel is None:
         hwc_to_nchw_kernel = SourceModule("""
