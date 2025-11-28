@@ -189,23 +189,25 @@ class YoLov5TRT:
     def infer_batch(self, images: list[np.ndarray]) -> tuple[list[list[Detection]], float]:
         threading.Thread.__init__(self)  # type: ignore
 
+        # Make self the active context, pushing it on top of the context stack.
         self.ctx.push()
+
+        # Claim slots (and possibly create) slots for all images in the batch
         inference_slots = [self.inference_slots.pop() if self.inference_slots else self._create_inference_slot()
                            for _ in images]
 
         start = time.time()
         for image, inference_slot in zip(images, inference_slots, strict=True):
             self._preprocess_image(image, inference_slot)
-
-            # Run inference
             self._dispatch_gpu_inference(inference_slot)
 
         end = time.time()
 
         results = []
         for image, inference_slot in zip(images, inference_slots, strict=True):
-            inference_slot.stream.synchronize()
             h, w, _ = image.shape
+            # Synchronize stream to make sure that inference_slot.host_output has valid values
+            inference_slot.stream.synchronize()
             post_process_results = self._post_process(inference_slot.host_output, h, w)
             detections = _pack_detection_results(*post_process_results)
             results.append(detections)
@@ -286,11 +288,9 @@ class YoLov5TRT:
         Resize and pad it to target size, normalize to [0,1], transform to NCHW format.
 
         param:
-            input_image_path: str, image path
-        return:
-            image:  the processed image
-            h: original height
-            w: original width
+            image_raw:  A raw image ndarray, shape is [H,W,3]
+            slot:       An InferenceSlot object whose device_input will be updated
+
         """
         h, w, _ = image_raw.shape
         # Calculate widht and height and paddings
@@ -327,13 +327,7 @@ class YoLov5TRT:
         assert image.shape == slot.device_preprocess_tmp.shape, f'{image.shape}'
         assert slot.device_preprocess_tmp.dtype == np.uint8
         assert slot.device_input.dtype == np.float32
-        convert_hwc_uint8_to_nchw_float(slot.device_preprocess_tmp, slot.device_input, stream=slot.stream)
-        # image = image.astype(np.float32)
-        # image /= 255.0  # Normalize to [0,1]
-        # image = np.expand_dims(image, axis=0)  # CHW to NCHW format
-
-        # Copy to output (host buffer), implicitly retaining its (i.e., the host buffer's) C order:
-        # output[:, :, :, :] = image[:, :, :, :]
+        _convert_hwc_uint8_to_nchw_float(slot.device_preprocess_tmp, slot.device_input, stream=slot.stream)
 
     def xywh2xyxy(self, origin_h: int, origin_w: int, x: np.ndarray) -> np.ndarray:
         """
@@ -479,6 +473,9 @@ class warmUpThread(threading.Thread):
 
 
 def _pack_detection_results(result_boxes: np.ndarray, result_scores: np.ndarray, result_classid: np.ndarray) -> list[Detection]:
+    """
+    Pack detection array results into a list of Detection namedtuples, suitable for returning from node
+    """
     detections = []
     for j, box in enumerate(result_boxes):
         x, y, br_x, br_y = box
@@ -492,7 +489,10 @@ def _pack_detection_results(result_boxes: np.ndarray, result_scores: np.ndarray,
 hwc_uint8_to_nchw_float_kernel: None | SourceModule = None
 
 
-def convert_hwc_uint8_to_nchw_float(src: gpuarray.GPUArray, dst: gpuarray.GPUArray, stream: cuda.Stream):
+def _convert_hwc_uint8_to_nchw_float(src: gpuarray.GPUArray, dst: gpuarray.GPUArray, stream: cuda.Stream) -> None:
+    """
+    Convert image from HWC uint8 [0,255] to NCHW float32 [0.0,1.0]
+    """
     global hwc_uint8_to_nchw_float_kernel
     if hwc_uint8_to_nchw_float_kernel is None:
         hwc_uint8_to_nchw_float_kernel = SourceModule("""
@@ -507,7 +507,7 @@ def convert_hwc_uint8_to_nchw_float(src: gpuarray.GPUArray, dst: gpuarray.GPUArr
                 {
                     int src_idx = h*W*C + w*C + c;     // NHWC
                     int dst_idx = c*H*W + h*W + w;     // NCHW
-                    dst[dst_idx] = float(src[src_idx]) / 255.0;
+                    dst[dst_idx] = float(src[src_idx]) / 255.0; // uint8 -> float conversion
                 }
             }
         }
