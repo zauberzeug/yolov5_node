@@ -38,8 +38,7 @@ class BindingDescription:
     dtype: np.dtype
 
     def alloc_buffers(self) -> tuple[np.ndarray, cuda.DeviceAllocation]:
-        size = trt.volume(self.shape)
-        host_mem = cuda.pagelocked_empty(size, self.dtype)
+        host_mem = cuda.pagelocked_empty(self.shape, self.dtype)
         cuda_mem = cuda.mem_alloc(host_mem.nbytes)
 
         return host_mem, cuda_mem
@@ -97,7 +96,7 @@ class YoLov5TRT:
 
     def _create_inference_slot(self) -> InferenceSlot:
         input_host, input_device = self.input_binding.alloc_buffers()
-        output_host, output_device = self.input_binding.alloc_buffers()
+        output_host, output_device = self.output_binding.alloc_buffers()
 
         return InferenceSlot(
             context=self.engine.create_execution_context(),
@@ -117,7 +116,7 @@ class YoLov5TRT:
         output_descriptions = []
 
         for binding_name in engine:
-            shape = engine.get_tensor_shape(binding_name)
+            shape = list(engine.get_tensor_shape(binding_name))
             print('binding_name:', binding_name, shape)
             dtype = trt.nptype(engine.get_tensor_dtype(binding_name))
 
@@ -169,9 +168,8 @@ class YoLov5TRT:
         inference_slot = self.inference_slots.pop() if self.inference_slots else self._create_inference_slot()
 
         # Do image preprocess
-        input_image, origin_h, origin_w = self._preprocess_image(image_raw)
-        # Copy input image to host buffer
-        np.copyto(inference_slot.host_input, input_image.ravel())
+        origin_h, origin_w, _ = image_raw.shape
+        self._preprocess_image(image_raw, inference_slot.host_input)
 
         # Run inference
         start = time.time()
@@ -184,7 +182,7 @@ class YoLov5TRT:
         self.ctx.pop()
 
         # Do postprocess
-        post_process_results = self._post_process(inference_slot.host_output[0:LEN_ALL_RESULT], origin_h, origin_w)
+        post_process_results = self._post_process(inference_slot.host_output, origin_h, origin_w)
         detections = _pack_detection_results(*post_process_results)
 
         self.inference_slots.append(inference_slot)
@@ -199,9 +197,7 @@ class YoLov5TRT:
 
         start = time.time()
         for image, inference_slot in zip(images, inference_slots, strict=True):
-            input_image, _, _ = self._preprocess_image(image)
-            # Copy input image to host buffer
-            np.copyto(inference_slot.host_input, input_image.ravel())
+            self._preprocess_image(image, inference_slot.host_input)
 
             # Run inference
             self._dispatch_gpu_inference(inference_slot)
@@ -216,7 +212,7 @@ class YoLov5TRT:
         results = []
         for image, inference_slot in zip(images, inference_slots, strict=True):
             h, w, _ = image.shape
-            post_process_results = self._post_process(inference_slot.host_output[0:LEN_ALL_RESULT], h, w)
+            post_process_results = self._post_process(inference_slot.host_output, h, w)
             detections = _pack_detection_results(*post_process_results)
             results.append(detections)
             self.inference_slots.append(inference_slot)
@@ -288,7 +284,7 @@ class YoLov5TRT:
         self._check_cuda_init_error()
         return np.zeros([self.input_h, self.input_w, 3], dtype=np.uint8)
 
-    def _preprocess_image(self, image_raw: np.ndarray) -> tuple[np.ndarray, int, int]:
+    def _preprocess_image(self, image_raw: np.ndarray, output: np.ndarray) -> None:
         """
         Resize and pad it to target size, normalize to [0,1], transform to NCHW format.
 
@@ -334,10 +330,9 @@ class YoLov5TRT:
         image /= 255.0  # Normalize to [0,1]
         image = np.transpose(image, [2, 0, 1])  # HWC to CHW format:
         image = np.expand_dims(image, axis=0)  # CHW to NCHW format
-        # Convert the image to row-major order, also known as "C order":
-        image = np.ascontiguousarray(image)
 
-        return image, h, w
+        # Copy to output (host buffer), implicitly retaining its (i.e., the host buffer's) C order:
+        output[:, :, :, :] = image[:, :, :, :]
 
     def xywh2xyxy(self, origin_h: int, origin_w: int, x: np.ndarray) -> np.ndarray:
         """
@@ -367,7 +362,7 @@ class YoLov5TRT:
 
         return y
 
-    def _post_process(self, output: np.ndarray, origin_h: int, origin_w: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _post_process(self, output_tensor: np.ndarray, origin_h: int, origin_w: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Postprocess the prediction
         param:
@@ -380,6 +375,7 @@ class YoLov5TRT:
             result_classid: finally classid, a numpy, each element is the classid correspoing to box
         """
 
+        output = output_tensor[0, 0:LEN_ALL_RESULT, 0, 0]
         num = int(output[0])  # Get the num of boxes detected
         # Reshape to a 2D ndarray
         pred = np.reshape(output[1:], (-1, LEN_ONE_RESULT))[:num, :]
