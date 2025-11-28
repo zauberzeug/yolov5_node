@@ -7,17 +7,41 @@ import logging
 import threading
 import time
 from collections import namedtuple
+from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 import pycuda.driver as cuda  # type: ignore # pylint: disable=import-error
+import pycuda.gpuarray as gpuarray  # type: ignore # pylint: disable=import-error
 import tensorrt as trt  # type: ignore # pylint: disable=import-error
 from PIL import Image
 from pycuda._driver import (  # type: ignore # pylint: disable=import-error, no-name-in-module
     Error as CudaError,
 )
+from pycuda.compiler import SourceModule  # type: ignore # pylint: disable=import-error
 
 LEN_ALL_RESULT = 38001
 LEN_ONE_RESULT = 38
+
+
+@dataclass(slots=True, kw_only=True)
+class InferenceSlot:
+    stream: cuda.Stream
+    context: Any  # TODO
+    device_preprocess_tmp: gpuarray.GPUArray
+    device_input: gpuarray.GPUArray
+    device_output: gpuarray.GPUArray
+    host_output: np.ndarray
+
+
+@dataclass(slots=True, kw_only=True)
+class BindingDescription:
+    name: str
+    shape: list[int]
+    dtype: np.dtype
+
+
+Detection = namedtuple('Detection', 'x y w h category probability')
 
 
 class YoLov5TRT:
@@ -25,7 +49,7 @@ class YoLov5TRT:
     description: A YOLOv5 class that warps TensorRT ops, preprocess and postprocess ops.
     """
 
-    def __init__(self, engine_file_path: str, iou_threshold: float, conf_threshold: float):
+    def __init__(self, engine_file_path: str, iou_threshold: float, conf_threshold: float) -> None:
         logging.info('Initializing YOLOv5 TRT engine with iou_threshold: %s, conf_threshold: %s',
                      iou_threshold, conf_threshold)
         # Create a Context on this device,
@@ -59,102 +83,142 @@ class YoLov5TRT:
                 'The engine file needs to be rebuilt with the current TensorRT version.'
             )
 
-        context = engine.create_execution_context()
-
         self._setup_bindings(engine)
+        assert self.batch_size == 1
+        self.inference_slots: list[InferenceSlot] = []
 
         # Store
-        self.stream = stream
-        self.context = context
         self.engine = engine
-        self.batch_size = engine.get_tensor_shape(self.input_binding_names[0])[0]
 
-    def _setup_bindings(self, engine: trt.ICudaEngine):
+    def _create_inference_slot(self) -> InferenceSlot:
+        input_img_shape = [self.input_h, self.input_w, 3]
+        device_preprocess_tmp = gpuarray.empty(shape=input_img_shape, dtype=np.uint8)
+        device_input = gpuarray.empty(shape=self.input_binding.shape, dtype=self.input_binding.dtype)
+        device_output = gpuarray.empty(shape=self.output_binding.shape, dtype=self.output_binding.dtype)
+        host_output = cuda.pagelocked_empty(self.output_binding.shape, self.output_binding.dtype)
+
+        return InferenceSlot(
+            stream=cuda.Stream(),
+            context=self.engine.create_execution_context(),
+            device_preprocess_tmp=device_preprocess_tmp,
+            device_input=device_input,
+            device_output=device_output,
+            host_output=host_output,
+        )
+
+    def _setup_bindings(self, engine: trt.ICudaEngine) -> None:
         """
         Set up TensorRT bindings for input and output tensors.
 
         :param engine: TensorRT CUDA engine
         """
-        self.host_inputs = []
-        self.cuda_inputs = []
-        self.host_outputs = []
-        self.cuda_outputs = []
-        self.input_binding_names = []
-        self.output_binding_names = []
+        input_descriptions = []
+        output_descriptions = []
 
         for binding_name in engine:
-            shape = engine.get_tensor_shape(binding_name)
+            shape = list(engine.get_tensor_shape(binding_name))
             print('binding_name:', binding_name, shape)
-            size = trt.volume(shape)
             dtype = trt.nptype(engine.get_tensor_dtype(binding_name))
-            # Allocate host and device buffers
-            host_mem = cuda.pagelocked_empty(size, dtype)
-            cuda_mem = cuda.mem_alloc(host_mem.nbytes)
-            # Append the device buffer to device bindings.
-            # Append to the appropriate list.
+
+            binding_description = BindingDescription(name=binding_name, shape=shape, dtype=dtype)
             if engine.get_tensor_mode(binding_name) == trt.TensorIOMode.INPUT:
-                self.input_binding_names.append(binding_name)
-                self.input_w = shape[-1]
-                self.input_h = shape[-2]
-                self.host_inputs.append(host_mem)
-                self.cuda_inputs.append(cuda_mem)
+                input_descriptions.append(binding_description)
             elif engine.get_tensor_mode(binding_name) == trt.TensorIOMode.OUTPUT:
-                self.output_binding_names.append(binding_name)
-                self.host_outputs.append(host_mem)
-                self.cuda_outputs.append(cuda_mem)
+                output_descriptions.append(binding_description)
             else:
                 print(f'unknown binding: "{binding_name}"')
 
-    def _check_cuda_init_error(self):
+        assert len(input_descriptions) == 1
+        assert len(output_descriptions) == 1
+
+        self.input_binding = input_descriptions[0]
+        self.output_binding = output_descriptions[0]
+
+    @property
+    def input_w(self) -> int:
+        return self.input_binding.shape[-1]
+
+    @property
+    def input_h(self) -> int:
+        return self.input_binding.shape[-2]
+
+    @property
+    def batch_size(self) -> int:
+        return self.input_binding.shape[0]
+
+    def _check_cuda_init_error(self) -> None:
         if self.cuda_init_error:
             raise RuntimeError('cuda.init() failed .. detector cannot be used! Try to restart the machine.')
 
-    def infer(self, image_raw: np.ndarray):
+    def _dispatch_gpu_inference(self, inference_slot: InferenceSlot):
+        # Run inference.
+        context = inference_slot.context
+        context.set_tensor_address(self.input_binding.name, inference_slot.device_input.ptr)
+        context.set_tensor_address(self.output_binding.name, inference_slot.device_output.ptr)
+        context.execute_async_v3(stream_handle=inference_slot.stream.handle)
+        # Transfer predictions back from the GPU.
+        cuda.memcpy_dtoh_async(inference_slot.host_output, inference_slot.device_output.ptr, inference_slot.stream)
+
+    def infer(self, image_raw: np.ndarray) -> tuple[list[Detection], float]:
         threading.Thread.__init__(self)  # type: ignore
         # Make self the active context, pushing it on top of the context stack.
         self.ctx.push()
-        # Restore
-        stream = self.stream
-        context = self.context
-        host_inputs = self.host_inputs
-        cuda_inputs = self.cuda_inputs
-        host_outputs = self.host_outputs
-        cuda_outputs = self.cuda_outputs
-        input_binding_names = self.input_binding_names
-        output_binding_names = self.output_binding_names
+        inference_slot = self.inference_slots.pop() if self.inference_slots else self._create_inference_slot()
+
         # Do image preprocess
-        input_image, origin_h, origin_w = self._preprocess_image(image_raw)
-        # Copy input image to host buffer
-        np.copyto(host_inputs[0], input_image.ravel())
+        origin_h, origin_w, _ = image_raw.shape
+        self._preprocess_image(image_raw, inference_slot)
+
+        # Run inference
         start = time.time()
-        # Transfer input data  to the GPU.
-        cuda.memcpy_htod_async(cuda_inputs[0], host_inputs[0], stream)
-        # Run inference.
-        context.set_tensor_address(input_binding_names[0], cuda_inputs[0])
-        context.set_tensor_address(output_binding_names[0], cuda_outputs[0])
-        context.execute_async_v3(stream_handle=stream.handle)
-        # Transfer predictions back from the GPU.
-        cuda.memcpy_dtoh_async(host_outputs[0], cuda_outputs[0], stream)
+        self._dispatch_gpu_inference(inference_slot)
         # Synchronize the stream
-        stream.synchronize()
+        inference_slot.stream.synchronize()
         end = time.time()
+
         # Remove any context from the top of the context stack, deactivating it.
         self.ctx.pop()
-        # Here we use the first row of output in that batch_size = 1
-        output = host_outputs[0]
+
         # Do postprocess
-        detections = []
-        Detection = namedtuple('Detection', 'x y w h category probability')
-        result_boxes, result_scores, result_classid = self._post_process(output[0:LEN_ALL_RESULT], origin_h, origin_w)
-        for j, box in enumerate(result_boxes):
-            x, y, br_x, br_y = box
-            w = br_x - x
-            h = br_y - y
-            detections.append(Detection(int(x), int(y), int(w), int(h),
-                                        int(result_classid[j]), round(float(result_scores[j]), 2)))
+        post_process_results = self._post_process(inference_slot.host_output, origin_h, origin_w)
+        detections = _pack_detection_results(*post_process_results)
+
+        self.inference_slots.append(inference_slot)
         return detections, end - start
 
-    def destroy(self):
+    def infer_batch(self, images: list[np.ndarray]) -> tuple[list[list[Detection]], float]:
+        threading.Thread.__init__(self)  # type: ignore
+
+        # Make self the active context, pushing it on top of the context stack.
+        self.ctx.push()
+
+        # Claim slots (and possibly create) slots for all images in the batch
+        inference_slots = [self.inference_slots.pop() if self.inference_slots else self._create_inference_slot()
+                           for _ in images]
+
+        start = time.time()
+        for image, inference_slot in zip(images, inference_slots, strict=True):
+            self._preprocess_image(image, inference_slot)
+            self._dispatch_gpu_inference(inference_slot)
+
+        end = time.time()
+
+        results = []
+        for image, inference_slot in zip(images, inference_slots, strict=True):
+            h, w, _ = image.shape
+            # Synchronize stream to make sure that inference_slot.host_output has valid values
+            inference_slot.stream.synchronize()
+            post_process_results = self._post_process(inference_slot.host_output, h, w)
+            detections = _pack_detection_results(*post_process_results)
+            results.append(detections)
+            self.inference_slots.append(inference_slot)
+
+        # Remove any context from the top of the context stack, deactivating it.
+        self.ctx.pop()
+
+        return results, end - start
+
+    def destroy(self) -> None:
         """
         Destroy the TRT engine and free up resources.
 
@@ -170,38 +234,34 @@ class YoLov5TRT:
         # Make sure the owning context is current for all frees
         self.ctx.push()
         try:
-            # 1) Stop work
-            if getattr(self, "stream", None) is not None:
-                self.stream.synchronize()
-
-            # 2) Free device buffers
-            for m in getattr(self, "cuda_inputs", []) or []:
+            # 1) Free device buffers
+            for slot in getattr(self, "inference_slots", []):
+                slot.stream.synchronize()
                 try:
-                    m.free()
+                    slot.device_preprocess_tmp.free()
                 except Exception:
                     pass
-            for m in getattr(self, "cuda_outputs", []) or []:
                 try:
-                    m.free()
+                    slot.device_input.free()
                 except Exception:
                     pass
-            self.cuda_inputs = []
-            self.cuda_outputs = []
+                try:
+                    slot.device_output.free()
+                except Exception:
+                    pass
+                try:
+                    del slot.context
+                except Exception:
+                    pass
 
-            # 3) Destroy TRT objects while context is current
-            try:
-                del self.context
-            except Exception:
-                pass
+            # 2) Destroy TRT objects while context is current
             try:
                 del self.engine
             except Exception:
                 pass
 
-            # 4) Drop stream and host buffers
-            self.stream = None
-            self.host_inputs = []
-            self.host_outputs = []
+            # 3) Drop slots and associated ressources
+            self.inference_slots = []
         finally:
             # Remove the push we just did and the original make_context push
             try:
@@ -218,21 +278,19 @@ class YoLov5TRT:
                 pass
             self.ctx = None
 
-    def get_raw_image_zeros(self, image_path_batch=None):
+    def get_raw_image_zeros(self, image_path_batch=None) -> np.ndarray:
         """Data for warmup"""
         self._check_cuda_init_error()
         return np.zeros([self.input_h, self.input_w, 3], dtype=np.uint8)
 
-    def _preprocess_image(self, image_raw) -> tuple[np.ndarray, int, int]:
+    def _preprocess_image(self, image_raw: np.ndarray, slot: InferenceSlot) -> None:
         """
         Resize and pad it to target size, normalize to [0,1], transform to NCHW format.
 
         param:
-            input_image_path: str, image path
-        return:
-            image:  the processed image
-            h: original height
-            w: original width
+            image_raw:  A raw image ndarray, shape is [H,W,3]
+            slot:       An InferenceSlot object whose device_input will be updated
+
         """
         h, w, _ = image_raw.shape
         # Calculate widht and height and paddings
@@ -251,24 +309,25 @@ class YoLov5TRT:
             tx2 = self.input_w - tw - tx1
             ty1 = ty2 = 0
         # Resize the image with long side while maintaining ratio
-        pil_image = Image.fromarray(image_raw)
-        pil_image = pil_image.resize((tw, th), Image.Resampling.BILINEAR)
-        image = np.array(pil_image)
+        if tw == w and th == h:
+            image = image_raw
+        else:
+            pil_image = Image.fromarray(image_raw)
+            pil_image = pil_image.resize((tw, th), Image.Resampling.BILINEAR)
+            image = np.array(pil_image)
         # Pad with (128, 128, 128)
-        image = np.pad(
-            image,
-            ((ty1, ty2), (tx1, tx2), (0, 0)),
-            mode='constant',
-            constant_values=128
-        )
-        image = image.astype(np.float32)
-        image /= 255.0  # Normalize to [0,1]
-        image = np.transpose(image, [2, 0, 1])  # HWC to CHW format:
-        image = np.expand_dims(image, axis=0)  # CHW to NCHW format
-        # Convert the image to row-major order, also known as "C order":
-        image = np.ascontiguousarray(image)
-
-        return image, h, w
+        if tx1 != 0 or tx2 != 0 or ty1 != 0 or ty2 != 0:
+            image = np.pad(
+                image,
+                ((ty1, ty2), (tx1, tx2), (0, 0)),
+                mode='constant',
+                constant_values=128
+            )
+        slot.device_preprocess_tmp.set_async(image, stream=slot.stream)
+        assert image.shape == slot.device_preprocess_tmp.shape, f'{image.shape}'
+        assert slot.device_preprocess_tmp.dtype == np.uint8
+        assert slot.device_input.dtype == np.float32
+        _convert_hwc_uint8_to_nchw_float(slot.device_preprocess_tmp, slot.device_input, stream=slot.stream)
 
     def xywh2xyxy(self, origin_h: int, origin_w: int, x: np.ndarray) -> np.ndarray:
         """
@@ -298,7 +357,7 @@ class YoLov5TRT:
 
         return y
 
-    def _post_process(self, output: np.ndarray, origin_h: int, origin_w: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _post_process(self, output_tensor: np.ndarray, origin_h: int, origin_w: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Postprocess the prediction
         param:
@@ -311,6 +370,7 @@ class YoLov5TRT:
             result_classid: finally classid, a numpy, each element is the classid correspoing to box
         """
 
+        output = output_tensor[0, 0:LEN_ALL_RESULT, 0, 0]
         num = int(output[0])  # Get the num of boxes detected
         # Reshape to a 2D ndarray
         pred = np.reshape(output[1:], (-1, LEN_ONE_RESULT))[:num, :]
@@ -402,11 +462,66 @@ class YoLov5TRT:
 
 
 class warmUpThread(threading.Thread):
-    def __init__(self, yolov5_wrapper: YoLov5TRT):
+    def __init__(self, yolov5_wrapper: YoLov5TRT) -> None:
         threading.Thread.__init__(self)
         self.yolov5_wrapper = yolov5_wrapper
 
-    def run(self):
+    def run(self) -> None:
         _, use_time = self.yolov5_wrapper.infer(
             self.yolov5_wrapper.get_raw_image_zeros())
         print(f'warm_up time->{use_time * 1000:.2f}ms')
+
+
+def _pack_detection_results(result_boxes: np.ndarray, result_scores: np.ndarray, result_classid: np.ndarray) -> list[Detection]:
+    """
+    Pack detection array results into a list of Detection namedtuples, suitable for returning from node
+    """
+    detections = []
+    for j, box in enumerate(result_boxes):
+        x, y, br_x, br_y = box
+        w = br_x - x
+        h = br_y - y
+        detections.append(Detection(int(x), int(y), int(w), int(h),
+                                    int(result_classid[j]), round(float(result_scores[j]), 2)))
+    return detections
+
+
+hwc_uint8_to_nchw_float_kernel: None | SourceModule = None
+
+
+def _convert_hwc_uint8_to_nchw_float(src: gpuarray.GPUArray, dst: gpuarray.GPUArray, stream: cuda.Stream) -> None:
+    """
+    Convert image from HWC uint8 [0,255] to NCHW float32 [0.0,1.0]
+    """
+    global hwc_uint8_to_nchw_float_kernel
+    if hwc_uint8_to_nchw_float_kernel is None:
+        hwc_uint8_to_nchw_float_kernel = SourceModule("""
+        __global__ void hwc_to_nchw(unsigned char *src, float *dst,
+                                    int H, int W, int C)
+        {
+            int h = blockIdx.y * blockDim.y + threadIdx.y;
+            int w = blockIdx.x * blockDim.x + threadIdx.x;
+            if (h < H && w < W)
+            {
+                for(int c = 0; c < C; ++c)
+                {
+                    int src_idx = h*W*C + w*C + c;     // NHWC
+                    int dst_idx = c*H*W + h*W + w;     // NCHW
+                    dst[dst_idx] = float(src[src_idx]) / 255.0; // uint8 -> float conversion
+                }
+            }
+        }
+        """)
+
+    H, W, C = src.shape
+    func = hwc_uint8_to_nchw_float_kernel.get_function("hwc_to_nchw")
+
+    block = (16, 16, 1)
+    grid = ((W + 15)//16, (H + 15)//16)
+
+    func(
+        src.gpudata,
+        dst.gpudata,
+        np.int32(H), np.int32(W), np.int32(C),
+        block=block, grid=grid, stream=stream
+    )
