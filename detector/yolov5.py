@@ -12,6 +12,7 @@ from typing import Any
 
 import numpy as np
 import pycuda.driver as cuda  # type: ignore # pylint: disable=import-error
+import pycuda.gpuarray as gpuarray  # type: ignore # pylint: disable=import-error
 import tensorrt as trt  # type: ignore # pylint: disable=import-error
 from PIL import Image
 from pycuda._driver import (  # type: ignore # pylint: disable=import-error, no-name-in-module
@@ -152,10 +153,10 @@ class YoLov5TRT:
 
     def _dispatch_gpu_inference(self, inference_slot: InferenceSlot):
         # Transfer input data  to the GPU.
-        cuda.memcpy_htod_async(inference_slot.device_input, inference_slot.host_input, self.stream)
+        # cuda.memcpy_htod_async(inference_slot.device_input, inference_slot.host_input, self.stream)
         # Run inference.
         context = inference_slot.context
-        context.set_tensor_address(self.input_binding.name, inference_slot.device_input)
+        context.set_tensor_address(self.input_binding.name, inference_slot.device_input.ptr)
         context.set_tensor_address(self.output_binding.name, inference_slot.device_output)
         context.execute_async_v3(stream_handle=self.stream.handle)
         # Transfer predictions back from the GPU.
@@ -169,7 +170,7 @@ class YoLov5TRT:
 
         # Do image preprocess
         origin_h, origin_w, _ = image_raw.shape
-        self._preprocess_image(image_raw, inference_slot.host_input)
+        inference_slot.device_input = self._preprocess_image(image_raw, self.stream)
 
         # Run inference
         start = time.time()
@@ -197,7 +198,7 @@ class YoLov5TRT:
 
         start = time.time()
         for image, inference_slot in zip(images, inference_slots, strict=True):
-            self._preprocess_image(image, inference_slot.host_input)
+            inference_slot.device_input = self._preprocess_image(image, self.stream)
 
             # Run inference
             self._dispatch_gpu_inference(inference_slot)
@@ -284,7 +285,7 @@ class YoLov5TRT:
         self._check_cuda_init_error()
         return np.zeros([self.input_h, self.input_w, 3], dtype=np.uint8)
 
-    def _preprocess_image(self, image_raw: np.ndarray, output: np.ndarray) -> None:
+    def _preprocess_image(self, image_raw: np.ndarray, stream: cuda.Stream) -> cuda.DeviceAllocation:
         """
         Resize and pad it to target size, normalize to [0,1], transform to NCHW format.
 
@@ -326,13 +327,18 @@ class YoLov5TRT:
                 mode='constant',
                 constant_values=128
             )
-        image = image.astype(np.float32)
-        image /= 255.0  # Normalize to [0,1]
         image = np.transpose(image, [2, 0, 1])  # HWC to CHW format:
-        image = np.expand_dims(image, axis=0)  # CHW to NCHW format
+        image = np.ascontiguousarray(image)
+        gpu_image = gpuarray.to_gpu_async(image, stream=stream)
+        gpu_image = gpu_image.astype(np.float32, stream=stream)
+        gpu_image /= 255.0
+        return gpu_image
+        # image = image.astype(np.float32)
+        # image /= 255.0  # Normalize to [0,1]
+        # image = np.expand_dims(image, axis=0)  # CHW to NCHW format
 
         # Copy to output (host buffer), implicitly retaining its (i.e., the host buffer's) C order:
-        output[:, :, :, :] = image[:, :, :, :]
+        # output[:, :, :, :] = image[:, :, :, :]
 
     def xywh2xyxy(self, origin_h: int, origin_w: int, x: np.ndarray) -> np.ndarray:
         """
