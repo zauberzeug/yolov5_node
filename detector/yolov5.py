@@ -18,6 +18,7 @@ from PIL import Image
 from pycuda._driver import (  # type: ignore # pylint: disable=import-error, no-name-in-module
     Error as CudaError,
 )
+from pycuda.elementwise import ElementwiseKernel  # type: ignore # pylint: disable=import-error
 
 LEN_ALL_RESULT = 38001
 LEN_ONE_RESULT = 38
@@ -28,8 +29,8 @@ class InferenceSlot:
     context: Any  # TODO
     host_input: np.ndarray
     host_output: np.ndarray
-    device_input: cuda.DeviceAllocation
-    device_output: cuda.DeviceAllocation
+    device_input: gpuarray.GPUArray
+    device_output: gpuarray.GPUArray
 
 
 @dataclass(slots=True, kw_only=True)
@@ -38,14 +39,19 @@ class BindingDescription:
     shape: list[int]
     dtype: np.dtype
 
-    def alloc_buffers(self) -> tuple[np.ndarray, cuda.DeviceAllocation]:
+    def alloc_buffers(self) -> tuple[np.ndarray, gpuarray.GPUArray]:
         host_mem = cuda.pagelocked_empty(self.shape, self.dtype)
-        cuda_mem = cuda.mem_alloc(host_mem.nbytes)
+        cuda_mem = gpuarray.empty(shape=self.shape, dtype=self.dtype)
 
         return host_mem, cuda_mem
 
 
 Detection = namedtuple('Detection', 'x y w h category probability')
+
+rescale_float_kernel = ElementwiseKernel(
+    'unsigned char* in, float* out',
+    'out[i] = float(in[i]) / 255.0',
+    'rescale_float')
 
 
 class YoLov5TRT:
@@ -157,10 +163,10 @@ class YoLov5TRT:
         # Run inference.
         context = inference_slot.context
         context.set_tensor_address(self.input_binding.name, inference_slot.device_input.ptr)
-        context.set_tensor_address(self.output_binding.name, inference_slot.device_output)
+        context.set_tensor_address(self.output_binding.name, inference_slot.device_output.ptr)
         context.execute_async_v3(stream_handle=self.stream.handle)
         # Transfer predictions back from the GPU.
-        cuda.memcpy_dtoh_async(inference_slot.host_output, inference_slot.device_output, self.stream)
+        cuda.memcpy_dtoh_async(inference_slot.host_output, inference_slot.device_output.ptr, self.stream)
 
     def infer(self, image_raw: np.ndarray) -> tuple[list[Detection], float]:
         threading.Thread.__init__(self)  # type: ignore
@@ -170,7 +176,7 @@ class YoLov5TRT:
 
         # Do image preprocess
         origin_h, origin_w, _ = image_raw.shape
-        inference_slot.device_input = self._preprocess_image(image_raw, self.stream)
+        self._preprocess_image(image_raw, inference_slot.device_input, self.stream)
 
         # Run inference
         start = time.time()
@@ -198,7 +204,7 @@ class YoLov5TRT:
 
         start = time.time()
         for image, inference_slot in zip(images, inference_slots, strict=True):
-            inference_slot.device_input = self._preprocess_image(image, self.stream)
+            self._preprocess_image(image, inference_slot.device_input, self.stream)
 
             # Run inference
             self._dispatch_gpu_inference(inference_slot)
@@ -285,7 +291,7 @@ class YoLov5TRT:
         self._check_cuda_init_error()
         return np.zeros([self.input_h, self.input_w, 3], dtype=np.uint8)
 
-    def _preprocess_image(self, image_raw: np.ndarray, stream: cuda.Stream) -> cuda.DeviceAllocation:
+    def _preprocess_image(self, image_raw: np.ndarray, output: gpuarray.GPUArray, stream: cuda.Stream) -> None:
         """
         Resize and pad it to target size, normalize to [0,1], transform to NCHW format.
 
@@ -330,9 +336,9 @@ class YoLov5TRT:
         image = np.transpose(image, [2, 0, 1])  # HWC to CHW format:
         image = np.ascontiguousarray(image)
         gpu_image = gpuarray.to_gpu_async(image, stream=stream)
-        gpu_image = gpu_image.astype(np.float32, stream=stream)
-        gpu_image /= 255.0
-        return gpu_image
+        assert gpu_image.dtype == np.uint8
+        assert output.dtype == np.float32
+        rescale_float_kernel(gpu_image, output, stream=stream)
         # image = image.astype(np.float32)
         # image /= 255.0  # Normalize to [0,1]
         # image = np.expand_dims(image, axis=0)  # CHW to NCHW format
