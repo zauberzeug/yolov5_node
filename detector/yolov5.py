@@ -28,10 +28,10 @@ LEN_ONE_RESULT = 38
 class InferenceSlot:
     stream: cuda.Stream
     context: Any  # TODO
-    host_input: np.ndarray
-    host_output: np.ndarray
+    device_preprocess_tmp: gpuarray.GPUArray
     device_input: gpuarray.GPUArray
     device_output: gpuarray.GPUArray
+    host_output: np.ndarray
 
 
 @dataclass(slots=True, kw_only=True)
@@ -39,12 +39,6 @@ class BindingDescription:
     name: str
     shape: list[int]
     dtype: np.dtype
-
-    def alloc_buffers(self) -> tuple[np.ndarray, gpuarray.GPUArray]:
-        host_mem = cuda.pagelocked_empty(self.shape, self.dtype)
-        cuda_mem = gpuarray.empty(shape=self.shape, dtype=self.dtype)
-
-        return host_mem, cuda_mem
 
 
 Detection = namedtuple('Detection', 'x y w h category probability')
@@ -97,16 +91,19 @@ class YoLov5TRT:
         self.engine = engine
 
     def _create_inference_slot(self) -> InferenceSlot:
-        input_host, input_device = self.input_binding.alloc_buffers()
-        output_host, output_device = self.output_binding.alloc_buffers()
+        input_img_shape = [self.input_h, self.input_w, 3]
+        device_preprocess_tmp = gpuarray.empty(shape=input_img_shape, dtype=np.uint8)
+        device_input = gpuarray.empty(shape=self.input_binding.shape, dtype=self.input_binding.dtype)
+        device_output = gpuarray.empty(shape=self.output_binding.shape, dtype=self.output_binding.dtype)
+        host_output = cuda.pagelocked_empty(self.output_binding.shape, self.output_binding.dtype)
 
         return InferenceSlot(
             stream=cuda.Stream(),
             context=self.engine.create_execution_context(),
-            host_input=input_host,
-            host_output=output_host,
-            device_input=input_device,
-            device_output=output_device,
+            device_preprocess_tmp=device_preprocess_tmp,
+            device_input=device_input,
+            device_output=device_output,
+            host_output=host_output,
         )
 
     def _setup_bindings(self, engine: trt.ICudaEngine) -> None:
@@ -170,7 +167,7 @@ class YoLov5TRT:
 
         # Do image preprocess
         origin_h, origin_w, _ = image_raw.shape
-        self._preprocess_image(image_raw, inference_slot.device_input, inference_slot.stream)
+        self._preprocess_image(image_raw, inference_slot)
 
         # Run inference
         start = time.time()
@@ -198,7 +195,7 @@ class YoLov5TRT:
 
         start = time.time()
         for image, inference_slot in zip(images, inference_slots, strict=True):
-            self._preprocess_image(image, inference_slot.device_input, inference_slot.stream)
+            self._preprocess_image(image, inference_slot)
 
             # Run inference
             self._dispatch_gpu_inference(inference_slot)
@@ -238,6 +235,10 @@ class YoLov5TRT:
             # 1) Free device buffers
             for slot in getattr(self, "inference_slots", []):
                 slot.stream.synchronize()
+                try:
+                    slot.device_preprocess_tmp.free()
+                except Exception:
+                    pass
                 try:
                     slot.device_input.free()
                 except Exception:
@@ -280,7 +281,7 @@ class YoLov5TRT:
         self._check_cuda_init_error()
         return np.zeros([self.input_h, self.input_w, 3], dtype=np.uint8)
 
-    def _preprocess_image(self, image_raw: np.ndarray, output: gpuarray.GPUArray, stream: cuda.Stream) -> None:
+    def _preprocess_image(self, image_raw: np.ndarray, slot: InferenceSlot) -> None:
         """
         Resize and pad it to target size, normalize to [0,1], transform to NCHW format.
 
@@ -322,10 +323,11 @@ class YoLov5TRT:
                 mode='constant',
                 constant_values=128
             )
-        gpu_image = gpuarray.to_gpu_async(image, stream=stream)
-        assert gpu_image.dtype == np.uint8
-        assert output.dtype == np.float32
-        convert_hwc_uint8_to_nchw_float(gpu_image, output, stream=stream)
+        slot.device_preprocess_tmp.set_async(image, stream=slot.stream)
+        assert image.shape == slot.device_preprocess_tmp.shape, f'{image.shape}'
+        assert slot.device_preprocess_tmp.dtype == np.uint8
+        assert slot.device_input.dtype == np.float32
+        convert_hwc_uint8_to_nchw_float(slot.device_preprocess_tmp, slot.device_input, stream=slot.stream)
         # image = image.astype(np.float32)
         # image /= 255.0  # Normalize to [0,1]
         # image = np.expand_dims(image, axis=0)  # CHW to NCHW format
