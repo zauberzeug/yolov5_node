@@ -3,7 +3,6 @@ Based on https://github.com/wang-xinyu/tensorrtx/blob/7b79de466c7ac2fcf179e65c2f
 MIT License
 """
 
-from pycuda.compiler import SourceModule
 import logging
 import threading
 import time
@@ -19,7 +18,7 @@ from PIL import Image
 from pycuda._driver import (  # type: ignore # pylint: disable=import-error, no-name-in-module
     Error as CudaError,
 )
-from pycuda.elementwise import ElementwiseKernel  # type: ignore # pylint: disable=import-error
+from pycuda.compiler import SourceModule  # type: ignore # pylint: disable=import-error
 
 LEN_ALL_RESULT = 38001
 LEN_ONE_RESULT = 38
@@ -49,11 +48,6 @@ class BindingDescription:
 
 
 Detection = namedtuple('Detection', 'x y w h category probability')
-
-rescale_float_kernel = ElementwiseKernel(
-    'unsigned char* in, float* out',
-    'out[i] = float(in[i]) / 255.0',
-    'rescale_float')
 
 
 class YoLov5TRT:
@@ -329,11 +323,9 @@ class YoLov5TRT:
                 constant_values=128
             )
         gpu_image = gpuarray.to_gpu_async(image, stream=stream)
-        tmp = gpuarray.empty(shape=output.shape, dtype=gpu_image.dtype)
-        convert_hwc_to_nchw(gpu_image, tmp, stream=stream)
         assert gpu_image.dtype == np.uint8
         assert output.dtype == np.float32
-        rescale_float_kernel(tmp, output, stream=stream)
+        convert_hwc_uint8_to_nchw_float(gpu_image, output, stream=stream)
         # image = image.astype(np.float32)
         # image /= 255.0  # Normalize to [0,1]
         # image = np.expand_dims(image, axis=0)  # CHW to NCHW format
@@ -495,14 +487,14 @@ def _pack_detection_results(result_boxes: np.ndarray, result_scores: np.ndarray,
     return detections
 
 
-hwc_to_nchw_kernel: None | SourceModule = None
+hwc_uint8_to_nchw_float_kernel: None | SourceModule = None
 
 
-def convert_hwc_to_nchw(src: gpuarray.GPUArray, dst: gpuarray.GPUArray, stream: cuda.Stream):
-    global hwc_to_nchw_kernel
-    if hwc_to_nchw_kernel is None:
-        hwc_to_nchw_kernel = SourceModule("""
-        __global__ void hwc_to_nchw(unsigned char *src, unsigned char *dst,
+def convert_hwc_uint8_to_nchw_float(src: gpuarray.GPUArray, dst: gpuarray.GPUArray, stream: cuda.Stream):
+    global hwc_uint8_to_nchw_float_kernel
+    if hwc_uint8_to_nchw_float_kernel is None:
+        hwc_uint8_to_nchw_float_kernel = SourceModule("""
+        __global__ void hwc_to_nchw(unsigned char *src, float *dst,
                                     int H, int W, int C)
         {
             int h = blockIdx.y * blockDim.y + threadIdx.y;
@@ -513,14 +505,14 @@ def convert_hwc_to_nchw(src: gpuarray.GPUArray, dst: gpuarray.GPUArray, stream: 
                 {
                     int src_idx = h*W*C + w*C + c;     // NHWC
                     int dst_idx = c*H*W + h*W + w;     // NCHW
-                    dst[dst_idx] = src[src_idx];
+                    dst[dst_idx] = float(src[src_idx]) / 255.0;
                 }
             }
         }
         """)
 
     H, W, C = src.shape
-    func = hwc_to_nchw_kernel.get_function("hwc_to_nchw")
+    func = hwc_uint8_to_nchw_float_kernel.get_function("hwc_to_nchw")
 
     block = (16, 16, 1)
     grid = ((W + 15)//16, (H + 15)//16)
