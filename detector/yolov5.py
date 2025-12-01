@@ -448,15 +448,22 @@ class YoLov5TRT:
         confs = boxes[:, 4]
         # Sort by the confs
         boxes = boxes[np.argsort(-confs)]
-        # Perform non-maximum suppression
+
+        if len(confs) == 0:
+            return boxes
+
+        max_class = int(np.max(boxes[:, -1]))
+        num_classes = max_class + 1
+
+        # Perform per-class non-maximum suppression
         keep_boxes = []
-        while boxes.shape[0]:
-            large_overlap = self.bbox_iou(np.expand_dims(boxes[0, :4], 0), boxes[:, :4]) > nms_thres
-            label_match = boxes[0, -1] == boxes[:, -1]
-            # Indices of boxes with lower confidence scores, large IOUs and matching labels
-            invalid = large_overlap & label_match
-            keep_boxes += [boxes[0]]
-            boxes = boxes[~invalid]
+        for _class in range(num_classes):
+            class_boxes = boxes[boxes[:, -1] == _class]
+            while class_boxes.shape[0]:
+                # Indices of boxes with lower confidence scores, large IOUs
+                large_overlap = self.bbox_iou(np.expand_dims(class_boxes[0, :4], 0), class_boxes[:, :4]) > nms_thres
+                keep_boxes += [class_boxes[0]]
+                class_boxes = class_boxes[~large_overlap]
         boxes = np.stack(keep_boxes, 0) if len(keep_boxes) else np.array([])
         return boxes
 
