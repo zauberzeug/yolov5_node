@@ -60,7 +60,7 @@ class Yolov5Detector(DetectorLogic):
             raise
 
         for _ in range(8):
-            warmup = yolov5.warmUpThread(self.yolov5)
+            warmup = yolov5.WarmUpThread(self.yolov5)
             warmup.start()
             warmup.join()
 
