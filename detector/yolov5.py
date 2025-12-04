@@ -86,6 +86,8 @@ class YoLov5TRT:
         batch_size = self.input_binding.shape[0]
         assert batch_size == 1
 
+        self.hwc_uint8_to_nchw_float_kernel: None | SourceModule = None
+
         self.inference_slots: list[InferenceSlot] = []
 
         # Store
@@ -153,6 +155,42 @@ class YoLov5TRT:
             host_output=host_output,
         )
 
+    def _convert_hwc_uint8_to_nchw_float(self, src: gpuarray.GPUArray, dst: gpuarray.GPUArray, stream: cuda.Stream) -> None:
+        """Convert image from HWC uint8 [0,255] to NCHW float32 [0.0,1.0]"""
+
+        # Lazily compile cuda kernel:
+        if self.hwc_uint8_to_nchw_float_kernel is None:
+            self.hwc_uint8_to_nchw_float_kernel = SourceModule("""
+            __global__ void hwc_to_nchw(unsigned char *src, float *dst,
+                                        int H, int W, int C)
+            {
+                int h = blockIdx.y * blockDim.y + threadIdx.y;
+                int w = blockIdx.x * blockDim.x + threadIdx.x;
+                if (h < H && w < W)
+                {
+                    for(int c = 0; c < C; ++c)
+                    {
+                        int src_idx = h*W*C + w*C + c;     // NHWC
+                        int dst_idx = c*H*W + h*W + w;     // NCHW
+                        dst[dst_idx] = float(src[src_idx]) / 255.0; // uint8 -> float conversion
+                    }
+                }
+            }
+            """)
+
+        H, W, C = src.shape
+        func = self.hwc_uint8_to_nchw_float_kernel.get_function("hwc_to_nchw")  # type: ignore
+
+        block = (16, 16, 1)
+        grid = ((W + 15)//16, (H + 15)//16)
+
+        func(
+            src.gpudata,
+            dst.gpudata,
+            np.int32(H), np.int32(W), np.int32(C),
+            block=block, grid=grid, stream=stream
+        )
+
     def _preprocess_image(self, image_raw: np.ndarray, slot: InferenceSlot) -> None:
         """Resize and pad it to target size, normalize to [0,1], transform to NCHW format.
 
@@ -194,7 +232,8 @@ class YoLov5TRT:
         assert image.shape == slot.device_preprocess_input.shape, f'{image.shape}'
         assert slot.device_preprocess_input.dtype == np.uint8
         assert slot.device_inference_input.dtype == np.float32
-        _convert_hwc_uint8_to_nchw_float(slot.device_preprocess_input, slot.device_inference_input, stream=slot.stream)
+        self._convert_hwc_uint8_to_nchw_float(slot.device_preprocess_input,
+                                              slot.device_inference_input, stream=slot.stream)
 
     def _dispatch_gpu_inference(self, inference_slot: InferenceSlot):
         # Run inference.
@@ -461,45 +500,6 @@ def _pack_detection_results(
         detections.append(Detection(int(x), int(y), int(w), int(h),
                                     int(result_classid[j]), round(float(result_scores[j]), 2)))
     return detections
-
-
-hwc_uint8_to_nchw_float_kernel: None | SourceModule = None
-
-
-def _convert_hwc_uint8_to_nchw_float(src: gpuarray.GPUArray, dst: gpuarray.GPUArray, stream: cuda.Stream) -> None:
-    """Convert image from HWC uint8 [0,255] to NCHW float32 [0.0,1.0]"""
-    global hwc_uint8_to_nchw_float_kernel
-    if hwc_uint8_to_nchw_float_kernel is None:
-        hwc_uint8_to_nchw_float_kernel = SourceModule("""
-        __global__ void hwc_to_nchw(unsigned char *src, float *dst,
-                                    int H, int W, int C)
-        {
-            int h = blockIdx.y * blockDim.y + threadIdx.y;
-            int w = blockIdx.x * blockDim.x + threadIdx.x;
-            if (h < H && w < W)
-            {
-                for(int c = 0; c < C; ++c)
-                {
-                    int src_idx = h*W*C + w*C + c;     // NHWC
-                    int dst_idx = c*H*W + h*W + w;     // NCHW
-                    dst[dst_idx] = float(src[src_idx]) / 255.0; // uint8 -> float conversion
-                }
-            }
-        }
-        """)
-
-    H, W, C = src.shape
-    func = hwc_uint8_to_nchw_float_kernel.get_function("hwc_to_nchw")  # type: ignore
-
-    block = (16, 16, 1)
-    grid = ((W + 15)//16, (H + 15)//16)
-
-    func(
-        src.gpudata,
-        dst.gpudata,
-        np.int32(H), np.int32(W), np.int32(C),
-        block=block, grid=grid, stream=stream
-    )
 
 
 class WarmUpThread(threading.Thread):
