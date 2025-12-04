@@ -7,6 +7,7 @@ import logging
 import threading
 import time
 from collections import namedtuple
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
 
@@ -90,6 +91,15 @@ class YoLov5TRT:
 
         # Store
         self.engine = engine
+
+    @contextmanager
+    def _active_cuda_context(self):
+        assert self.ctx is not None
+        self.ctx.push()
+        try:
+            yield
+        finally:
+            self.ctx.pop()
 
     def _init_engine_IO_binding_descriptions(self, engine: trt.ICudaEngine) -> None:
         """
@@ -200,25 +210,20 @@ class YoLov5TRT:
 
     def infer(self, image_raw: np.ndarray) -> tuple[list[Detection], float]:
         threading.Thread.__init__(self)  # type: ignore
-        assert self.ctx is not None
 
-        # Make self the active context, pushing it on top of the context stack.
-        self.ctx.push()
-        inference_slot = self.inference_slots.pop() if self.inference_slots else self._create_inference_slot()
+        with self._active_cuda_context():
+            inference_slot = self.inference_slots.pop() if self.inference_slots else self._create_inference_slot()
 
-        # Do image preprocess
-        origin_h, origin_w, _ = image_raw.shape
-        self._preprocess_image(image_raw, inference_slot)
+            # Do image preprocess
+            origin_h, origin_w, _ = image_raw.shape
+            self._preprocess_image(image_raw, inference_slot)
 
-        # Run inference
-        start = time.time()
-        self._dispatch_gpu_inference(inference_slot)
-        # Synchronize the stream
-        inference_slot.stream.synchronize()
-        end = time.time()
-
-        # Remove any context from the top of the context stack, deactivating it.
-        self.ctx.pop()
+            # Run inference
+            start = time.time()
+            self._dispatch_gpu_inference(inference_slot)
+            # Synchronize the stream
+            inference_slot.stream.synchronize()
+            end = time.time()
 
         # Do postprocess
         post_process_results = self._post_process(inference_slot.host_output, origin_h, origin_w)
@@ -231,32 +236,27 @@ class YoLov5TRT:
         threading.Thread.__init__(self)  # type: ignore
         assert self.ctx is not None
 
-        # Make self the active context, pushing it on top of the context stack.
-        self.ctx.push()
+        with self._active_cuda_context():
+            # Claim slots (and possibly create) slots for all images in the batch
+            inference_slots = [self.inference_slots.pop() if self.inference_slots else self._create_inference_slot()
+                               for _ in images]
 
-        # Claim slots (and possibly create) slots for all images in the batch
-        inference_slots = [self.inference_slots.pop() if self.inference_slots else self._create_inference_slot()
-                           for _ in images]
+            start = time.time()
+            for image, inference_slot in zip(images, inference_slots, strict=True):
+                self._preprocess_image(image, inference_slot)
+                self._dispatch_gpu_inference(inference_slot)
 
-        start = time.time()
-        for image, inference_slot in zip(images, inference_slots, strict=True):
-            self._preprocess_image(image, inference_slot)
-            self._dispatch_gpu_inference(inference_slot)
+            end = time.time()
 
-        end = time.time()
-
-        results = []
-        for image, inference_slot in zip(images, inference_slots, strict=True):
-            h, w, _ = image.shape
-            # Synchronize stream to make sure that inference_slot.host_output has valid values
-            inference_slot.stream.synchronize()
-            post_process_results = self._post_process(inference_slot.host_output, h, w)
-            detections = _pack_detection_results(*post_process_results)
-            results.append(detections)
-            self.inference_slots.append(inference_slot)
-
-        # Remove any context from the top of the context stack, deactivating it.
-        self.ctx.pop()
+            results = []
+            for image, inference_slot in zip(images, inference_slots, strict=True):
+                h, w, _ = image.shape
+                # Synchronize stream to make sure that inference_slot.host_output has valid values
+                inference_slot.stream.synchronize()
+                post_process_results = self._post_process(inference_slot.host_output, h, w)
+                detections = _pack_detection_results(*post_process_results)
+                results.append(detections)
+                self.inference_slots.append(inference_slot)
 
         return results, end - start
 
@@ -273,9 +273,8 @@ class YoLov5TRT:
         # If init failed or already cleaned up, nothing to do
         if getattr(self, "ctx", None) is None:
             return
-        # Make sure the owning context is current for all frees
-        self.ctx.push()  # type: ignore
-        try:
+
+        with self._active_cuda_context():
             # 1) Free device buffers
             for slot in getattr(self, "inference_slots", []):
                 slot.stream.synchronize()
@@ -304,21 +303,13 @@ class YoLov5TRT:
 
             # 3) Drop slots and associated ressources
             self.inference_slots = []
-        finally:
-            # Remove the push we just did and the original make_context push
-            try:
-                self.ctx.pop()  # type: ignore   # pop for this destroy()
-            except Exception:
-                pass
-            try:
-                self.ctx.pop()  # type: ignore   # pop for make_context()
-            except Exception:
-                pass
-            try:
-                self.ctx.detach()  # type: ignore
-            except Exception:
-                pass
-            self.ctx = None
+
+        # 4) Drop context
+        try:
+            self.ctx.detach()  # type: ignore
+        except Exception:
+            pass
+        self.ctx = None
 
     def xywh2xyxy(self, origin_h: int, origin_w: int, x: np.ndarray) -> np.ndarray:
         """
