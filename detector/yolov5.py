@@ -28,7 +28,7 @@ LEN_ONE_RESULT = 38
 @dataclass(slots=True, kw_only=True)
 class InferenceSlot:
     stream: cuda.Stream
-    context: Any  # TODO
+    context: trt.tensorrt.IExecutionContext
     device_preprocess_tmp: gpuarray.GPUArray
     device_input: gpuarray.GPUArray
     device_output: gpuarray.GPUArray
