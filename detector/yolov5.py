@@ -29,9 +29,9 @@ LEN_ONE_RESULT = 38
 class InferenceSlot:
     stream: cuda.Stream
     context: trt.tensorrt.IExecutionContext
-    device_preprocess_tmp: gpuarray.GPUArray
-    device_input: gpuarray.GPUArray
-    device_output: gpuarray.GPUArray
+    device_preprocess_input: gpuarray.GPUArray
+    device_inference_input: gpuarray.GPUArray
+    device_inference_output: gpuarray.GPUArray
     host_output: np.ndarray
 
 
@@ -139,17 +139,17 @@ class YoLov5TRT:
 
     def _create_inference_slot(self) -> InferenceSlot:
         input_img_shape = [self.input_h, self.input_w, 3]
-        device_preprocess_tmp = gpuarray.empty(shape=input_img_shape, dtype=np.uint8)
-        device_input = gpuarray.empty(shape=self.input_binding.shape, dtype=self.input_binding.dtype)
-        device_output = gpuarray.empty(shape=self.output_binding.shape, dtype=self.output_binding.dtype)
+        device_preprocess_input = gpuarray.empty(shape=input_img_shape, dtype=np.uint8)
+        device_inference_input = gpuarray.empty(shape=self.input_binding.shape, dtype=self.input_binding.dtype)
+        device_inference_output = gpuarray.empty(shape=self.output_binding.shape, dtype=self.output_binding.dtype)
         host_output = cuda.pagelocked_empty(self.output_binding.shape, self.output_binding.dtype)
 
         return InferenceSlot(
             stream=cuda.Stream(),
             context=self.engine.create_execution_context(),
-            device_preprocess_tmp=device_preprocess_tmp,
-            device_input=device_input,
-            device_output=device_output,
+            device_preprocess_input=device_preprocess_input,
+            device_inference_input=device_inference_input,
+            device_inference_output=device_inference_output,
             host_output=host_output,
         )
 
@@ -190,20 +190,21 @@ class YoLov5TRT:
                 mode='constant',
                 constant_values=128
             )
-        slot.device_preprocess_tmp.set_async(image, stream=slot.stream)
-        assert image.shape == slot.device_preprocess_tmp.shape, f'{image.shape}'
-        assert slot.device_preprocess_tmp.dtype == np.uint8
-        assert slot.device_input.dtype == np.float32
-        _convert_hwc_uint8_to_nchw_float(slot.device_preprocess_tmp, slot.device_input, stream=slot.stream)
+        slot.device_preprocess_input.set_async(image, stream=slot.stream)
+        assert image.shape == slot.device_preprocess_input.shape, f'{image.shape}'
+        assert slot.device_preprocess_input.dtype == np.uint8
+        assert slot.device_inference_input.dtype == np.float32
+        _convert_hwc_uint8_to_nchw_float(slot.device_preprocess_input, slot.device_inference_input, stream=slot.stream)
 
     def _dispatch_gpu_inference(self, inference_slot: InferenceSlot):
         # Run inference.
         context = inference_slot.context
-        context.set_tensor_address(self.input_binding.name, inference_slot.device_input.ptr)
-        context.set_tensor_address(self.output_binding.name, inference_slot.device_output.ptr)
+        context.set_tensor_address(self.input_binding.name, inference_slot.device_inference_input.ptr)
+        context.set_tensor_address(self.output_binding.name, inference_slot.device_inference_output.ptr)
         context.execute_async_v3(stream_handle=inference_slot.stream.handle)
         # Transfer predictions back from the GPU.
-        cuda.memcpy_dtoh_async(inference_slot.host_output, inference_slot.device_output.ptr, inference_slot.stream)
+        cuda.memcpy_dtoh_async(inference_slot.host_output,
+                               inference_slot.device_inference_output.ptr, inference_slot.stream)
 
     # ============================================ PUBLIC METHODS ============================================
 
