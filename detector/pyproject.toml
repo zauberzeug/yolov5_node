@@ -1,6 +1,6 @@
 [project]
 name = "yolov5-detector"
-version = "0.2.0"
+version = "0.2.1"
 description = "YOLOv5 TensorRT detector node"
 authors = [{ name="Zauberzeug GmbH", email="info@zauberzeug.com" }]
 readme = "README.md"
