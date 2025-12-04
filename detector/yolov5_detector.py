@@ -129,9 +129,7 @@ class Yolov5Detector(DetectorLogic):
             t = time.time()
             results, total_ms = self.yolov5.infer_batch(images)
 
-            detections = []
-            for result in results:
-                detections.append(self._collect_detections(result, shape[0], shape[1]))
+            detections = [self._collect_detections(result, shape[0], shape[1]) for result in results]
 
             self.log.debug('batch infer took %f s, overall %f s', total_ms, time.time() - t)
             return ImagesMetadata(items=detections)
