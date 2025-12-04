@@ -67,7 +67,6 @@ class YoLov5TRT:
         """a confidence threshold to filter detections during nms"""
 
         self.ctx = cuda.Device(0).make_context()
-        stream = cuda.Stream()
         TRT_LOGGER = trt.Logger(trt.Logger.INFO)
         runtime = trt.Runtime(TRT_LOGGER)
 
