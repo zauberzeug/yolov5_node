@@ -9,7 +9,6 @@ import time
 from collections import namedtuple
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any
 
 import numpy as np
 import pycuda.driver as cuda  # type: ignore # pylint: disable=import-error
@@ -155,7 +154,8 @@ class YoLov5TRT:
             host_output=host_output,
         )
 
-    def _convert_hwc_uint8_to_nchw_float(self, src: gpuarray.GPUArray, dst: gpuarray.GPUArray, stream: cuda.Stream) -> None:
+    def _convert_hwc_uint8_to_nchw_float(
+            self, src: gpuarray.GPUArray, dst: gpuarray.GPUArray, stream: cuda.Stream) -> None:
         """Convert image from HWC uint8 [0,255] to NCHW float32 [0.0,1.0]"""
 
         # Lazily compile cuda kernel:
