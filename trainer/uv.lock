@@ -2962,7 +2962,7 @@ wheels = [
 
 [[package]]
 name = "yolov5-trainer-node"
-version = "0.1.15"
+version = "0.1.16"
 source = { virtual = "." }
 dependencies = [
     { name = "learning-loop-node" },
