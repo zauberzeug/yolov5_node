@@ -59,9 +59,16 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
     @property
     def provided_pretrained_models(self) -> list[PretrainedModel]:
-        return [PretrainedModel(name='s', label='YOLO v5 640 small', description=''),
+        return [PretrainedModel(name='n', label='YOLO v5 640 nano', description=''),
+                PretrainedModel(name='s', label='YOLO v5 640 small', description=''),
                 PretrainedModel(name='m', label='YOLO v5 640 medium', description=''),
-                PretrainedModel(name='s6', label='YOLO v5 1280 small', description='~5 fps on Jetson Nano'), ]
+                PretrainedModel(name='l', label='YOLO v5 640 large', description=''),
+                PretrainedModel(name='x', label='YOLO v5 640 extra large', description=''),
+                PretrainedModel(name='n6', label='YOLO v5 1280 nano', description=''),
+                PretrainedModel(name='s6', label='YOLO v5 1280 small', description=''),
+                PretrainedModel(name='m6', label='YOLO v5 1280 medium', description=''),
+                PretrainedModel(name='l6', label='YOLO v5 1280 large', description=''),
+                PretrainedModel(name='x6', label='YOLO v5 1280 extra large', description='')]
 
     @property
     def hyperparameter_path(self) -> str:
