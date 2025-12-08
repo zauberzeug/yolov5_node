@@ -1,6 +1,6 @@
 [project]
 name = "yolov5-trainer-node"
-version = "0.1.15"
+version = "0.1.16"
 description = "Yolov5 trainer node"
 authors = [{ name="Zauberzeug GmbH", email="info@zauberzeug.com" }]
 readme = "README.md"
