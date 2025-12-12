@@ -7,6 +7,7 @@ then
     echo "Usage:"
     echo
     echo "  `basename $0` (b | build)            Build or rebuild"
+    echo "  `basename $0` (bx | buildx)          Build multi-arch (arm64 + amd64) and push"
     echo "  `basename $0` (bnc | build-no-cache) Build or rebuild without cache"
     echo "  `basename $0` (p | push)             Push image"
     echo "  ------------------------------"
@@ -32,6 +33,13 @@ SEMANTIC_VERSION=$(grep -oP '^version\s*=\s*"\K[0-9.]+' pyproject.toml)
 NODE_LIB_VERSION=$(grep -oP 'learning_loop_node==\K[0-9.]+' pyproject.toml)
 build_args=" --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION"
 
+BASE_JETSON="dustynv/l4t-ml:r36.4.0"
+BASE_CLOUD="nvcr.io/nvidia/tensorrt:25.01-py3"
+
+TARGET_JETSON="zauberzeug/yolov5-detector:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION-jetson"
+TARGET_CLOUD="zauberzeug/yolov5-detector:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION-cloud"
+
+
 if [ -f /etc/nv_tegra_release ] # Check if we are on a Jetson device
 then
     # version discovery borrowed from https://github.com/dusty-nv/jetson-containers/blob/master/scripts/l4t_version.sh
@@ -43,16 +51,18 @@ then
     if [ "$L4T_RELEASE" == "36" ]; then
         # L4T R36.x containers can run on other versions of L4T R36.x (JetPack 6.0+)
         echo "Using L4T version 36.4.0 (dusty image for exact version $L4T_VERSION)"
-        build_args+=" --build-arg BASE_IMAGE=dustynv/l4t-ml:r36.4.0"
+        build_args+=" --build-arg BASE_IMAGE=$BASE_JETSON"
+        build_args+=" --build-arg INSTALL_OPENCV=false"
     else
         echo "Unsupported L4T version: $L4T_VERSION"
         exit 1
     fi
 
-    image="zauberzeug/yolov5-detector:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION-$L4T_VERSION"
+    image=$TARGET_JETSON
 else # ----------------------------------------------------------------------- This is cloud (linux) (python 3.12)
-    build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/tensorrt:25.01-py3"
-    image="zauberzeug/yolov5-detector:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION-cloud"
+    build_args+=" --build-arg BASE_IMAGE=$BASE_CLOUD"
+    build_args+=" --build-arg INSTALL_OPENCV=true"
+    image=$TARGET_CLOUD
 fi
 
 # ========================== RUN CONFIGURATION =========================================
@@ -91,6 +101,36 @@ set -x
 case $cmd in
     b | build)
         docker build . -t $image $build_args $cmd_args
+        ;;
+    bx | buildx)
+        # Ensure buildx builder exists and supports multi-platform
+        docker buildx create --name multiarch-builder --use 2>/dev/null || docker buildx use multiarch-builder
+        
+        # Build ARM64 image (Jetson)
+        echo "Building ARM64 image (Jetson)..."
+        docker buildx build \
+            --platform linux/arm64 \
+            --push \
+            -t $TARGET_JETSON \
+            --build-arg BASE_IMAGE=$BASE_JETSON \
+            --build-arg INSTALL_OPENCV=false \
+            --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION \
+            $cmd_args \
+            .
+        
+        # Build AMD64 image (Cloud)
+        echo "Building AMD64 image (Cloud)..."
+        docker buildx build \
+            --platform linux/amd64 \
+            --push \
+            -t $TARGET_CLOUD \
+            --build-arg BASE_IMAGE=$BASE_CLOUD \
+            --build-arg INSTALL_OPENCV=true \
+            --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION \
+            $cmd_args \
+            .
+        
+        echo "Created images: $target-jetson and $target-cloud"
         ;;
     bnc | build-no-cache)
         docker build --no-cache . -t $image $build_args $cmd_args
