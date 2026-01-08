@@ -4,7 +4,7 @@ version = "0.2.1"
 description = "YOLOv5 TensorRT detector node"
 authors = [{ name="Zauberzeug GmbH", email="info@zauberzeug.com" }]
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.10, <3.11"
 dependencies = [
     "uvicorn",
     "async_generator",
@@ -44,12 +44,21 @@ default-groups = ["dev"]
 python_version = "3.12"
 check_untyped_defs = true
 
+[[tool.mypy.overrides]]
+module = "pycuda.*"
+ignore_missing_imports = true
+
+[tool.pyright]
+reportMissingImports = false
+
 [tool.pylint]
 disable = [
     "C0114", # Missing module docstring
     "C0116", # Missing function or method docstring
     "C0301", # Line too long (exceeds character limit)
 ]
+extension-pkg-allow-list = ["pycuda", "pycuda.driver", "pycuda._driver"]
+generated-members = ["pycuda.driver.*"]
 
 [tool.ruff]
 line-length = 120

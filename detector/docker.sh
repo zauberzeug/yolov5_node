@@ -7,7 +7,6 @@ then
     echo "Usage:"
     echo
     echo "  `basename $0` (b | build)            Build or rebuild"
-    echo "  `basename $0` (bx | buildx)          Build multi-arch (arm64 + amd64) and push"
     echo "  `basename $0` (bnc | build-no-cache) Build or rebuild without cache"
     echo "  `basename $0` (p | push)             Push image"
     echo "  ------------------------------"
@@ -101,36 +100,6 @@ set -x
 case $cmd in
     b | build)
         docker build . -t $image $build_args $cmd_args
-        ;;
-    bx | buildx)
-        # Ensure buildx builder exists and supports multi-platform
-        docker buildx create --name multiarch-builder --use 2>/dev/null || docker buildx use multiarch-builder
-        
-        # Build ARM64 image (Jetson)
-        echo "Building ARM64 image (Jetson)..."
-        docker buildx build \
-            --platform linux/arm64 \
-            --push \
-            -t $TARGET_JETSON \
-            --build-arg BASE_IMAGE=$BASE_JETSON \
-            --build-arg INSTALL_OPENCV=false \
-            --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION \
-            $cmd_args \
-            .
-        
-        # Build AMD64 image (Cloud)
-        echo "Building AMD64 image (Cloud)..."
-        docker buildx build \
-            --platform linux/amd64 \
-            --push \
-            -t $TARGET_CLOUD \
-            --build-arg BASE_IMAGE=$BASE_CLOUD \
-            --build-arg INSTALL_OPENCV=true \
-            --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION \
-            $cmd_args \
-            .
-        
-        echo "Created images: $target-jetson and $target-cloud"
         ;;
     bnc | build-no-cache)
         docker build --no-cache . -t $image $build_args $cmd_args

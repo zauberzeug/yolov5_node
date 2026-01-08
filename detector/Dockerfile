@@ -34,9 +34,9 @@ WORKDIR /uv_env
 COPY pyproject.toml uv.lock ./
 
 # Install deps into a project-local venv
-RUN pip install --no-cache-dir uv && \
-    uv venv --system-site-packages && \
-    uv sync --locked
+ENV UV_SYSTEM_PYTHON=1
+RUN uv venv .venv --system-site-packages --python /usr/bin/python3 && \
+    uv sync --frozen
 
 # Ensure the venv is first on PATH for CMD/RUN that follow
 ENV PATH="/uv_env/.venv/bin:${PATH}"
