@@ -51,7 +51,7 @@ WORKDIR /tensorrtx/yolov5/build
 RUN cmake \
     -DCMAKE_CUDA_FLAGS="--diag-suppress=997 -Xcompiler=-Wno-deprecated-declarations" \
     -DCMAKE_CXX_FLAGS="-Wno-deprecated-declarations" \
-    .. && make -j$(nproc)
+    .. 
 
 # 4. Copy the app --------------------------------------------------------------
 COPY . /app
