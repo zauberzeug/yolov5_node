@@ -20,8 +20,8 @@ jobs:
       - name: run
         env:
           LOOP_HOST: ${{ secrets.LOOP_HOST }}
-          LOOP_USERNAME: ${{ secrets.LOOP_USERNAME }}
-          LOOP_PASSWORD: ${{ secrets.LOOP_PASSWORD }}
+          LOOP_USERNAME: "admin"
+          LOOP_PASSWORD: ${{ secrets.LEARNING_LOOP_ADMIN_PASSWORD }}
         run: |
           docker run -d -it --rm -v /home/zauberzeug/data:/data -h n6 -e LOOP_HOST=$LOOP_HOST -e LOOP_USERNAME=$LOOP_USERNAME -e LOOP_PASSWORD=$LOOP_PASSWORD --name yolov5_trainer_node_github_action --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all --gpus all --ipc host zauberzeug/yolov5-trainer:latest
       - name: tests
