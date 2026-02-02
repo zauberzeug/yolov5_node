@@ -112,7 +112,9 @@ class TestWithDetection:
                       Category(name='point_category_2', id='uuid_of_class_2', point_size=30)]
         image_data = [{'set': 'train',  'id': 'image_1', 'width': 100, 'height': 100, 'box_annotations': [],
                        'point_annotations': [{'category_id': 'uuid_of_class_1', 'x': 50, 'y': 60},
-                                             {'category_id': 'uuid_of_class_2', 'x': 60, 'y': 70}]}]
+                                             {'category_id': 'uuid_of_class_2', 'x': 60, 'y': 70}]},
+                      {'set': 'test', 'id': 'image_2', 'width': 100, 'height': 100, 'box_annotations': [],
+                       'point_annotations': []}]
         trainer = Yolov5TrainerLogic()
         trainer._training = Training(
             id='someid', context=Context(organization='o', project='p'),
