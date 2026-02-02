@@ -100,6 +100,12 @@ def create_file_structure(training: Training) -> None:
 
     num_test_imgs = _create_set(training, 'test')
     num_train_imgs = _create_set(training, 'train')
+
+    if num_train_imgs == 0:
+        raise CriticalError('No training images found. Cannot start training without images in the train set.')
+    if num_test_imgs == 0:
+        raise CriticalError('No validation images found. Training requires at least 1 image in the test set.')
+
     create_dataset_yaml(training)
 
     logging.info('Prepared file structure with %d training images and %d test images', num_train_imgs, num_test_imgs)
