@@ -53,7 +53,7 @@ fi
 # sourcing .env file to get configuration (see README.md)
 . .env || echo "you should provide an .env file for the trainer"
 
-run_args="-it" 
+run_args="-it"
 #run_args+=" -v $(pwd)/:/app/"
 run_args+=" -v $HOME/trainer_nodes_data:/data"
 run_args+=" -h ${HOSTNAME}_DEV"
@@ -69,7 +69,7 @@ run_args+=" -p 7443:80"
 # Link Learning Loop Node library if requested
 if [ "$LINKLL" == "TRUE" ]; then
     SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-    run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/uv_env/.venv/lib/python3.12/site-packages/learning_loop_node"
+    run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/uv_venv/lib/python3.12/site-packages/learning_loop_node"
     echo "Linked Learning Loop from $SCRIPT_DIR/../../learning_loop_node"
 fi
 
