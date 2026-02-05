@@ -2,13 +2,14 @@
 # check=skip=InvalidDefaultArgInFrom
 
 ARG BASE_IMAGE
-ARG INSTALL_OPENCV=false
 FROM ${BASE_IMAGE}
+
+ARG INSTALL_OPENCV=true
 
 # 1. Install system dependencies -----------------------------------------------
 
 # Install build tools and runtime dependencies (needed for runtime engine compilation)
-# OpenCV is conditionally installed based on INSTALL_OPENCV (Jetson base images already include it)
+# OpenCV is conditionally installed based on INSTALL_OPENCV (Jetson base images already include the build with NEON support)
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
     apt-get install -y --no-install-recommends \
@@ -17,9 +18,11 @@ RUN apt-get update && \
     make \
     libjpeg8 \
     zlib1g \
-    ca-certificates \
-    && if [ "$INSTALL_OPENCV" = "true" ]; then apt-get install -y --no-install-recommends libopencv-dev; fi \
-    && rm -rf /var/lib/apt/lists/* \
+    ca-certificates
+
+RUN if [ "$INSTALL_OPENCV" = "true" ]; then apt-get install -y --no-install-recommends libopencv-dev; fi
+
+RUN rm -rf /var/lib/apt/lists/* \
     && rm -rf /usr/share/doc/* \
     && rm -rf /usr/share/man/* \
     && rm -rf /usr/share/locale/* \
