@@ -4,7 +4,7 @@ version = "0.2.1"
 description = "YOLOv5 TensorRT detector node"
 authors = [{ name="Zauberzeug GmbH", email="info@zauberzeug.com" }]
 readme = "README.md"
-requires-python = ">=3.10, <3.11"
+requires-python = ">=3.10, <3.13"
 dependencies = [
     "uvicorn",
     "async_generator",
