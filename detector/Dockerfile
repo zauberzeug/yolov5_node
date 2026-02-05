@@ -1,3 +1,6 @@
+# syntax=docker/dockerfile:1
+# check=skip=InvalidDefaultArgInFrom
+
 ARG BASE_IMAGE
 ARG INSTALL_OPENCV=false
 FROM ${BASE_IMAGE}
