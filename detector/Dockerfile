@@ -40,8 +40,7 @@ WORKDIR /uv_env
 COPY pyproject.toml uv.lock ./
 
 # Install deps into a project-local venv
-ENV UV_SYSTEM_PYTHON=1
-RUN uv venv .venv --system-site-packages --python /usr/bin/python3 && \
+RUN uv venv .venv --system-site-packages --no-managed-python --python /usr/bin/python3 && \
     uv sync --frozen
 
 # Ensure the venv is first on PATH for CMD/RUN that follow
@@ -49,7 +48,7 @@ ENV PATH="/uv_env/.venv/bin:${PATH}"
 
 # 3. Build TensorRT ------------------------------------------------------------
 
-# Copy and build TensorRT (initial build, will be rebuilt at runtime with model-specific config)
+# Copy TensorRTX and generate build files. We will fully build at runtime with model-specific config)
 WORKDIR /
 COPY ./tensorrtx /tensorrtx
 
