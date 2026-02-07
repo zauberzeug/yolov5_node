@@ -17,10 +17,18 @@ enable_language(CUDA)
 include_directories(/usr/local/cuda/include)
 link_directories(/usr/local/cuda/lib64)
 
-# tensorrt
-# TODO(Call for PR): make TRT path configurable from command line
-include_directories(/workspace/shared/TensorRT-10.2.0.19/include/)
-link_directories(/workspace/shared/TensorRT-10.2.0.19/lib/)
+# tensorrt - auto-detect or use custom path
+if(DEFINED ENV{TENSORRT_DIR})
+    include_directories($ENV{TENSORRT_DIR}/include/)
+    link_directories($ENV{TENSORRT_DIR}/lib/)
+elseif(EXISTS "/workspace/shared/TensorRT-10.2.0.19/include/")
+    include_directories(/workspace/shared/TensorRT-10.2.0.19/include/)
+    link_directories(/workspace/shared/TensorRT-10.2.0.19/lib/)
+else()
+    # Jetson JetPack: TensorRT is in system paths
+    include_directories(/usr/include/aarch64-linux-gnu/)
+    link_directories(/usr/lib/aarch64-linux-gnu/)
+endif()
 
 include_directories(${PROJECT_SOURCE_DIR}/src/)
 include_directories(${PROJECT_SOURCE_DIR}/plugin/)

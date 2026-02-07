@@ -1,20 +1,28 @@
+# syntax=docker/dockerfile:1
+# check=skip=InvalidDefaultArgInFrom
+
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
+
+ARG INSTALL_OPENCV=true
 
 # 1. Install system dependencies -----------------------------------------------
 
 # Install build tools and runtime dependencies (needed for runtime engine compilation)
+# OpenCV is conditionally installed based on INSTALL_OPENCV (Jetson base images already include the build with NEON support)
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
     apt-get install -y --no-install-recommends \
     cmake \
     g++ \
     make \
-    libopencv-dev \
     libjpeg8 \
     zlib1g \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/* \
+    ca-certificates
+
+RUN if [ "$INSTALL_OPENCV" = "true" ]; then apt-get install -y --no-install-recommends libopencv-dev; fi
+
+RUN rm -rf /var/lib/apt/lists/* \
     && rm -rf /usr/share/doc/* \
     && rm -rf /usr/share/man/* \
     && rm -rf /usr/share/locale/* \
@@ -32,16 +40,15 @@ WORKDIR /uv_env
 COPY pyproject.toml uv.lock ./
 
 # Install deps into a project-local venv
-RUN pip install --no-cache-dir uv && \
-    uv venv --system-site-packages && \
-    uv sync --locked
+RUN uv venv .venv --system-site-packages --no-managed-python --python /usr/bin/python3 && \
+    uv sync --frozen
 
 # Ensure the venv is first on PATH for CMD/RUN that follow
 ENV PATH="/uv_env/.venv/bin:${PATH}"
 
 # 3. Build TensorRT ------------------------------------------------------------
 
-# Copy and build TensorRT (initial build, will be rebuilt at runtime with model-specific config)
+# Copy TensorRTX and generate build files. We will fully build at runtime with model-specific config)
 WORKDIR /
 COPY ./tensorrtx /tensorrtx
 
@@ -49,7 +56,7 @@ WORKDIR /tensorrtx/yolov5/build
 RUN cmake \
     -DCMAKE_CUDA_FLAGS="--diag-suppress=997 -Xcompiler=-Wno-deprecated-declarations" \
     -DCMAKE_CXX_FLAGS="-Wno-deprecated-declarations" \
-    .. && make -j$(nproc)
+    .. 
 
 # 4. Copy the app --------------------------------------------------------------
 COPY . /app

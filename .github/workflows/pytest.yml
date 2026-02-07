@@ -8,10 +8,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: checkout | cleanup
-        env:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          docker stop yolov5_trainer_node_github_action | echo "Nothing to do. No container running."
+          docker stop yolov5_trainer_node_github_action || echo "Nothing to do. No container running."
       - name: pre-connect to nvidia container
         run: |
           docker run -d -it --rm nvcr.io/nvidia/pytorch:25.01-py3 echo "I have to be startet to authenticate against nvcr.io"
@@ -20,15 +18,19 @@ jobs:
           cd trainer
           ./docker.sh b test_latest
       - name: run
+        env:
+          LOOP_HOST: ${{ secrets.LOOP_HOST }}
+          LOOP_USERNAME: "admin"
+          LOOP_PASSWORD: ${{ secrets.LEARNING_LOOP_ADMIN_PASSWORD }}
         run: |
-          docker run -d -it --rm -v /home/zauberzeug/data:/data -h n6 -e LOOP_HOST=$LOOP_HOST  -e LOOP_USERNAME=$LOOP_USERNAME -e LOOP_PASSWORD=$LOOP_PASSWORD --name yolov5_trainer_node_github_action --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all --gpus all --ipc host zauberzeug/yolov5-trainer:latest
+          docker run -d -it --rm -v /home/zauberzeug/data:/data -h n6 -e LOOP_HOST=$LOOP_HOST -e LOOP_USERNAME=$LOOP_USERNAME -e LOOP_PASSWORD=$LOOP_PASSWORD --name yolov5_trainer_node_github_action --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=all --gpus all --ipc host zauberzeug/yolov5-trainer:latest
       - name: tests
         run: |
           docker exec yolov5_trainer_node_github_action pytest -vv
       - name: cleanup
         if: always() # also execute when pytest fails
         run: |
-          docker stop yolov5_trainer_node_github_action | echo "Nothing to do. No container running."
+          docker stop yolov5_trainer_node_github_action || echo "Nothing to do. No container running."
 
   pytest_detector_cpu:
     runs-on: ubuntu-latest
