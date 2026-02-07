@@ -32,6 +32,13 @@ SEMANTIC_VERSION=$(grep -oP '^version\s*=\s*"\K[0-9.]+' pyproject.toml)
 NODE_LIB_VERSION=$(grep -oP 'learning_loop_node==\K[0-9.]+' pyproject.toml)
 build_args=" --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION"
 
+BASE_JETSON="dustynv/l4t-ml:r36.4.0"
+BASE_CLOUD="nvcr.io/nvidia/tensorrt:25.01-py3"
+
+TARGET_JETSON="zauberzeug/yolov5-detector:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION-jetson"
+TARGET_CLOUD="zauberzeug/yolov5-detector:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION-cloud"
+
+
 if [ -f /etc/nv_tegra_release ] # Check if we are on a Jetson device
 then
     # version discovery borrowed from https://github.com/dusty-nv/jetson-containers/blob/master/scripts/l4t_version.sh
@@ -43,16 +50,18 @@ then
     if [ "$L4T_RELEASE" == "36" ]; then
         # L4T R36.x containers can run on other versions of L4T R36.x (JetPack 6.0+)
         echo "Using L4T version 36.4.0 (dusty image for exact version $L4T_VERSION)"
-        build_args+=" --build-arg BASE_IMAGE=dustynv/l4t-ml:r36.4.0"
+        build_args+=" --build-arg BASE_IMAGE=$BASE_JETSON"
+        build_args+=" --build-arg INSTALL_OPENCV=false"
     else
         echo "Unsupported L4T version: $L4T_VERSION"
         exit 1
     fi
 
-    image="zauberzeug/yolov5-detector:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION-$L4T_VERSION"
+    image=$TARGET_JETSON
 else # ----------------------------------------------------------------------- This is cloud (linux) (python 3.12)
-    build_args+=" --build-arg BASE_IMAGE=nvcr.io/nvidia/tensorrt:25.01-py3"
-    image="zauberzeug/yolov5-detector:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION-cloud"
+    build_args+=" --build-arg BASE_IMAGE=$BASE_CLOUD"
+    build_args+=" --build-arg INSTALL_OPENCV=true"
+    image=$TARGET_CLOUD
 fi
 
 # ========================== RUN CONFIGURATION =========================================
