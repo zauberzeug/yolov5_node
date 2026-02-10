@@ -8,7 +8,7 @@ ARG MAKEFLAGS=-j$(nproc)
 # Install system dependencies
 RUN apt update && \
     apt purge -y hwloc-nox libhwloc-dev libhwloc-plugins && \
-    apt install -y zip nano htop screen libgl1 libglib2.0-0 libmpich-dev jpeginfo && \
+    apt install -y zip nano htop screen libgl1 libglib2.0-0 libmpich-dev jpeginfo curl && \
     rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
