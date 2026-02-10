@@ -7,7 +7,6 @@ readme = "README.md"
 requires-python = ">=3.12"
 
 dependencies = [
-    #"onnx==1.16.0",
     "ruamel.yaml",
     "learning_loop_node==0.18.5",
     "torchinfo>=1.8.0",
@@ -37,7 +36,6 @@ yolo = [
     "ipython",  # interactive notebook
     "matplotlib>=3.2.2",
     "numpy>=1.18.5",
-    "opencv-python>=4.10.0",
     "opencv-python-headless>=4.10.0",
     "Pillow>=7.1.2",
     "psutil",  # system resources
