@@ -14,7 +14,7 @@ RUN apt update && \
 
 WORKDIR /app
 
-RUN python -m pip install --no-cache-dir uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/bin/
 
 # Copy only dependency files first (enables layer caching)
 COPY pyproject.toml uv.lock ./
