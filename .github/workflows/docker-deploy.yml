@@ -1,9 +1,11 @@
 name: docker-deploy
 
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types: [published]
+
+env:
+  VERSION: ${{ github.event.release.tag_name }}
 
 jobs:
   multi-arch:
@@ -32,7 +34,7 @@ jobs:
           docker buildx build ${{ matrix.context }} \
             --platform linux/amd64,linux/arm64 \
             -f ${{ matrix.dockerfile }} \
-            -t ${{ matrix.image }}:${GITHUB_REF_NAME#v}${{ matrix.tag_suffix }} \
+            -t ${{ matrix.image }}:${VERSION#v}${{ matrix.tag_suffix }} \
             --push
 
   detector-cloud:
@@ -47,8 +49,8 @@ jobs:
             -f detector/Dockerfile \
             --build-arg BASE_IMAGE=nvcr.io/nvidia/tensorrt:25.01-py3 \
             --build-arg INSTALL_OPENCV=true \
-            -t zauberzeug/yolov5-detector:${GITHUB_REF_NAME#v}-cloud
-          docker push zauberzeug/yolov5-detector:${GITHUB_REF_NAME#v}-cloud
+            -t zauberzeug/yolov5-detector:${VERSION#v}-cloud
+          docker push zauberzeug/yolov5-detector:${VERSION#v}-cloud
 
   detector-jetson:
     runs-on: [self-hosted, arm64]
@@ -62,5 +64,5 @@ jobs:
             -f detector/Dockerfile \
             --build-arg BASE_IMAGE=dustynv/l4t-ml:r36.4.0 \
             --build-arg INSTALL_OPENCV=false \
-            -t zauberzeug/yolov5-detector:${GITHUB_REF_NAME#v}-jetson
-          docker push zauberzeug/yolov5-detector:${GITHUB_REF_NAME#v}-jetson
+            -t zauberzeug/yolov5-detector:${VERSION#v}-jetson
+          docker push zauberzeug/yolov5-detector:${VERSION#v}-jetson
