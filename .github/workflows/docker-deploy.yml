@@ -14,9 +14,11 @@ jobs:
           - context: trainer/
             dockerfile: trainer/Dockerfile
             image: zauberzeug/yolov5-trainer
+            tag_suffix: ""
           - context: .
             dockerfile: detector_cpu/Dockerfile
             image: zauberzeug/yolov5-detector
+            tag_suffix: "-cloud-cpu"
     steps:
       - uses: actions/checkout@v4
       - name: Set up QEMU
@@ -30,7 +32,7 @@ jobs:
           docker buildx build ${{ matrix.context }} \
             --platform linux/amd64,linux/arm64 \
             -f ${{ matrix.dockerfile }} \
-            -t ${{ matrix.image }}:${GITHUB_REF_NAME#v} \
+            -t ${{ matrix.image }}:${GITHUB_REF_NAME#v}${{ matrix.tag_suffix }} \
             --push
 
   detector-cloud:
