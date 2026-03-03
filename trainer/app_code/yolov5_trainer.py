@@ -237,7 +237,8 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         cmd = f'python /app/train_det.py --exist-ok --patience {self.patience} \
             --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} \
             --project {self.training.training_folder} --name result --hyp {self.hyperparameter_path} \
-            --epochs {self.epochs} {additional_parameters}'
+            --epochs {self.epochs} --conf-thres {self.detect_nms_conf_thres} --iou-thres {self.detect_nms_iou_thres} \
+            {additional_parameters}'
         if p_sizes_by_id:
             cmd += f' --point_sizes_by_id {p_sizes_by_id[:-1]}'
         if flip_label_pairs:
