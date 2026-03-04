@@ -76,7 +76,7 @@ run_args+=" -h ${HOSTNAME}_DEV"
 run_args+=" -e HOST=$LOOP_HOST -e ORGANIZATION=$LOOP_ORGANIZATION -e PROJECT=$LOOP_PROJECT"
 run_args+=" -e USE_BACKDOOR_CONTROLS=$USE_BACKDOOR_CONTROLS"
 run_args+=" --name $DETECTOR_NAME"
-run_args+=" --gpus all"
+run_args+=" --device=nvidia.com/gpu=all"
 run_args+=" -p 8004:80"
 
 # Link Learning Loop Node library if requested

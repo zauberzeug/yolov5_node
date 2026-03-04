@@ -75,7 +75,7 @@ case $cmd in
         docker build .. -f $dockerfile -t $image $cmd_args
         ;;
     bnc | build-no-cache)
-        docker build --no-cache . -f $dockerfile -t $image $cmd_args
+        docker build --no-cache .. -f $dockerfile -t $image $cmd_args
         ;;
     U | update)
 	    docker pull ${image}

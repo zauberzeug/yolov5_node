@@ -62,7 +62,7 @@ run_args+=" -e BATCH_SIZE=$BATCH_SIZE -e UVICORN_RELOAD=$UVICORN_RELOAD -e KEEP_
 run_args+=" -e NODE_TYPE=trainer -e YOLOV5_MODE=$YOLOV5_MODE -e RESTART_AFTER_TRAINING=$RESTART_AFTER_TRAINING -e TRAINER_IDLE_TIMEOUT_SEC=$TRAINER_IDLE_TIMEOUT_SEC"
 run_args+=" -e USE_BACKDOOR_CONTROLS=$USE_BACKDOOR_CONTROLS"
 run_args+=" --name $TRAINER_NAME"
-run_args+=" -e NVIDIA_VISIBLE_DEVICES=all --gpus all"
+run_args+=" --device=nvidia.com/gpu=all"
 run_args+=" --ipc host"
 run_args+=" -p 7443:80"
 

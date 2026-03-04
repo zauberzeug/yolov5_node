@@ -33,8 +33,7 @@ WORKDIR /uv_env
 COPY ./detector_cpu/pyproject.toml ./detector_cpu/uv.lock ./
 
 # Install deps into a project-local venv
-RUN pip install --no-cache-dir uv 
-RUN uv venv --system-site-packages 
+RUN uv venv --system-site-packages
 RUN uv sync --locked
 
 # Ensure the venv is first on PATH for CMD/RUN that follow
