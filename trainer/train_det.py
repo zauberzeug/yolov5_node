@@ -457,6 +457,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             results, confusion_matrices, maps, _ = validate.run(data_dict,
                                                                 batch_size=batch_size // 2,
                                                                 imgsz=imgsz,
+                                                                conf_thres=opt.conf_thres,
+                                                                iou_thres=opt.iou_thres,
                                                                 half=amp,
                                                                 model=ema.ema,
                                                                 single_cls=single_cls,
@@ -527,8 +529,9 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     data_dict,
                     batch_size=batch_size // 2,
                     imgsz=imgsz,
+                    conf_thres=opt.conf_thres,
+                    iou_thres=opt.iou_thres,
                     model=attempt_load(f, device).half(),
-                    iou_thres=0.65 if is_coco else 0.60,  # best pycocotools at iou 0.65
                     single_cls=single_cls,
                     dataloader=val_loader,
                     save_dir=save_dir,
@@ -583,6 +586,9 @@ def parse_opt(known=False):
     parser.add_argument('--save-period', type=int, default=-1, help='Save checkpoint every x epochs (disabled if < 1)')
     parser.add_argument('--seed', type=int, default=0, help='Global training seed')
     parser.add_argument('--local_rank', type=int, default=-1, help='Automatic DDP Multi-GPU argument, do not modify')
+
+    parser.add_argument('--conf-thres', type=float, default=0.001, help='confidence threshold for NMS during validation')
+    parser.add_argument('--iou-thres', type=float, default=0.6, help='IoU threshold for NMS during validation')
 
     # Modification by Zauberzeug
     parser.add_argument('--point_sizes_by_id', type=str, default='',
