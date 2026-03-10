@@ -87,7 +87,7 @@ if [ "$LINKLL" == "TRUE" ]; then
         # TODO: check that this is correct for new jetson versions
         run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/usr/local/lib/python3.8/dist-packages/learning_loop_node"
     else
-        run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/uv_env/.venv/lib/python3.12/dist-packages/learning_loop_node"
+        run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:/uv_env/.venv/lib/python3.12/site-packages/learning_loop_node"
     fi
     echo "Linking Learning Loop from $SCRIPT_DIR/../../learning_loop_node"
 fi
