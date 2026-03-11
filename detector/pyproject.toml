@@ -40,6 +40,9 @@ types = []
 [tool.uv]
 default-groups = ["dev"]
 
+[tool.uv.sources]
+learning_loop_node = { git = "https://github.com/zauberzeug/learning_loop_node", branch = "parallel_model_upgrade" }
+
 [tool.mypy]
 python_version = "3.12"
 check_untyped_defs = true
