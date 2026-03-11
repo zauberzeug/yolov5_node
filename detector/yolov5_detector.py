@@ -1,56 +1,60 @@
+from __future__ import annotations
+
+import asyncio
 import ctypes
 import logging
 import os
 import re
 import subprocess
 import time
+from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 from learning_loop_node.data_classes import (
     BoxDetection,
     ImageMetadata,
     ImagesMetadata,
+    ModelInformation,
     PointDetection,
 )
-from learning_loop_node.detector.detector_logic import DetectorLogic
 from learning_loop_node.enums import CategoryType
 
 import yolov5
 
 
-class Yolov5Detector(DetectorLogic):
+@dataclass(frozen=True)
+class Yolov5DetectorParams:
+    weight_type: Literal['FP16', 'FP32', 'INT8']
+    iou_threshold: float
+    conf_threshold: float
+    model_format: str = 'yolov5_wts'
+
+    async def build(self, model_info: ModelInformation) -> Yolov5Detector:
+        return await asyncio.to_thread(Yolov5Detector, model_info, self)
+
+
+class Yolov5Detector:
     MIN_BOX_SIZE = 2
 
-    def __init__(self) -> None:
-        super().__init__('yolov5_wts')
-        self.yolov5: yolov5.YoLov5TRT | None = None
-        self.weight_type = os.getenv('WEIGHT_TYPE', 'FP16')
-        assert self.weight_type in ['FP16', 'FP32', 'INT8'], 'WEIGHT_TYPE must be one of FP16, FP32, INT8'
+    def __init__(self, model_info: ModelInformation, params: Yolov5DetectorParams) -> None:
+        self.model_info = model_info
         self.log = logging.getLogger('Yolov5Detector')
         self.log.setLevel(logging.INFO)
-        self.iou_threshold = float(os.getenv('IOU_THRESHOLD', '0.45'))
-        self.conf_threshold = float(os.getenv('CONF_THRESHOLD', '0.2'))
 
-    def init(self) -> None:
-        if self.model_info is None:
-            raise RuntimeError('Model info not initialized. Call load_model_info_and_init_model() first.')
-        if not isinstance(self.model_info.resolution, int) or self.model_info.resolution <= 0:
+        if not isinstance(model_info.resolution, int) or model_info.resolution <= 0:
             raise RuntimeError("resolution must be an integer > 0")
 
-        engine_file = self._create_engine(self.model_info.resolution,
-                                          len(self.model_info.categories),
-                                          self.model_info.model_size,
-                                          f'{self.model_info.model_root_path}/model.wts')
+        engine_file = self._create_engine(model_info.resolution,
+                                          len(model_info.categories),
+                                          model_info.model_size,
+                                          f'{model_info.model_root_path}/model.wts',
+                                          params.weight_type)
 
         ctypes.CDLL('/tensorrtx/yolov5/build/libmyplugins.so')
-        if self.yolov5 is not None:
-            self.yolov5.destroy()
-            self.yolov5 = None
-            self.log.info('destroyed old yolov5 instance')
 
         try:
-            self.yolov5 = yolov5.YoLov5TRT(engine_file, self.iou_threshold, self.conf_threshold)
-
+            self.yolov5 = yolov5.YoLov5TRT(engine_file, params.iou_threshold, params.conf_threshold)
         except RuntimeError as e:
             if 'TensorRT version mismatch' in str(e) or 'deserialize' in str(e):
                 self.log.error('TensorRT engine compatibility issue: %s', e)
@@ -100,11 +104,6 @@ class Yolov5Detector(DetectorLogic):
         return x, y
 
     def evaluate(self, image: np.ndarray) -> ImageMetadata:
-        if self.yolov5 is None:
-            raise RuntimeError('init() must be executed first. Maybe loading the engine failed?!')
-        if self.model_info is None:
-            raise RuntimeError('model_info must be set before calling evaluate()')
-
         try:
             t = time.time()
             results, inference_ms = self.yolov5.infer(image)
@@ -115,11 +114,6 @@ class Yolov5Detector(DetectorLogic):
             raise RuntimeError('Error during inference') from e
 
     def batch_evaluate(self, images: list[np.ndarray]) -> ImagesMetadata:
-        if self.yolov5 is None:
-            raise RuntimeError('init() must be executed first. Maybe loading the engine failed?!')
-        if self.model_info is None:
-            raise RuntimeError('model_info must be set before calling evaluate()')
-
         if len(images) == 0:
             return []
 
@@ -175,14 +169,14 @@ class Yolov5Detector(DetectorLogic):
 
         return image_metadata
 
-    def _create_engine(self, resolution: int, cat_count: int, model_variant: str | None, wts_file: str) -> str:
+    def _create_engine(self, resolution: int, cat_count: int, model_variant: str | None, wts_file: str, weight_type: str) -> str:
         engine_file = os.path.dirname(wts_file) + '/model.engine'
         if os.path.isfile(engine_file):
             self.log.info('Engine at %s already exists, skipping conversion', engine_file)
             return engine_file
         self.log.info('Building Engine (%s to %s)', wts_file, engine_file)
         self.log.info('Resolution: %s', resolution)
-        self.log.info('Weight_type: %s', self.weight_type)
+        self.log.info('Weight_type: %s', weight_type)
         self.log.info('Num Categories: %d', cat_count)
         self.log.info('Model_variant: %s', model_variant)
 
@@ -192,10 +186,10 @@ class Yolov5Detector(DetectorLogic):
         # Adapt resolution
         with open('../src/config.h', 'r+') as f:
             content = f.read()
-            if self.weight_type == 'INT8':
+            if weight_type == 'INT8':
                 self.log.info('using INT8')
                 content = content.replace('#define USE_FP16', '#define USE_INT8')
-            elif self.weight_type == 'FP32':
+            elif weight_type == 'FP32':
                 self.log.info('using FP32')
                 content = content.replace('#define USE_FP16', '#define USE_FP32')
             else:
