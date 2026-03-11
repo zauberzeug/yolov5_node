@@ -62,6 +62,7 @@ default = true
 torch = { index = "pytorch" }
 torchvision = { index = "pytorch" }
 torchaudio = { index = "pytorch" }
+learning_loop_node = { git = "https://github.com/zauberzeug/learning_loop_node", branch = "parallel_model_upgrade" }
 
 [tool.mypy]
 python_version = "3.12"

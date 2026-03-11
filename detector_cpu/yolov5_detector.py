@@ -1,7 +1,10 @@
+from __future__ import annotations
+
+import asyncio
 import logging
 import os
 import time
-from typing import List, Tuple
+from dataclasses import dataclass
 
 import cv2  # type: ignore # pylint: disable=import-error
 import numpy as np
@@ -10,30 +13,36 @@ from learning_loop_node.data_classes import (
     BoxDetection,
     ImageMetadata,
     ImagesMetadata,
+    ModelInformation,
     PointDetection,
 )
-from learning_loop_node.detector.detector_logic import DetectorLogic
 from learning_loop_node.enums import CategoryType
 
 
-class Yolov5Detector(DetectorLogic):
+@dataclass(frozen=True)
+class Yolov5DetectorParams:
+    iou_threshold: float
+    conf_threshold: float
+    model_format: str = 'yolov5_pytorch'
 
-    def __init__(self) -> None:
-        super().__init__('yolov5_pytorch')
-        self.yolov5 = None
-        self.input_size: int = 0
+    async def build(self, model_info: ModelInformation) -> Yolov5Detector:
+        return await asyncio.to_thread(Yolov5Detector, model_info, self)
+
+
+class Yolov5Detector:
+
+    def __init__(self, model_info: ModelInformation, params: Yolov5DetectorParams) -> None:
+        self.model_info = model_info
         self.log = logging.getLogger('Yolov5Detector')
         self.log.setLevel(logging.INFO)
-        self.iou_threshold = float(os.getenv('IOU_THRESHOLD', '0.45'))
-        self.conf_threshold = float(os.getenv('CONF_THRESHOLD', '0.2'))
+        self.iou_threshold = params.iou_threshold
+        self.conf_threshold = params.conf_threshold
 
-    def init(self) -> None:
-        if self.model_info is None:
-            raise RuntimeError('Model info not initialized. Call load_model_info_and_init_model() first.')
-        if not isinstance(self.model_info.resolution, int) or self.model_info.resolution <= 0:
+        if not isinstance(model_info.resolution, int) or model_info.resolution <= 0:
             raise RuntimeError("model_info.resolution must be an integer > 0")
+        self.input_size: int = model_info.resolution
 
-        pt_file = f'{self.model_info.model_root_path}/model.pt'
+        pt_file = f'{model_info.model_root_path}/model.pt'
         yolov5_path = os.path.join(os.path.dirname(__file__), 'app_code', 'yolov5')
         self.yolov5 = torch.hub.load(yolov5_path, 'custom', pt_file, source='local')
 
@@ -44,7 +53,7 @@ class Yolov5Detector(DetectorLogic):
 
     @staticmethod
     def clip_box(
-            x1: float, y1: float, width: float, height: float, img_width: int, img_height: int) -> Tuple[
+            x1: float, y1: float, width: float, height: float, img_width: int, img_height: int) -> tuple[
             int, int, int, int]:
         '''Clips a box defined by top-left corner (x1, y1), width, and height
            to stay within image boundaries (img_width, img_height).
@@ -72,21 +81,13 @@ class Yolov5Detector(DetectorLogic):
         return clipped_x1, clipped_y1, clipped_width, clipped_height
 
     @staticmethod
-    def clip_point(x: float, y: float, img_width: int, img_height: int) -> Tuple[float, float]:
+    def clip_point(x: float, y: float, img_width: int, img_height: int) -> tuple[float, float]:
         x = min(max(0, x), img_width)
         y = min(max(0, y), img_height)
         return x, y
 
     def evaluate(self, image: np.ndarray) -> ImageMetadata:
-        if self.yolov5 is None:
-            raise RuntimeError('Model not initialized. Call load_model_info_and_init_model() first.')
-        if self.model_info is None:
-            raise RuntimeError('Model info not initialized. Call load_model_info_and_init_model() first.')
-
         image_metadata = ImageMetadata()
-        if not isinstance(self.model_info.resolution, int) or self.model_info.resolution <= 0:
-            raise RuntimeError("input_size must be an integer > 0")
-        self.input_size = self.model_info.resolution
 
         try:
             t = time.time()
@@ -345,5 +346,5 @@ class Yolov5Detector(DetectorLogic):
 
         return y
 
-    def batch_evaluate(self, images: List[np.ndarray]) -> ImagesMetadata:
+    def batch_evaluate(self, images: list[np.ndarray]) -> ImagesMetadata:
         raise NotImplementedError('batch_evaluate is not implemented yet')
