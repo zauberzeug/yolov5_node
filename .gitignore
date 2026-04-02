@@ -4,6 +4,7 @@ __pycache__/
 *.wts
 *.engine
 *.pt
+.claude/*local*
 detector/.mypy_cache
 detector/livesync.sh
 trainer/.mypy_cache
