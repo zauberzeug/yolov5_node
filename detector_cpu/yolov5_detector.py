@@ -5,10 +5,12 @@ import logging
 import os
 import time
 from dataclasses import dataclass
+from typing import final, override
 
 import cv2  # type: ignore # pylint: disable=import-error
 import numpy as np
 import torch  # type: ignore # pylint: disable=import-error
+from learning_loop_node import DetectorLogic, DetectorLogicFactory
 from learning_loop_node.data_classes import (
     BoxDetection,
     ImageMetadata,
@@ -19,17 +21,24 @@ from learning_loop_node.data_classes import (
 from learning_loop_node.enums import CategoryType
 
 
+@final
 @dataclass(frozen=True)
-class Yolov5DetectorParams:
+class Yolov5DetectorParams(DetectorLogicFactory):
     iou_threshold: float
     conf_threshold: float
-    model_format: str = 'yolov5_pytorch'
 
+    @property
+    @override
+    def model_format(self) -> str:
+        return 'yolov5_pytorch'
+
+    @override
     async def build(self, model_info: ModelInformation) -> Yolov5Detector:
         return await asyncio.to_thread(Yolov5Detector, model_info, self)
 
 
-class Yolov5Detector:
+@final
+class Yolov5Detector(DetectorLogic):
 
     def __init__(self, model_info: ModelInformation, params: Yolov5DetectorParams) -> None:
         self.model_info = model_info
@@ -86,6 +95,7 @@ class Yolov5Detector:
         y = min(max(0, y), img_height)
         return x, y
 
+    @override
     def evaluate(self, image: np.ndarray) -> ImageMetadata:
         image_metadata = ImageMetadata()
 
@@ -346,5 +356,6 @@ class Yolov5Detector:
 
         return y
 
+    @override
     def batch_evaluate(self, images: list[np.ndarray]) -> ImagesMetadata:
         raise NotImplementedError('batch_evaluate is not implemented yet')

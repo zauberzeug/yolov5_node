@@ -8,9 +8,10 @@ import re
 import subprocess
 import time
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, final, override
 
 import numpy as np
+from learning_loop_node import DetectorLogic, DetectorLogicFactory
 from learning_loop_node.data_classes import (
     BoxDetection,
     ImageMetadata,
@@ -23,13 +24,19 @@ from learning_loop_node.enums import CategoryType
 import yolov5
 
 
+@final
 @dataclass(frozen=True)
-class Yolov5DetectorParams:
+class Yolov5DetectorParams(DetectorLogicFactory):
     weight_type: Literal['FP16', 'FP32', 'INT8']
     iou_threshold: float
     conf_threshold: float
-    model_format: str = 'yolov5_wts'
 
+    @property
+    @override
+    def model_format(self) -> str:
+        return 'yolov5_wts'
+
+    @override
     async def build(self, model_info: ModelInformation) -> Yolov5Detector:
         return await asyncio.to_thread(Yolov5Detector, model_info, self)
 
