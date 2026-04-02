@@ -892,8 +892,8 @@ wheels = [
 
 [[package]]
 name = "learning-loop-node"
-version = "0.18.6"
-source = { git = "https://github.com/zauberzeug/learning_loop_node?branch=parallel_model_upgrade#a1ec07b14d731495ca93db41737ef153fcc40e10" }
+version = "0.19.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles" },
     { name = "aiohttp" },
@@ -915,6 +915,10 @@ dependencies = [
     { name = "simplejson" },
     { name = "tqdm" },
     { name = "uvicorn", extra = ["standard"] },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d3/0d/4d359d4c112d6512e3926cc049e07cafa8fa4136d2a064546b74a1f76e89/learning_loop_node-0.19.0.tar.gz", hash = "sha256:02ffa17d60c6a4ba065c5739fc672de94af28142486a2adc5c4c819c413a2620", size = 62599, upload-time = "2026-04-02T07:37:43.565Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/57/90/016229476e789ba0106b11e975b4b77248511380bbd89934ac5e8f74fb68/learning_loop_node-0.19.0-py3-none-any.whl", hash = "sha256:8dd256b753cf5133dbf35de294d3dedd4d5877b68371fb91e244bf9f9d305589", size = 76912, upload-time = "2026-04-02T07:37:42.216Z" },
 ]
 
 [[package]]
@@ -2235,8 +2239,8 @@ dependencies = [
     { name = "torch", version = "2.5.1", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version < '3.13' and platform_machine == 'aarch64' and platform_python_implementation == 'CPython' and sys_platform == 'linux') or sys_platform == 'darwin'" },
 ]
 wheels = [
-    { url = "https://download.pytorch.org/whl/cpu/torchvision-0.20.1-cp312-cp312-linux_aarch64.whl", hash = "sha256:9f853ba4497ac4691815ad41b523ee23cf5ba4f87b1ce869d704052e233ca8b7" },
-    { url = "https://download.pytorch.org/whl/cpu/torchvision-0.20.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:1a31256ff945d64f006bb306813a7c95a531fe16bfb2535c837dd4c104533d7a" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.20.1-cp312-cp312-linux_aarch64.whl", hash = "sha256:9f853ba4497ac4691815ad41b523ee23cf5ba4f87b1ce869d704052e233ca8b7" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.20.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:1a31256ff945d64f006bb306813a7c95a531fe16bfb2535c837dd4c104533d7a" },
 ]
 
 [[package]]
@@ -2254,8 +2258,8 @@ dependencies = [
     { name = "torch", version = "2.5.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(python_full_version >= '3.13' and sys_platform == 'linux') or (platform_machine != 'aarch64' and sys_platform == 'linux') or (platform_python_implementation != 'CPython' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')" },
 ]
 wheels = [
-    { url = "https://download.pytorch.org/whl/cpu/torchvision-0.20.1%2Bcpu-cp312-cp312-linux_x86_64.whl", hash = "sha256:5f46c7ac7f00a065cb40bfb1e1bfc4ba16a35f5d46b3fe70cca6b3cea7f822f7" },
-    { url = "https://download.pytorch.org/whl/cpu/torchvision-0.20.1%2Bcpu-cp312-cp312-win_amd64.whl", hash = "sha256:64832095b9b8b8185f24788f1a531ae96c937bf797cd3474a2ea7511852e5cd7" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.20.1%2Bcpu-cp312-cp312-linux_x86_64.whl", hash = "sha256:5f46c7ac7f00a065cb40bfb1e1bfc4ba16a35f5d46b3fe70cca6b3cea7f822f7" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.20.1%2Bcpu-cp312-cp312-win_amd64.whl", hash = "sha256:64832095b9b8b8185f24788f1a531ae96c937bf797cd3474a2ea7511852e5cd7" },
 ]
 
 [[package]]
@@ -2741,7 +2745,7 @@ requires-dist = [
     { name = "attrs" },
     { name = "idna-ssl" },
     { name = "ipython" },
-    { name = "learning-loop-node", git = "https://github.com/zauberzeug/learning_loop_node?branch=parallel_model_upgrade" },
+    { name = "learning-loop-node", specifier = "==0.19.0" },
     { name = "multidict" },
     { name = "pillow" },
     { name = "psutil" },

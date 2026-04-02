@@ -20,7 +20,7 @@ dependencies = [
     "numpy",
     "pyyaml",
     "pycuda==2025.1.2",
-    "learning_loop_node==0.18.5",
+    "learning_loop_node==0.19.0",
 ]
 
 # Note: learning_loop_node is installed separately in Dockerfiles with a specific version
@@ -39,9 +39,6 @@ types = []
 
 [tool.uv]
 default-groups = ["dev"]
-
-[tool.uv.sources]
-learning_loop_node = { git = "https://github.com/zauberzeug/learning_loop_node", branch = "parallel_model_upgrade" }
 
 [tool.mypy]
 python_version = "3.12"

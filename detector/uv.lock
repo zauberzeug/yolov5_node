@@ -583,8 +583,8 @@ wheels = [
 
 [[package]]
 name = "learning-loop-node"
-version = "0.18.6"
-source = { git = "https://github.com/zauberzeug/learning_loop_node?branch=parallel_model_upgrade#a1ec07b14d731495ca93db41737ef153fcc40e10" }
+version = "0.19.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles" },
     { name = "aiohttp" },
@@ -607,6 +607,10 @@ dependencies = [
     { name = "simplejson" },
     { name = "tqdm" },
     { name = "uvicorn", extra = ["standard"] },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d3/0d/4d359d4c112d6512e3926cc049e07cafa8fa4136d2a064546b74a1f76e89/learning_loop_node-0.19.0.tar.gz", hash = "sha256:02ffa17d60c6a4ba065c5739fc672de94af28142486a2adc5c4c819c413a2620", size = 62599, upload-time = "2026-04-02T07:37:43.565Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/57/90/016229476e789ba0106b11e975b4b77248511380bbd89934ac5e8f74fb68/learning_loop_node-0.19.0-py3-none-any.whl", hash = "sha256:8dd256b753cf5133dbf35de294d3dedd4d5877b68371fb91e244bf9f9d305589", size = 76912, upload-time = "2026-04-02T07:37:42.216Z" },
 ]
 
 [[package]]
@@ -1922,7 +1926,7 @@ requires-dist = [
     { name = "async-timeout" },
     { name = "attrs" },
     { name = "idna-ssl" },
-    { name = "learning-loop-node", git = "https://github.com/zauberzeug/learning_loop_node?branch=parallel_model_upgrade" },
+    { name = "learning-loop-node", specifier = "==0.19.0" },
     { name = "multidict" },
     { name = "numpy" },
     { name = "pillow" },
