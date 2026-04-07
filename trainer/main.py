@@ -3,8 +3,9 @@ import multiprocessing
 import os
 
 import uvicorn
-from app_code.yolov5_trainer import Yolov5TrainerLogic
 from learning_loop_node import TrainerNode
+
+from app_code.yolov5_trainer import Yolov5TrainerLogic
 
 print(f'Uvicorn reload is set to: {os.getenv("UVICORN_RELOAD", "FALSE").lower() == "true"}')
 logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
