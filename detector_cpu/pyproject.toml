@@ -4,7 +4,7 @@ version = "0.1.13"
 description = "YOLOv5 TensorRT detector node"
 authors = [{ name="Zauberzeug GmbH", email="info@zauberzeug.com" }]
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"
 
 # RUN pip3 install torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
@@ -12,7 +12,6 @@ dependencies = [
     "wheel",
     "torch==2.5.1",
     "torchvision",
-
     "ultralytics",
     "uvicorn",
     "async_generator",
