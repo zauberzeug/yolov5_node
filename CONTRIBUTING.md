@@ -13,7 +13,7 @@ Then set it as the project interpreter in your IDE (e.g. Python: Select Interpre
 
 ## Publish a Release
 
-To publish a new release of the software (trainer and detectors), create a new release via github and use the [version number](https://semver.org/) as a name with the pattern `v<MAJOR>.<MINOR>.<PATCH>`.
+To publish a new release of the software (trainer and detectors), create a new release via github and use the [version number](https://semver.org/) as a name and tag name with the pattern `v<MAJOR>.<MINOR>.<PATCH>`.
 This will automatically trigger a pipeline action that builds and publishes docker containers as defined in the [workflow file](.github/workflows/docker-deploy.yml).
 
 ## Style Guide
