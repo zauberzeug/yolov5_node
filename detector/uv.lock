@@ -1905,6 +1905,7 @@ dependencies = [
     { name = "psutil" },
     { name = "pycuda" },
     { name = "pyyaml" },
+    { name = "typing-extensions" },
     { name = "uvicorn" },
     { name = "yarl" },
 ]
@@ -1933,6 +1934,7 @@ requires-dist = [
     { name = "psutil" },
     { name = "pycuda", specifier = "==2025.1.2" },
     { name = "pyyaml" },
+    { name = "typing-extensions" },
     { name = "uvicorn" },
     { name = "yarl" },
 ]

@@ -8,7 +8,7 @@ import re
 import subprocess
 import time
 from dataclasses import dataclass
-from typing import Literal, final, override
+from typing import Literal, final
 
 import numpy as np
 from learning_loop_node import DetectorLogic, DetectorLogicFactory
@@ -20,6 +20,7 @@ from learning_loop_node.data_classes import (
     PointDetection,
 )
 from learning_loop_node.enums import CategoryType
+from typing_extensions import override
 
 import yolov5
 
