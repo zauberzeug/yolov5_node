@@ -17,10 +17,17 @@ jobs:
             dockerfile: trainer/Dockerfile
             image: zauberzeug/yolov5-trainer
             tag_suffix: ""
+            build_args: ""
           - context: .
             dockerfile: detector_cpu/Dockerfile
             image: zauberzeug/yolov5-detector
             tag_suffix: "-cloud-cpu"
+            build_args: ""
+          - context: detector/
+            dockerfile: detector/Dockerfile
+            image: zauberzeug/yolov5-detector
+            tag_suffix: "-cloud"
+            build_args: "--build-arg BASE_IMAGE=nvcr.io/nvidia/tensorrt:25.01-py3 --build-arg INSTALL_OPENCV=true"
     steps:
       - uses: actions/checkout@v4
       - name: Set up QEMU
@@ -34,23 +41,9 @@ jobs:
           docker buildx build ${{ matrix.context }} \
             --platform linux/amd64,linux/arm64 \
             -f ${{ matrix.dockerfile }} \
+            ${{ matrix.build_args }} \
             -t ${{ matrix.image }}:${VERSION#v}${{ matrix.tag_suffix }} \
             --push
-
-  detector-cloud:
-    runs-on: [self-hosted, X64]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Log in to Docker Hub
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-      - name: Build and push
-        run: |
-          docker build detector/ \
-            -f detector/Dockerfile \
-            --build-arg BASE_IMAGE=nvcr.io/nvidia/tensorrt:25.01-py3 \
-            --build-arg INSTALL_OPENCV=true \
-            -t zauberzeug/yolov5-detector:${VERSION#v}-cloud
-          docker push zauberzeug/yolov5-detector:${VERSION#v}-cloud
 
   detector-jetson:
     runs-on: [self-hosted, arm64]
