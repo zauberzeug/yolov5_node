@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import ctypes
+import json
 import logging
 import os
 import re
 import subprocess
 import time
-from dataclasses import dataclass
-from typing import Literal, final
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any, Literal, final
 
 import numpy as np
 from learning_loop_node import DetectorLogic, DetectorLogicFactory
@@ -56,13 +58,16 @@ class Yolov5Detector(DetectorLogic):
         if not isinstance(model_info.resolution, int) or model_info.resolution <= 0:
             raise RuntimeError("resolution must be an integer > 0")
 
-        engine_file = _create_engine(model_info.resolution,
-                                     len(model_info.categories),
-                                     model_info.model_size,
-                                     f'{model_info.model_root_path}/model.wts',
-                                     params.weight_type)
+        lib_config = _LibConfig(
+            resolution=model_info.resolution,
+            cat_count=len(model_info.categories),
+            weight_type=params.weight_type,
+        )
+        _build_module_lib(lib_config)
+        engine_file = _create_engine(f'{model_info.model_root_path}/model.wts',
+                                     model_info.model_size or 's6')
 
-        ctypes.CDLL('/tensorrtx/yolov5/build/libmyplugins.so')
+        ctypes.CDLL(str(_LIB_FILE))
 
         try:
             self.yolov5 = yolov5.YoLov5TRT(engine_file, params.iou_threshold, params.conf_threshold)
@@ -183,38 +188,56 @@ class Yolov5Detector(DetectorLogic):
         return image_metadata
 
 
-def _create_engine(resolution: int, cat_count: int, model_variant: str | None, wts_file: str, weight_type: str) -> str:
-    engine_file = os.path.dirname(wts_file) + '/model.engine'
-    if os.path.isfile(engine_file):
-        _LOG.info('Engine at %s already exists, skipping conversion', engine_file)
-        return engine_file
-    _LOG.info('Building Engine (%s to %s)', wts_file, engine_file)
-    _LOG.info('Resolution: %s', resolution)
-    _LOG.info('Weight_type: %s', weight_type)
-    _LOG.info('Num Categories: %d', cat_count)
-    _LOG.info('Model_variant: %s', model_variant)
+_BUILD_DIR = Path('/tensorrtx/yolov5/build')
+_LIB_FILE = _BUILD_DIR / 'libmyplugins.so'
+_DET_BIN = _BUILD_DIR / 'yolov5_det'
+_LIB_CONFIG_FILE = _BUILD_DIR / 'build.json'
 
-    os.chdir('/tensorrtx/yolov5/build')
 
-    # Adapt resolution
+@final
+@dataclass(frozen=True, kw_only=True, slots=True)
+class _LibConfig:
+    resolution: int
+    cat_count: int
+    weight_type: Literal['FP16', 'FP32', 'INT8']
+
+    def save(self, path: Path) -> None:
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(asdict(self), f, indent=2)
+
+    @classmethod
+    def load(cls, path: Path) -> _LibConfig | None:
+        if not path.exists():
+            return None
+        try:
+            with open(path, encoding='utf-8') as f:
+                data: dict[str, Any] = json.load(f)
+            return cls(**data)
+        except (json.JSONDecodeError, TypeError, KeyError, ValueError):
+            return None
+
+
+def _build_module_lib(config: _LibConfig) -> None:
+    existing = _LibConfig.load(_LIB_CONFIG_FILE)
+    if _LIB_FILE.is_file() and _DET_BIN.is_file() and existing == config:
+        _LOG.info('Module lib already built with matching config, skipping')
+        return
+    if _LIB_FILE.is_file():
+        _LOG.info('Module lib config changed, rebuilding')
+
+    _LOG.info('Building module lib (%s)', config)
+    os.chdir(_BUILD_DIR)
+
     with open('../src/config.h', 'r+') as f:
         content = f.read()
-        if weight_type == 'INT8':
-            _LOG.info('using INT8')
-            content = content.replace('#define USE_FP16', '#define USE_INT8')
-        elif weight_type == 'FP32':
-            _LOG.info('using FP32')
-            content = content.replace('#define USE_FP16', '#define USE_FP32')
-        else:
-            _LOG.info('using FP16')
-
-        content = re.sub(r'(kNumClass =) \d*', r'\1 ' + str(cat_count), content)
-        content = re.sub(r'(kInput[HW] =) \d*', r'\1 ' + str(resolution), content)
+        content = re.sub(r'#define USE_(FP16|FP32|INT8)', f'#define USE_{config.weight_type}', content)
+        content = re.sub(r'(kNumClass =) \d*', r'\1 ' + str(config.cat_count), content)
+        content = re.sub(r'(kInput[HW] =) \d*', r'\1 ' + str(config.resolution), content)
         f.seek(0)
         f.truncate()
         f.write(content)
 
-    if not os.path.isfile('Makefile'):
+    if not Path('Makefile').is_file():
         _LOG.info('Running cmake for tensorrtx/yolov5')
         subprocess.run(
             'cmake '
@@ -225,8 +248,16 @@ def _create_engine(resolution: int, cat_count: int, model_variant: str | None, w
     _LOG.info('Making tensorrtx/yolov5')
     subprocess.run('make -j6 -Wno-deprecated-declarations', shell=True, check=True)
 
-    _LOG.info('Building engine file with tensorrtx/yolov5_det')
-    model_variant = model_variant or 's6'
+    config.save(_LIB_CONFIG_FILE)
 
-    subprocess.run(f'./yolov5_det -s {wts_file} {engine_file} {model_variant}', shell=True, check=True)
-    return engine_file
+
+def _create_engine(wts_file: str, model_variant: str) -> str:
+    engine_file = Path(wts_file).parent / 'model.engine'
+    if engine_file.is_file():
+        _LOG.info('Engine at %s already exists, skipping conversion', engine_file)
+        return str(engine_file)
+
+    _LOG.info('Building engine %s from %s', engine_file, wts_file)
+    os.chdir(_BUILD_DIR)
+    subprocess.run(f'{_DET_BIN} -s {wts_file} {engine_file} {model_variant}', shell=True, check=True)
+    return str(engine_file)
