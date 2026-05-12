@@ -194,7 +194,6 @@ def _create_engine(resolution: int, cat_count: int, model_variant: str | None, w
     _LOG.info('Num Categories: %d', cat_count)
     _LOG.info('Model_variant: %s', model_variant)
 
-    # NOTE cmake and initial building is done in Dockerfile (to speeds things up)
     os.chdir('/tensorrtx/yolov5/build')
 
     # Adapt resolution
@@ -214,6 +213,14 @@ def _create_engine(resolution: int, cat_count: int, model_variant: str | None, w
         f.seek(0)
         f.truncate()
         f.write(content)
+
+    if not os.path.isfile('Makefile'):
+        _LOG.info('Running cmake for tensorrtx/yolov5')
+        subprocess.run(
+            'cmake '
+            '-DCMAKE_CUDA_FLAGS="--diag-suppress=997 -Xcompiler=-Wno-deprecated-declarations" '
+            '-DCMAKE_CXX_FLAGS="-Wno-deprecated-declarations" ..',
+            shell=True, check=True)
 
     _LOG.info('Making tensorrtx/yolov5')
     subprocess.run('make -j6 -Wno-deprecated-declarations', shell=True, check=True)
