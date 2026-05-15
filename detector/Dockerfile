@@ -46,17 +46,11 @@ RUN uv venv .venv --system-site-packages --no-managed-python --python /usr/bin/p
 # Ensure the venv is first on PATH for CMD/RUN that follow
 ENV PATH="/uv_env/.venv/bin:${PATH}"
 
-# 3. Build TensorRT ------------------------------------------------------------
+# 3. Copy TensorRT sources -----------------------------------------------------
 
-# Copy TensorRTX and generate build files. We will fully build at runtime with model-specific config)
 WORKDIR /
 COPY ./tensorrtx /tensorrtx
-
-WORKDIR /tensorrtx/yolov5/build
-RUN cmake \
-    -DCMAKE_CUDA_FLAGS="--diag-suppress=997 -Xcompiler=-Wno-deprecated-declarations" \
-    -DCMAKE_CXX_FLAGS="-Wno-deprecated-declarations" \
-    .. 
+RUN mkdir -p /tensorrtx/yolov5/build
 
 # 4. Copy the app --------------------------------------------------------------
 COPY . /app
