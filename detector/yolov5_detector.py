@@ -47,6 +47,11 @@ class Yolov5DetectorParams(DetectorLogicFactory):
 _LOG = logging.getLogger('Yolov5Detector')
 _LOG.setLevel(logging.INFO)
 
+_BUILD_DIR = Path('/tensorrtx/yolov5/build')
+_LIB_FILE = _BUILD_DIR / 'libmyplugins.so'
+_DET_BIN = _BUILD_DIR / 'yolov5_det'
+_LIB_CONFIG_FILE = _BUILD_DIR / 'build.json'
+
 
 @final
 class Yolov5Detector(DetectorLogic):
@@ -188,10 +193,7 @@ class Yolov5Detector(DetectorLogic):
         return image_metadata
 
 
-_BUILD_DIR = Path('/tensorrtx/yolov5/build')
-_LIB_FILE = _BUILD_DIR / 'libmyplugins.so'
-_DET_BIN = _BUILD_DIR / 'yolov5_det'
-_LIB_CONFIG_FILE = _BUILD_DIR / 'build.json'
+
 
 
 @final
