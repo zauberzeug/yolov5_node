@@ -60,7 +60,7 @@ class Yolov5Detector(DetectorLogic):
 
         lib_config = _LibConfig(
             resolution=model_info.resolution,
-            cat_count=len(model_info.categories),
+            category_count=len(model_info.categories),
             weight_type=params.weight_type,
         )
         _build_module_lib(lib_config)
@@ -198,7 +198,7 @@ _LIB_CONFIG_FILE = _BUILD_DIR / 'build.json'
 @dataclass(frozen=True, kw_only=True, slots=True)
 class _LibConfig:
     resolution: int
-    cat_count: int
+    category_count: int
     weight_type: Literal['FP16', 'FP32', 'INT8']
 
     def save(self, path: Path) -> None:
@@ -231,7 +231,7 @@ def _build_module_lib(config: _LibConfig) -> None:
     with open('../src/config.h', 'r+') as f:
         content = f.read()
         content = re.sub(r'#define USE_(FP16|FP32|INT8)', f'#define USE_{config.weight_type}', content)
-        content = re.sub(r'(kNumClass =) \d*', r'\1 ' + str(config.cat_count), content)
+        content = re.sub(r'(kNumClass =) \d*', r'\1 ' + str(config.category_count), content)
         content = re.sub(r'(kInput[HW] =) \d*', r'\1 ' + str(config.resolution), content)
         f.seek(0)
         f.truncate()
