@@ -1,6 +1,6 @@
 [project]
 name = "yolov5-trainer-node"
-version = "1.0.3"
+version = "1.0.4"
 description = "Yolov5 trainer node"
 authors = [{ name="Zauberzeug GmbH", email="info@zauberzeug.com" }]
 readme = "README.md"
@@ -8,11 +8,10 @@ requires-python = ">=3.12"
 
 dependencies = [
     "ruamel.yaml",
-    "learning_loop_node==0.19.0",
+    "learning_loop_node==0.20.0",
     "torchinfo>=1.8.0",
 ]
 
-# Note: learning_loop_node is installed separately in Dockerfiles with a specific version
 [dependency-groups]
 dev = [
     {include-group = "types"},
