@@ -1,6 +1,6 @@
 [project]
 name = "yolov5-detector"
-version = "0.1.14"
+version = "0.1.15"
 description = "YOLOv5 TensorRT detector node"
 authors = [{ name="Zauberzeug GmbH", email="info@zauberzeug.com" }]
 readme = "README.md"
@@ -25,7 +25,7 @@ dependencies = [
     "idna_ssl",
     "aiosignal",
     "IPython",
-    "learning_loop_node==0.20.0",
+    "learning_loop_node==0.20.1",
 ]
 
 [dependency-groups]
