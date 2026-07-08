@@ -27,7 +27,7 @@ jobs:
             dockerfile: detector/Dockerfile
             image: zauberzeug/yolov5-detector
             tag_suffix: "-cloud"
-            build_args: "--build-arg BASE_IMAGE=nvcr.io/nvidia/tensorrt:25.01-py3 --build-arg INSTALL_OPENCV=true"
+            build_args: "--build-arg BASE_IMAGE=nvcr.io/nvidia/tensorrt:26.05-py3 --build-arg INSTALL_OPENCV=true"
     steps:
       - uses: actions/checkout@v4
       - name: Set up QEMU

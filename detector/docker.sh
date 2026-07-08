@@ -33,7 +33,7 @@ NODE_LIB_VERSION=$(grep -oP 'learning_loop_node==\K[0-9.]+' pyproject.toml)
 build_args=" --build-arg NODE_LIB_VERSION=$NODE_LIB_VERSION"
 
 BASE_JETSON="dustynv/l4t-ml:r36.4.0"
-BASE_CLOUD="nvcr.io/nvidia/tensorrt:25.01-py3"
+BASE_CLOUD="nvcr.io/nvidia/tensorrt:26.05-py3"
 
 TARGET_JETSON="zauberzeug/yolov5-detector:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION-jetson"
 TARGET_CLOUD="zauberzeug/yolov5-detector:$SEMANTIC_VERSION-nlv$NODE_LIB_VERSION-cloud"
