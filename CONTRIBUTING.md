@@ -64,7 +64,33 @@ ui.button('Speichern', on_click=self.save).props(
     'button-primary')
 ```
 
-## 4. Ordering: Important things first
+### 4. Comments
+
+We keep comments as few and as short as possible.
+A comment should only state what is needed to understand the code — not the motivation behind an implementation and not a restatement of what the code already says.
+If the code is clear on its own, it needs no comment.
+
+### 5. Error handling
+
+We do not use return values to signal success or failure.
+A function that returns `True`/`False` or `None` for this purpose forces every caller to remember the convention, and a forgotten check fails silently.
+Instead we raise exceptions — custom exception classes where appropriate — and handle them where the caller can react.
+
+```python
+# preferred
+def parse_config(path: Path) -> Config:
+    if not path.exists():
+        raise ConfigNotFoundError(path)
+    ...
+
+# avoid (None as failure signal)
+def parse_config(path: Path) -> Config | None:
+    if not path.exists():
+        return None
+    ...
+```
+
+## 6. Ordering: Important things first
 
 We want to have main classes and functions at the top of the file, while helper functions and classes should be placed below. This allows to quickly understand the main purpose of the file without having to scroll through a lot of code.
 
@@ -93,7 +119,7 @@ class ReportGenerator:
         ...
 ```
 
-## 5. Docstrings and type hints
+## 7. Docstrings and type hints
 
 We use the reStructuredText (reST) or Sphinx-style docstring format.
 We don't declare types in the docstring but use type hints.
