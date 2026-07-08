@@ -583,7 +583,7 @@ wheels = [
 
 [[package]]
 name = "learning-loop-node"
-version = "0.20.0"
+version = "0.20.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles" },
@@ -608,9 +608,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "uvicorn", extra = ["standard"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ef/7b/152f37597c84c11d82608463a3b4cf77489338bde591048a8b58596c483d/learning_loop_node-0.20.0.tar.gz", hash = "sha256:65795c97728108ff5417f7cb24569b8a0d3ec95b32dc35de6d7fbd2101ac286b", size = 62661, upload-time = "2026-05-29T09:42:33.46Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cf/00/34e5870ce03c9096034c76eb9865d49b1c35694a8d6fd5bf1316bebadfc0/learning_loop_node-0.20.1.tar.gz", hash = "sha256:53d03ec6aa50330859186526acd0e2260f47806fafbb55f8135b75b4512e9dd2", size = 62716, upload-time = "2026-07-07T07:39:40.075Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/72/d9/7bb2b2d0530ff76596104da6dde76483b5a297f8934f0b50af41c8dc34ae/learning_loop_node-0.20.0-py3-none-any.whl", hash = "sha256:0f58f33be28b1c592c372824d0cdbbc687dc14351799190c54055052edbe78e3", size = 76940, upload-time = "2026-05-29T09:42:32.387Z" },
+    { url = "https://files.pythonhosted.org/packages/86/59/c64763fb3eefb9ba25fd4b2f50cf1264e63b62324e52e49c0105885afb79/learning_loop_node-0.20.1-py3-none-any.whl", hash = "sha256:b8c23e98cffbd4e1235179c835b6f27b4d486416714d91f46da2da05fa63035a", size = 76996, upload-time = "2026-07-07T07:39:39.074Z" },
 ]
 
 [[package]]
@@ -1888,7 +1888,7 @@ wheels = [
 
 [[package]]
 name = "yolov5-detector"
-version = "1.0.4"
+version = "1.0.5"
 source = { virtual = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -1927,7 +1927,7 @@ requires-dist = [
     { name = "async-timeout" },
     { name = "attrs" },
     { name = "idna-ssl" },
-    { name = "learning-loop-node", specifier = "==0.20.0" },
+    { name = "learning-loop-node", specifier = "==0.20.1" },
     { name = "multidict" },
     { name = "numpy" },
     { name = "pillow" },
