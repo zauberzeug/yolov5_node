@@ -29,6 +29,7 @@ RUN rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
 # 2. Install Python dependencies -----------------------------------------------
+# NOTE: Build context is the repo root, not this folder (yolo_common is a path dependency)!
 
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
@@ -36,8 +37,10 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 # Install Python dependencies
 WORKDIR /uv_env
 
-# Copy only dependency files first (enables layer caching)
-COPY pyproject.toml uv.lock ./
+# Copy only dependency files first (enables layer caching);
+# yolo_common is resolved relative to the pyproject.toml as ../yolo_common -> /yolo_common
+COPY ./yolo_common /yolo_common
+COPY ./detector/pyproject.toml ./detector/uv.lock ./
 
 # Install deps into a project-local venv
 RUN uv venv .venv --system-site-packages --no-managed-python --python /usr/bin/python3 && \
@@ -49,11 +52,11 @@ ENV PATH="/uv_env/.venv/bin:${PATH}"
 # 3. Copy TensorRT sources -----------------------------------------------------
 
 WORKDIR /
-COPY ./tensorrtx /tensorrtx
+COPY ./detector/tensorrtx /tensorrtx
 RUN mkdir -p /tensorrtx/yolov5/build
 
 # 4. Copy the app --------------------------------------------------------------
-COPY . /app
+COPY ./detector /app
 
 # Optional: remove dev-only files
 RUN rm -f /app/.env

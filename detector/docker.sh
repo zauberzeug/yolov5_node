@@ -98,10 +98,11 @@ cmd_args=${@:2}
 set -x
 case $cmd in
     b | build)
-        docker build . -t $image $build_args $cmd_args
+        # build context is the repo root so the image can include ../yolo_common
+        docker build .. -f Dockerfile -t $image $build_args $cmd_args
         ;;
     bnc | build-no-cache)
-        docker build --no-cache . -t $image $build_args $cmd_args
+        docker build --no-cache .. -f Dockerfile -t $image $build_args $cmd_args
         ;;
     U | update)
         docker pull ${image}

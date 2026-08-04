@@ -1,0 +1,5 @@
+# Applies to images built with the repo root as context (detector, detector_cpu)
+.git
+**/.venv
+**/__pycache__
+**/.env
