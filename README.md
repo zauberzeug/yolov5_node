@@ -34,7 +34,6 @@ When using the script it is required to set up a .env file in the training folde
 
 | Name                        | Purpose                                              | Value          | Default | Requi. only with ./docker.sh |
 | --------------------------- | ---------------------------------------------------- | -------------- | ------- | ---------------------------- |
-| CLASSIFICATION or DETECTION | -                                                    | No             |
 | TRAINER_NAME                | Will be the name of the container                    | String         | -       | Yes                          |
 | LINKLL                      | Link the node library into the container?            | TRUE/FALSE     | FALSE   | Yes                          |
 | UVICORN_RELOAD              | Enable hot-reload                                    | TRUE/FALSE/0/1 | FALSE   | No                           |
