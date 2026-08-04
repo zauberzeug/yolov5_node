@@ -9,6 +9,7 @@ if [ $# -eq 1 ]; then
     ( cd python && uv run pytest trainer -v -s -k "$1" )
     ( cd detector && uv run python -m pytest -v -s -k "$1" )
     ( cd detector_cpu &&  uv run python -m pytest -v -s -k "$1" )
+    ( cd yolo_common && uv run python -m pytest -v -s -k "$1" )
     exit 0
 fi
 
@@ -17,3 +18,4 @@ fi
 # ( cd trainer && uv run python -m pytest -v )
 # ( cd detector && uv run python -m pytest -v )
 ( cd detector_cpu && uv run python -m pytest -v )
+( cd yolo_common && uv run python -m pytest -v )

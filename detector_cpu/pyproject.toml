@@ -26,6 +26,7 @@ dependencies = [
     "aiosignal",
     "IPython",
     "learning_loop_node==0.20.1",
+    "yolo_common",
 ]
 
 [dependency-groups]
@@ -61,6 +62,7 @@ default = true
 torch = { index = "pytorch" }
 torchvision = { index = "pytorch" }
 torchaudio = { index = "pytorch" }
+yolo_common = { path = "../yolo_common", editable = true }
 
 [tool.mypy]
 python_version = "3.12"

@@ -1,0 +1,74 @@
+[project]
+name = "yolo_common"
+version = "0.0.0"
+description = "What the trainer and the detectors share: the model input contract (letterbox geometry and resize filter)"
+authors = [{ name="Zauberzeug GmbH", email="info@zauberzeug.com" }]
+# >=3.10 because the Jetson detector runs on Python 3.10 (L4T base image)
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "opencv-python-headless",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "mypy (>=1.18.2, <2.0.0)",
+    "pylint (>=3.3.3, <4.0.0)",
+    "pytest (>=8.0.0)",
+    "ruff (>=0.13.2, <1.0.0)",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.mypy]
+# numpy's stubs require analysis as >=3.12; the ruff target py310 guards runtime compatibility
+python_version = "3.12"
+check_untyped_defs = true
+
+[tool.pylint]
+disable = [
+    "C0114", # Missing module docstring
+    "C0116", # Missing function or method docstring
+    "C0301", # Line too long (exceeds character limit)
+    "R0914", # Too many local variables
+]
+generated-members = ["cv2.*"]
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "B", # bugbear
+    "E", # pycodestyle
+    "F", # pyflakes
+    "I", # isort
+    "PL", # pylint
+    "RUF", # ruff
+    "UP", # pyupgrade
+    "W", # pycodestyle
+]
+fixable = [
+    "I", # isort
+    "RUF022", # `__all__` is not sorted
+]
+ignore = [
+    "E501", # line too long
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "PLR2004", # magic values are the point of golden tests
+]
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests"
+]

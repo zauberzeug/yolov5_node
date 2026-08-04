@@ -29,7 +29,9 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 # Install Python dependencies
 WORKDIR /uv_env
 
-# Copy only dependency files first (enables layer caching)
+# Copy only dependency files first (enables layer caching);
+# yolo_common is resolved relative to the pyproject.toml as ../yolo_common -> /yolo_common
+COPY ./yolo_common /yolo_common
 COPY ./detector_cpu/pyproject.toml ./detector_cpu/uv.lock ./
 
 # Install deps into a project-local venv

@@ -13,12 +13,12 @@ from dataclasses import dataclass
 import numpy as np
 import pycuda.driver as cuda  # type: ignore # pylint: disable=import-error
 import tensorrt as trt  # type: ignore # pylint: disable=import-error
-from PIL import Image
 from pycuda import gpuarray  # type: ignore # pylint: disable=import-error
 from pycuda._driver import (  # type: ignore # pylint: disable=import-error, no-name-in-module
     Error as CudaError,
 )
 from pycuda.compiler import SourceModule  # type: ignore # pylint: disable=import-error
+from yolo_common.model_input import LetterboxGeometry, letterbox
 
 LEN_ALL_RESULT = 38001
 LEN_ONE_RESULT = 38
@@ -191,49 +191,20 @@ class YoLov5TRT:
             block=block, grid=grid, stream=stream
         )
 
-    def _preprocess_image(self, image_raw: np.ndarray, slot: InferenceSlot) -> None:
-        """Resize and pad it to target size, normalize to [0,1], transform to NCHW format.
+    def _preprocess_image(self, image_raw: np.ndarray, slot: InferenceSlot) -> LetterboxGeometry:
+        """Letterbox to the model input size and upload; the GPU kernel does NCHW/float/255.
 
         param image_raw: A raw image ndarray, shape is [H,W,3]
         param slot: An InferenceSlot object whose device_input will be updated
         """
-        h, w, _ = image_raw.shape
-        # Calculate widht and height and paddings
-        r_w = self.input_w / w
-        r_h = self.input_h / h
-        if r_h > r_w:
-            tw = self.input_w
-            th = int(r_w * h)
-            tx1 = tx2 = 0
-            ty1 = int((self.input_h - th) / 2)
-            ty2 = self.input_h - th - ty1
-        else:
-            tw = int(r_h * w)
-            th = self.input_h
-            tx1 = int((self.input_w - tw) / 2)
-            tx2 = self.input_w - tw - tx1
-            ty1 = ty2 = 0
-        # Resize the image with long side while maintaining ratio
-        if tw == w and th == h:
-            image = image_raw
-        else:
-            pil_image = Image.fromarray(image_raw)
-            pil_image = pil_image.resize((tw, th), Image.Resampling.BILINEAR)
-            image = np.array(pil_image)
-        # Pad with (128, 128, 128)
-        if tx1 != 0 or tx2 != 0 or ty1 != 0 or ty2 != 0:
-            image = np.pad(
-                image,
-                ((ty1, ty2), (tx1, tx2), (0, 0)),
-                mode='constant',
-                constant_values=128
-            )
+        image, geometry = letterbox(image_raw, self.input_h, self.input_w)
         slot.device_preprocess_input.set_async(image, stream=slot.stream)
         assert image.shape == slot.device_preprocess_input.shape, f'{image.shape}'
         assert slot.device_preprocess_input.dtype == np.uint8
         assert slot.device_inference_input.dtype == np.float32
         self._convert_hwc_uint8_to_nchw_float(slot.device_preprocess_input,
                                               slot.device_inference_input, stream=slot.stream)
+        return geometry
 
     def _dispatch_gpu_inference(self, inference_slot: InferenceSlot):
         # Run inference.
@@ -254,8 +225,7 @@ class YoLov5TRT:
             inference_slot = self.inference_slots.pop() if self.inference_slots else self._create_inference_slot()
 
             # Do image preprocess
-            origin_h, origin_w, _ = image_raw.shape
-            self._preprocess_image(image_raw, inference_slot)
+            geometry = self._preprocess_image(image_raw, inference_slot)
 
             # Run inference
             start = time.time()
@@ -265,7 +235,7 @@ class YoLov5TRT:
             end = time.time()
 
         # Do postprocess
-        post_process_results = self._post_process(inference_slot.host_output, origin_h, origin_w)
+        post_process_results = self._post_process(inference_slot.host_output, geometry)
         detections = _pack_detection_results(*post_process_results)
 
         self.inference_slots.append(inference_slot)
@@ -281,18 +251,18 @@ class YoLov5TRT:
                                for _ in images]
 
             start = time.time()
+            geometries = []
             for image, inference_slot in zip(images, inference_slots, strict=True):
-                self._preprocess_image(image, inference_slot)
+                geometries.append(self._preprocess_image(image, inference_slot))
                 self._dispatch_gpu_inference(inference_slot)
 
             end = time.time()
 
             results = []
-            for image, inference_slot in zip(images, inference_slots, strict=True):
-                h, w, _ = image.shape
+            for geometry, inference_slot in zip(geometries, inference_slots, strict=True):
                 # Synchronize stream to make sure that inference_slot.host_output has valid values
                 inference_slot.stream.synchronize()
-                post_process_results = self._post_process(inference_slot.host_output, h, w)
+                post_process_results = self._post_process(inference_slot.host_output, geometry)
                 detections = _pack_detection_results(*post_process_results)
                 results.append(detections)
                 self.inference_slots.append(inference_slot)
@@ -350,41 +320,28 @@ class YoLov5TRT:
             pass
         self.ctx = None
 
-    def xywh2xyxy(self, origin_h: int, origin_w: int, x: np.ndarray) -> np.ndarray:
+    def xywh2xyxy(self, geometry: LetterboxGeometry, x: np.ndarray) -> np.ndarray:
         """
-        Convert nx4 boxes from [x, y, w, h] to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
+        Convert nx4 boxes from [x, y, w, h] in letterbox space to [x1, y1, x2, y2] in original image pixels
         param:
-            origin_h:   height of original image
-            origin_w:   width of original image
+            geometry:   the letterbox geometry the image was preprocessed with
             x:          A boxes numpy, each row is a box [center_x, center_y, w, h]
         return:
             y:          A boxes numpy, each row is a box [x1, y1, x2, y2]
         """
         y = np.zeros_like(x)
-        r_w = self.input_w / origin_w
-        r_h = self.input_h / origin_h
-        if r_h > r_w:
-            y[:, 0] = x[:, 0] - x[:, 2] / 2
-            y[:, 2] = x[:, 0] + x[:, 2] / 2
-            y[:, 1] = x[:, 1] - x[:, 3] / 2 - (self.input_h - r_w * origin_h) / 2
-            y[:, 3] = x[:, 1] + x[:, 3] / 2 - (self.input_h - r_w * origin_h) / 2
-            y /= r_w
-        else:
-            y[:, 0] = x[:, 0] - x[:, 2] / 2 - (self.input_w - r_h * origin_w) / 2
-            y[:, 2] = x[:, 0] + x[:, 2] / 2 - (self.input_w - r_h * origin_w) / 2
-            y[:, 1] = x[:, 1] - x[:, 3] / 2
-            y[:, 3] = x[:, 1] + x[:, 3] / 2
-            y /= r_h
+        y[:, 0] = x[:, 0] - x[:, 2] / 2
+        y[:, 1] = x[:, 1] - x[:, 3] / 2
+        y[:, 2] = x[:, 0] + x[:, 2] / 2
+        y[:, 3] = x[:, 1] + x[:, 3] / 2
+        return geometry.boxes_to_original(y)
 
-        return y
-
-    def _post_process(self, output_tensor: np.ndarray, origin_h: int, origin_w: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _post_process(self, output_tensor: np.ndarray, geometry: LetterboxGeometry) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Postprocess the prediction
         param:
             output:     A numpy likes [num_boxes,cx,cy,w,h,conf,cls_id, cx,cy,w,h,conf,cls_id, ...]
-            origin_h:   height of original image
-            origin_w:   width of original image
+            geometry:   the letterbox geometry the image was preprocessed with
         return:
             result_boxes: finally boxes, a boxes numpy, each row is a box [x1, y1, x2, y2]
             result_scores: finally scores, a numpy, each element is the score correspoing to box
@@ -397,7 +354,7 @@ class YoLov5TRT:
         pred = np.reshape(output[1:], (-1, LEN_ONE_RESULT))[:num, :]
         pred = pred[:, :6]
         # Do nms
-        boxes = self._non_max_suppression(pred, origin_h, origin_w)
+        boxes = self._non_max_suppression(pred, geometry)
         result_boxes = boxes[:, :4] if len(boxes) else np.array([])
         result_scores = boxes[:, 4] if len(boxes) else np.array([])
         result_classid = boxes[:, 5] if len(boxes) else np.array([])
@@ -440,14 +397,13 @@ class YoLov5TRT:
 
         return iou
 
-    def _non_max_suppression(self, prediction: np.ndarray, origin_h: int, origin_w: int) -> np.ndarray:
+    def _non_max_suppression(self, prediction: np.ndarray, geometry: LetterboxGeometry) -> np.ndarray:
         """
         Removes detections with lower object confidence score than 'conf_thres' and performs
         Non-Maximum Suppression to further filter detections.
 
         param prediction:  detections, (x1, y1, x2, y2, conf, cls_id)
-        param origin_h: original image height
-        param origin_w: original image width
+        param geometry: the letterbox geometry the image was preprocessed with
 
         return:
             boxes: output after nms with the shape (x1, y1, x2, y2, conf, cls_id)
@@ -459,12 +415,12 @@ class YoLov5TRT:
         # Get the boxes that score > CONF_THRESH
         boxes = prediction[prediction[:, 4] >= conf_thres]
         # Trandform bbox from [center_x, center_y, w, h] to [x1, y1, x2, y2]
-        boxes[:, :4] = self.xywh2xyxy(origin_h, origin_w, boxes[:, :4])
+        boxes[:, :4] = self.xywh2xyxy(geometry, boxes[:, :4])
         # clip the coordinates
-        boxes[:, 0] = np.clip(boxes[:, 0], 0, origin_w - 1)
-        boxes[:, 2] = np.clip(boxes[:, 2], 0, origin_w - 1)
-        boxes[:, 1] = np.clip(boxes[:, 1], 0, origin_h - 1)
-        boxes[:, 3] = np.clip(boxes[:, 3], 0, origin_h - 1)
+        boxes[:, 0] = np.clip(boxes[:, 0], 0, geometry.original_width - 1)
+        boxes[:, 2] = np.clip(boxes[:, 2], 0, geometry.original_width - 1)
+        boxes[:, 1] = np.clip(boxes[:, 1], 0, geometry.original_height - 1)
+        boxes[:, 3] = np.clip(boxes[:, 3], 0, geometry.original_height - 1)
         # Object confidence
         confs = boxes[:, 4]
         # Sort by the confs

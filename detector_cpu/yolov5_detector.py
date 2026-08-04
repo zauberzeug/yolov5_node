@@ -7,7 +7,6 @@ import time
 from dataclasses import dataclass
 from typing import final, override
 
-import cv2  # type: ignore # pylint: disable=import-error
 import numpy as np
 import torch  # type: ignore # pylint: disable=import-error
 from learning_loop_node import DetectorLogic, DetectorLogicFactory
@@ -19,6 +18,7 @@ from learning_loop_node.data_classes import (
     PointDetection,
 )
 from learning_loop_node.enums import CategoryType
+from yolo_common.model_input import LetterboxGeometry, letterbox
 
 
 @final
@@ -101,10 +101,10 @@ class Yolov5Detector(DetectorLogic):
 
         try:
             t = time.time()
-            input_image, origin_h, origin_w = self._preprocess_image(image)
+            input_image, geometry = self._preprocess_image(image)
 
-            im_height = origin_h
-            im_width = origin_w
+            im_height = geometry.original_height
+            im_width = geometry.original_width
 
             # Inference
             det = self.yolov5(torch.from_numpy(input_image))[0].numpy()[0]
@@ -118,7 +118,7 @@ class Yolov5Detector(DetectorLogic):
                 return image_metadata
 
             result_boxes, result_scores, result_classid = self._post_process(
-                det, origin_h, origin_w, conf_thres, iou_thres)
+                det, geometry, conf_thres, iou_thres)
 
             for j, box in enumerate(result_boxes[:max_det]):
                 x, y, br_x, br_y = box
@@ -162,40 +162,17 @@ class Yolov5Detector(DetectorLogic):
         except Exception as e:
             raise RuntimeError('Error during inference') from e
 
-    def _preprocess_image(self, image_raw):
+    def _preprocess_image(self, image_raw: np.ndarray) -> tuple[np.ndarray, LetterboxGeometry]:
         """
-        description: resize and pad it to target size, normalize to [0,1],
+        description: letterbox to the model input size, normalize to [0,1],
                      transform to NCHW format.
         param:
-            input_image_path: str, image path
+            image_raw: A raw image ndarray, shape is [H,W,3]
         return:
-            image:  the processed image
-            h: original height
-            w: original width
+            image: the processed image
+            geometry: the letterbox geometry to map detections back with
         """
-        input_size = self.input_size
-        h, w, _ = image_raw.shape
-        # Calculate widht and height and paddings
-        r_w = input_size / w
-        r_h = input_size / h
-        if r_h > r_w:
-            tw = input_size
-            th = int(r_w * h)
-            tx1 = tx2 = 0
-            ty1 = int((input_size - th) / 2)
-            ty2 = input_size - th - ty1
-        else:
-            tw = int(r_h * w)
-            th = input_size
-            tx1 = int((input_size - tw) / 2)
-            tx2 = input_size - tw - tx1
-            ty1 = ty2 = 0
-
-        # Resize the image with long side while maintaining ratio
-        image = cv2.resize(image_raw, (tw, th))
-        # Pad the short side with (128,128,128)
-        image = cv2.copyMakeBorder(
-            image, ty1, ty2, tx1, tx2, cv2.BORDER_CONSTANT, None, (128, 128, 128))
+        image, geometry = letterbox(image_raw, self.input_size, self.input_size)
         image = image.astype(np.float32)
         image /= 255.0  # Normalize to [0,1]
         image = np.transpose(image, [2, 0, 1])  # HWC to CHW format:
@@ -203,16 +180,16 @@ class Yolov5Detector(DetectorLogic):
         # Convert the image to row-major order, also known as "C order":
         image = np.ascontiguousarray(image)
 
-        return image, h, w
+        return image, geometry
 
-    def _post_process(self, pred, origin_h, origin_w, conf_thres, nms_thres):
+    def _post_process(self, pred: np.ndarray, geometry: LetterboxGeometry,
+                      conf_thres: float, nms_thres: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         description: postprocess the prediction
         param:
-            pred:     A numpy likes [[cx,cy,w,h,conf, c0_prob, c1_prob, ...], 
-                                     [cx,cy,w,h,conf, c0_prob, c1_prob, ...], ...] 
-            origin_h:   height of original image
-            origin_w:   width of original image
+            pred:     A numpy likes [[cx,cy,w,h,conf, c0_prob, c1_prob, ...],
+                                     [cx,cy,w,h,conf, c0_prob, c1_prob, ...], ...]
+            geometry:   the letterbox geometry the image was preprocessed with
             conf_thres: confidence threshold
             nms_thres: iou threshold
         return:
@@ -225,7 +202,7 @@ class Yolov5Detector(DetectorLogic):
 
         # Do nms
         boxes = self._non_max_suppression(
-            pred, origin_h, origin_w, conf_thres, nms_thres)
+            pred, geometry, conf_thres, nms_thres)
         if len(boxes) == 0:
             return np.empty((0, 4)), np.empty((0,)), np.empty((0,), dtype=int)
 
@@ -238,16 +215,15 @@ class Yolov5Detector(DetectorLogic):
             result_classid = np.zeros(boxes.shape[0], dtype=int)
         return result_boxes, result_scores, result_classid
 
-    def _non_max_suppression(self, pred, origin_h, origin_w, conf_thres, nms_thres):
+    def _non_max_suppression(self, pred: np.ndarray, geometry: LetterboxGeometry,
+                             conf_thres: float, nms_thres: float) -> np.ndarray:
         """
         description: Removes detections with lower object confidence score than 'conf_thres' and performs
         Non-Maximum Suppression to further filter detections.
         param:
-            prediction: A numpy likes [[cx,cy,w,h,conf, c0_prob, c1_prob, ...], 
-                                       [cx,cy,w,h,conf, c0_prob, c1_prob, ...], ...] 
-            origin_h: original image height
-            origin_w: original image width
-            input_size: the input size of the model
+            prediction: A numpy likes [[cx,cy,w,h,conf, c0_prob, c1_prob, ...],
+                                       [cx,cy,w,h,conf, c0_prob, c1_prob, ...], ...]
+            geometry: the letterbox geometry the image was preprocessed with
             conf_thres: a confidence threshold to filter detections
             nms_thres: a iou threshold to filter detections
         return:
@@ -259,7 +235,7 @@ class Yolov5Detector(DetectorLogic):
             return np.array([])
         num_classes = boxes.shape[1] - 5
         # Transform bbox from [center_x, center_y, w, h] to [x1, y1, x2, y2]
-        boxes[:, :4] = self.xywh2xyxy(origin_h, origin_w, boxes[:, :4])
+        boxes[:, :4] = self.xywh2xyxy(geometry, boxes[:, :4])
         # Object confidence
         confs = boxes[:, 4]
         # Sort by the confs
@@ -323,38 +299,22 @@ class Yolov5Detector(DetectorLogic):
 
         return iou
 
-    def xywh2xyxy(self, origin_h, origin_w, x):
+    def xywh2xyxy(self, geometry: LetterboxGeometry, x: np.ndarray) -> np.ndarray:
         """
-        description:    Convert nx4 boxes from [x, y, w, h] to [x1, y1, x2, y2] where xy1=top-left, xy2=bottom-right
+        description:    Convert nx4 boxes from [x, y, w, h] in letterbox space to [x1, y1, x2, y2]
+                        in original image pixels where xy1=top-left, xy2=bottom-right
         param:
-            origin_h:   height of original image
-            origin_w:   width of original image
+            geometry:   the letterbox geometry the image was preprocessed with
             x:          A boxes numpy, each row is a box [center_x, center_y, w, h]
         return:
             y:          A boxes numpy, each row is a box [x1, y1, x2, y2]
         """
-        input_size = self.input_size
         y = np.zeros_like(x)
-        r_w = input_size / origin_w
-        r_h = input_size / origin_h
-        if r_h > r_w:
-            y[:, 0] = x[:, 0] - x[:, 2] / 2
-            y[:, 2] = x[:, 0] + x[:, 2] / 2
-            y[:, 1] = x[:, 1] - x[:, 3] / 2 - \
-                (input_size - r_w * origin_h) / 2
-            y[:, 3] = x[:, 1] + x[:, 3] / 2 - \
-                (input_size - r_w * origin_h) / 2
-            y /= r_w
-        else:
-            y[:, 0] = x[:, 0] - x[:, 2] / 2 - \
-                (input_size - r_h * origin_w) / 2
-            y[:, 2] = x[:, 0] + x[:, 2] / 2 - \
-                (input_size - r_h * origin_w) / 2
-            y[:, 1] = x[:, 1] - x[:, 3] / 2
-            y[:, 3] = x[:, 1] + x[:, 3] / 2
-            y /= r_h
-
-        return y
+        y[:, 0] = x[:, 0] - x[:, 2] / 2
+        y[:, 1] = x[:, 1] - x[:, 3] / 2
+        y[:, 2] = x[:, 0] + x[:, 2] / 2
+        y[:, 3] = x[:, 1] + x[:, 3] / 2
+        return geometry.boxes_to_original(y)
 
     @override
     def batch_evaluate(self, images: list[np.ndarray]) -> ImagesMetadata:

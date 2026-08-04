@@ -23,7 +23,7 @@ jobs:
             image: zauberzeug/yolov5-detector
             tag_suffix: "-cloud-cpu"
             build_args: ""
-          - context: detector/
+          - context: .
             dockerfile: detector/Dockerfile
             image: zauberzeug/yolov5-detector
             tag_suffix: "-cloud"
@@ -53,7 +53,7 @@ jobs:
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
       - name: Build and push
         run: |
-          docker build detector/ \
+          docker build . \
             -f detector/Dockerfile \
             --build-arg BASE_IMAGE=dustynv/l4t-ml:r36.4.0 \
             --build-arg INSTALL_OPENCV=false \

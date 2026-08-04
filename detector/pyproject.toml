@@ -18,13 +18,18 @@ dependencies = [
     "idna_ssl",
     "aiosignal",
     "numpy",
+    "opencv-python-headless",
     "pyyaml",
     "pycuda==2025.1.2",
     "learning_loop_node==0.20.1",
     "typing_extensions",
+    "yolo_common",
 ]
 
 # Note: learning_loop_node is installed separately in Dockerfiles with a specific version
+
+[tool.uv.sources]
+yolo_common = { path = "../yolo_common", editable = true }
 
 [dependency-groups]
 dev = [
