@@ -42,6 +42,7 @@ jobs:
             --platform linux/amd64,linux/arm64 \
             -f ${{ matrix.dockerfile }} \
             ${{ matrix.build_args }} \
+            --build-arg VERSION=${VERSION} \
             -t ${{ matrix.image }}:${VERSION#v}${{ matrix.tag_suffix }} \
             --push
 
@@ -57,5 +58,6 @@ jobs:
             -f detector/Dockerfile \
             --build-arg BASE_IMAGE=dustynv/l4t-ml:r36.4.0 \
             --build-arg INSTALL_OPENCV=false \
+            --build-arg VERSION=${VERSION} \
             -t zauberzeug/yolov5-detector:${VERSION#v}-jetson
           docker push zauberzeug/yolov5-detector:${VERSION#v}-jetson

@@ -62,4 +62,8 @@ WORKDIR /app/
 
 EXPOSE 80
 ENV TZ=Europe/Amsterdam
+
+ARG VERSION=unknown
+ENV NODE_VERSION=$VERSION
+
 CMD ["python", "/app/main.py"]
