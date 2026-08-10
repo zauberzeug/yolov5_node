@@ -25,7 +25,7 @@ dependencies = [
     "idna_ssl",
     "aiosignal",
     "IPython",
-    "learning_loop_node==0.20.1",
+    "learning_loop_node==0.21.0",
 ]
 
 [dependency-groups]
