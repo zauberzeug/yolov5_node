@@ -125,10 +125,8 @@ void save_timing_cache(ITimingCache* cache, const std::string& cache_name) {
 
     const std::string tmp_name = cache_name + ".tmp";
     std::ofstream file(tmp_name, std::ios::binary);
-    if (file) {
-        file.write(reinterpret_cast<const char*>(blob->data()), blob->size());
-        file.close();
-    }
+    file.write(reinterpret_cast<const char*>(blob->data()), blob->size());
+    file.close();
     if (!file || std::rename(tmp_name.c_str(), cache_name.c_str()) != 0) {
         std::cerr << "Could not write timing cache to " << cache_name << std::endl;
         std::remove(tmp_name.c_str());
