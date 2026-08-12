@@ -97,24 +97,21 @@ ITimingCache* load_timing_cache(IBuilderConfig* config, const std::string& cache
     const std::vector<char> blob(std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{});
 
     ITimingCache* cache = blob.empty() ? nullptr : config->createTimingCache(blob.data(), blob.size());
-    if (cache != nullptr && !config->setTimingCache(*cache, false)) {
+    if (cache != nullptr) {
+        if (config->setTimingCache(*cache, false)) {
+            std::cout << "Reusing timing cache " << cache_name << " (" << blob.size() << " bytes)" << std::endl;
+            return cache;
+        }
         std::cout << "Timing cache " << cache_name << " does not match this GPU or TensorRT version, discarding it"
                   << std::endl;
         delete cache;
-        cache = nullptr;
-    } else if (cache != nullptr) {
-        std::cout << "Reusing timing cache " << cache_name << " (" << blob.size() << " bytes)" << std::endl;
     }
 
-    if (cache == nullptr) {
-        cache = config->createTimingCache(nullptr, 0);
-        if (cache != nullptr && !config->setTimingCache(*cache, false)) {
-            delete cache;
-            cache = nullptr;
-        }
-        if (cache == nullptr) {
-            std::cerr << "Could not set up a timing cache, building without one" << std::endl;
-        }
+    cache = config->createTimingCache(nullptr, 0);
+    if (cache == nullptr || !config->setTimingCache(*cache, false)) {
+        std::cerr << "Could not set up a timing cache, building without one" << std::endl;
+        delete cache;
+        return nullptr;
     }
     return cache;
 }
