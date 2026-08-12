@@ -33,6 +33,7 @@ class Yolov5DetectorParams(DetectorLogicFactory):
     weight_type: Literal['FP16', 'FP32', 'INT8']
     iou_threshold: float
     conf_threshold: float
+    builder_optimization_level: int = 4
 
     @property
     @override
@@ -71,7 +72,8 @@ class Yolov5Detector(DetectorLogic):
         )
         _build_module_lib(lib_config)
         engine_file = _create_engine(f'{model_info.model_root_path}/model.wts',
-                                     model_info.model_size or 's6')
+                                     model_info.model_size or 's6',
+                                     params.builder_optimization_level)
 
         ctypes.CDLL(str(_LIB_FILE))
 
@@ -254,14 +256,16 @@ def _build_module_lib(config: _LibConfig) -> None:
     config.save(_LIB_CONFIG_FILE)
 
 
-def _create_engine(wts_file: str, model_variant: str) -> str:
+def _create_engine(wts_file: str, model_variant: str, builder_optimization_level: int) -> str:
     engine_file = Path(wts_file).parent / 'model.engine'
     if engine_file.is_file():
         _LOG.info('Engine at %s already exists, skipping conversion', engine_file)
         return str(engine_file)
 
-    _LOG.info('Building engine %s from %s', engine_file, wts_file)
+    _LOG.info('Building engine %s from %s at optimization level %d',
+              engine_file, wts_file, builder_optimization_level)
     os.chdir(_BUILD_DIR)
-    subprocess.run(f'{_DET_BIN} -s {wts_file} {engine_file} {model_variant} --timing-cache {_TIMING_CACHE_FILE}',
+    subprocess.run(f'{_DET_BIN} -s {wts_file} {engine_file} {model_variant} --timing-cache {_TIMING_CACHE_FILE} '
+                   f'--optimization-level {builder_optimization_level}',
                    shell=True, check=True)
     return str(engine_file)

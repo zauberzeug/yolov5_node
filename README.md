@@ -56,13 +56,16 @@ There are two variants of the detector:
 Mandatory parameters are those described in [Zauberzeug Learning Loop Node Library](https://github.com/zauberzeug/learning_loop_node).
 Besides, the following parameters may be set:
 
-| Name           | Purpose                                   | Value                     | Default | Required only with ./docker.sh |
-| -------------- | ----------------------------------------- | ------------------------- | ------- | ------------------------------ |
-| LINKLL         | Link the node library into the container? | TRUE or FALSE             | FALSE   | Yes                            |
-| DETECTOR_NAME  | Will be the name of the container         | String                    | -       | Yes                            |
-| WEIGHT_TYPE    | Data type to convert weights to           | String [FP32, FP16, INT8] | FP16    | No                             |
-| IOU_THRESHOLD  | IoU threshold for NMS                     | Float                     | 0.45    | No                             |
-| CONF_THRESHOLD | Confidence threshold for NMS              | Float                     | 0.2     | No                             |
+| Name                        | Purpose                                   | Value                     | Default | Required only with ./docker.sh |
+| --------------------------- | ----------------------------------------- | ------------------------- | ------- | ------------------------------ |
+| LINKLL                      | Link the node library into the container? | TRUE or FALSE             | FALSE   | Yes                            |
+| DETECTOR_NAME               | Will be the name of the container         | String                    | -       | Yes                            |
+| WEIGHT_TYPE                 | Data type to convert weights to           | String [FP32, FP16, INT8] | FP16    | No                             |
+| IOU_THRESHOLD               | IoU threshold for NMS                     | Float                     | 0.45    | No                             |
+| CONF_THRESHOLD              | Confidence threshold for NMS              | Float                     | 0.2     | No                             |
+| BUILDER_OPTIMIZATION_LEVEL  | TensorRT builder optimization level       | Integer [0-5]             | 4       | No                             |
+
+Higher `BUILDER_OPTIMIZATION_LEVEL` values let the TensorRT builder benchmark more kernel tactics, which can yield faster inference at the cost of a longer engine build (the timing cache described below keeps later builds fast). The level only applies while an engine is built, so changing it takes effect for the next model that has no engine yet — delete `model.engine` in the model folder to rebuild an existing one.
 
 Pulled images can be run with the `docker.sh` script by calling `./docker.sh run-image`.
 Local builds can be run with `./docker.sh run`.
