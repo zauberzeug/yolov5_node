@@ -89,9 +89,7 @@ void infer(IExecutionContext& context, cudaStream_t& stream, void** gpu_buffers,
     cudaStreamSynchronize(stream);
 }
 
-// PATCH (yolov5-node): added load_timing_cache/save_timing_cache. Upstream builds every engine from
-// scratch, so TensorRT re-benchmarks all kernel tactics each time. Persisting them cuts a rebuild on the
-// same device from ~158s to ~8s.
+// PATCH (yolov5-node): added load_timing_cache/save_timing_cache to reuse kernel timings across builds.
 // The returned cache is owned by the caller and has to outlive the config. Returns nullptr to build without one.
 ITimingCache* load_timing_cache(IBuilderConfig* config, const std::string& cache_name) {
     std::vector<char> blob;
@@ -219,8 +217,7 @@ void deserialize_engine(std::string& engine_name, IRuntime** runtime, ICudaEngin
     delete[] serialized_engine;
 }
 
-// PATCH (yolov5-node): added extract_timing_cache_arg for the new --timing-cache option, so upstream's
-// strictly positional parse_args stays untouched.
+// PATCH (yolov5-node): added for the new --timing-cache option.
 // Removes the pair from argv, so parse_args only sees positional arguments.
 std::string extract_timing_cache_arg(int& argc, char** argv) {
     for (int i = 1; i + 1 < argc; i++) {

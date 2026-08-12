@@ -21,9 +21,7 @@ This will automatically trigger a pipeline action that builds and publishes dock
 [detector/tensorrtx](detector/tensorrtx) is a copy of [wang-xinyu/tensorrtx](https://github.com/wang-xinyu/tensorrtx) (trt10 branch).
 Avoid changing it, so that upstream patches can still be merged.
 
-If a change is unavoidable, mark it with a `PATCH (yolov5-node)` comment at the place it applies and state what upstream does and why we deviate.
-Unlike the comment rule in the style guide below, these comments deliberately record the motivation, because whoever re-applies them after an upstream update needs to know whether they are still required.
-`grep -rn "PATCH (yolov5-node)"` then lists every deviation.
+If a change is unavoidable, mark it with a `PATCH (yolov5-node)` comment at the place it applies, so that `grep -rn "PATCH (yolov5-node)"` lists every deviation.
 
 ## Data Team Standards
 
