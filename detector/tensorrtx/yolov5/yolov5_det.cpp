@@ -146,7 +146,7 @@ void serialize_engine(unsigned int max_batchsize, bool& is_p6, float& gd, float&
     // PATCH (yolov5-node): cache_name parameter added; an empty name keeps the upstream behaviour.
     ITimingCache* timing_cache = cache_name.empty() ? nullptr : load_timing_cache(config, cache_name);
 
-    // PATCH (yolov5-node): optimization_level parameter added; a negative value keeps the TensorRT default.
+    // PATCH (yolov5-node): a negative value keeps the TensorRT default.
     if (optimization_level >= 0) {
         std::cout << "Building at optimization level " << optimization_level << std::endl;
         config->setBuilderOptimizationLevel(optimization_level);
@@ -240,7 +240,7 @@ int main(int argc, char** argv) {
     // PATCH (yolov5-node): consume our options before the upstream argument parsing runs.
     std::string timing_cache_name = extract_option(argc, argv, "--timing-cache");
     std::string optimization_level_arg = extract_option(argc, argv, "--optimization-level");
-    // A missing option keeps the TensorRT default; the caller checks the range, TensorRT itself silently clamps.
+    // A missing option keeps the TensorRT default.
     int optimization_level = optimization_level_arg.empty() ? -1 : atoi(optimization_level_arg.c_str());
 
     if (!parse_args(argc, argv, wts_name, engine_name, is_p6, gd, gw, img_dir)) {
