@@ -89,6 +89,9 @@ void infer(IExecutionContext& context, cudaStream_t& stream, void** gpu_buffers,
     cudaStreamSynchronize(stream);
 }
 
+// PATCH (yolov5-node): added load_timing_cache/save_timing_cache. Upstream builds every engine from
+// scratch, so TensorRT re-benchmarks all kernel tactics each time. Persisting them cuts a rebuild on the
+// same device from ~158s to ~8s.
 // The returned cache is owned by the caller and has to outlive the config. Returns nullptr to build without one.
 ITimingCache* load_timing_cache(IBuilderConfig* config, const std::string& cache_name) {
     std::vector<char> blob;
@@ -156,6 +159,7 @@ void serialize_engine(unsigned int max_batchsize, bool& is_p6, float& gd, float&
     IBuilder* builder = createInferBuilder(gLogger);
     IBuilderConfig* config = builder->createBuilderConfig();
 
+    // PATCH (yolov5-node): cache_name parameter added; an empty name keeps the upstream behaviour.
     ITimingCache* timing_cache = cache_name.empty() ? nullptr : load_timing_cache(config, cache_name);
 
     // Create model to populate the network, then set the outputs and create an engine
@@ -170,6 +174,7 @@ void serialize_engine(unsigned int max_batchsize, bool& is_p6, float& gd, float&
     // Serialize the engine
     assert(serialized_engine != nullptr);
 
+    // PATCH (yolov5-node): store the tactics measured during this build.
     if (timing_cache != nullptr) {
         save_timing_cache(timing_cache, cache_name);
     }
@@ -185,7 +190,7 @@ void serialize_engine(unsigned int max_batchsize, bool& is_p6, float& gd, float&
     // Close everything down (the config references the timing cache, so it has to go first)
     delete serialized_engine;
     delete config;
-    delete timing_cache;
+    delete timing_cache;  // PATCH (yolov5-node)
     delete builder;
 }
 
@@ -214,6 +219,8 @@ void deserialize_engine(std::string& engine_name, IRuntime** runtime, ICudaEngin
     delete[] serialized_engine;
 }
 
+// PATCH (yolov5-node): added extract_timing_cache_arg for the new --timing-cache option, so upstream's
+// strictly positional parse_args stays untouched.
 // Removes the pair from argv, so parse_args only sees positional arguments.
 std::string extract_timing_cache_arg(int& argc, char** argv) {
     for (int i = 1; i + 1 < argc; i++) {
@@ -241,6 +248,7 @@ int main(int argc, char** argv) {
     float gd = 0.0f, gw = 0.0f;
     std::string img_dir;
 
+    // PATCH (yolov5-node): consume --timing-cache before the upstream argument parsing runs.
     std::string timing_cache_name = extract_timing_cache_arg(argc, argv);
 
     if (!parse_args(argc, argv, wts_name, engine_name, is_p6, gd, gw, img_dir)) {
