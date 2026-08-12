@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <vector>
 
 using namespace nvinfer1;
@@ -92,18 +93,8 @@ void infer(IExecutionContext& context, cudaStream_t& stream, void** gpu_buffers,
 // PATCH (yolov5-node): added load_timing_cache/save_timing_cache to reuse kernel timings across builds.
 // The returned cache is owned by the caller and has to outlive the config. Returns nullptr to build without one.
 ITimingCache* load_timing_cache(IBuilderConfig* config, const std::string& cache_name) {
-    std::vector<char> blob;
     std::ifstream file(cache_name, std::ios::binary);
-    if (file.good()) {
-        file.seekg(0, file.end);
-        const std::streamoff size = file.tellg();
-        if (size > 0) {
-            blob.resize(size);
-            file.seekg(0, file.beg);
-            file.read(blob.data(), blob.size());
-            blob.resize(file.gcount());  // drop the tail of a short read
-        }
-    }
+    const std::vector<char> blob(std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{});
 
     ITimingCache* cache = blob.empty() ? nullptr : config->createTimingCache(blob.data(), blob.size());
     if (cache != nullptr && !config->setTimingCache(*cache, false)) {
