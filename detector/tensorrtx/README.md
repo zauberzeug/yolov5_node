@@ -2,6 +2,8 @@
 
 YOLOv5 TensorRTx is a TensorRT implementation of YOLOv5. It is based on the TensorRTx repository hosted at https://github.com/wang-xinyu/tensorrtx.
 The current version has been copied from the trt10 branch.
+The code is kept as close to upstream as possible so that upstream patches can still be merged.
+Every deviation is marked with a `PATCH (yolov5-node)` comment at the place where it applies, so `grep -rn "PATCH (yolov5-node)"` lists what has to be re-applied after an update.
 
 
 # TensorRTx

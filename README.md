@@ -103,6 +103,8 @@ The trainer uses the `yolov5_pytorch` format identifier (`yolov5_cla_pytorch` fo
 When it saves a model to the Learning Loop it saves the model as `yolov5_pytorch` and `yolov5_wts` (respectively `yolov5_cla_pytorch` and `yolov5_cla_wts` for classification).
 The wts formats may be used by a detector running on a NVIDIA Jetson device to create an engine file as required by tensorrtx (see https://github.com/wang-xinyu/tensorrtx/tree/master/yolov5).
 
+While building an engine the detector reads and updates a TensorRT timing cache at `trt_timing.cache` in the data folder, so later builds can reuse the kernel timings measured by earlier ones instead of benchmarking them again. The cache is safe to delete and is rebuilt automatically; TensorRT itself discards it when the GPU or the TensorRT version changed.
+
 # License
 
 This code is licensed under the [AGPL-3.0 License](https://opensource.org/license/agpl-v3/). The code in

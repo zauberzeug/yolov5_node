@@ -7,7 +7,11 @@
 
 #include <chrono>
 #include <cmath>
+#include <cstdio>
+#include <fstream>
 #include <iostream>
+#include <iterator>
+#include <vector>
 
 using namespace nvinfer1;
 
@@ -86,11 +90,61 @@ void infer(IExecutionContext& context, cudaStream_t& stream, void** gpu_buffers,
     cudaStreamSynchronize(stream);
 }
 
+// PATCH (yolov5-node): added load_timing_cache/save_timing_cache to reuse kernel timings across builds.
+// The returned cache is owned by the caller and has to outlive the config. Returns nullptr to build without one.
+ITimingCache* load_timing_cache(IBuilderConfig* config, const std::string& cache_name) {
+    std::ifstream file(cache_name, std::ios::binary);
+    const std::vector<char> blob(std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{});
+
+    ITimingCache* cache = blob.empty() ? nullptr : config->createTimingCache(blob.data(), blob.size());
+    if (cache != nullptr) {
+        if (config->setTimingCache(*cache, false)) {
+            std::cout << "Reusing timing cache " << cache_name << " (" << blob.size() << " bytes)" << std::endl;
+            return cache;
+        }
+        std::cout << "Timing cache " << cache_name << " does not match this GPU or TensorRT version, discarding it"
+                  << std::endl;
+        delete cache;
+    }
+
+    cache = config->createTimingCache(nullptr, 0);
+    if (cache == nullptr || !config->setTimingCache(*cache, false)) {
+        std::cerr << "Could not set up a timing cache, building without one" << std::endl;
+        delete cache;
+        return nullptr;
+    }
+    return cache;
+}
+
+void save_timing_cache(ITimingCache* cache, const std::string& cache_name) {
+    IHostMemory* blob = cache->serialize();
+    if (blob == nullptr) {
+        std::cerr << "Could not serialize timing cache" << std::endl;
+        return;
+    }
+
+    const std::string tmp_name = cache_name + ".tmp";
+    std::ofstream file(tmp_name, std::ios::binary);
+    file.write(reinterpret_cast<const char*>(blob->data()), blob->size());
+    file.close();
+    if (!file || std::rename(tmp_name.c_str(), cache_name.c_str()) != 0) {
+        std::cerr << "Could not write timing cache to " << cache_name << std::endl;
+        std::remove(tmp_name.c_str());
+    } else {
+        std::cout << "Wrote timing cache " << cache_name << " (" << blob->size() << " bytes)" << std::endl;
+    }
+
+    delete blob;
+}
+
 void serialize_engine(unsigned int max_batchsize, bool& is_p6, float& gd, float& gw, std::string& wts_name,
-                      std::string& engine_name) {
+                      std::string& engine_name, const std::string& cache_name) {
     // Create builder
     IBuilder* builder = createInferBuilder(gLogger);
     IBuilderConfig* config = builder->createBuilderConfig();
+
+    // PATCH (yolov5-node): cache_name parameter added; an empty name keeps the upstream behaviour.
+    ITimingCache* timing_cache = cache_name.empty() ? nullptr : load_timing_cache(config, cache_name);
 
     // Create model to populate the network, then set the outputs and create an engine
     IHostMemory* serialized_engine = nullptr;
@@ -104,6 +158,11 @@ void serialize_engine(unsigned int max_batchsize, bool& is_p6, float& gd, float&
     // Serialize the engine
     assert(serialized_engine != nullptr);
 
+    // PATCH (yolov5-node): store the tactics measured during this build.
+    if (timing_cache != nullptr) {
+        save_timing_cache(timing_cache, cache_name);
+    }
+
     // Save engine to file
     std::ofstream p(engine_name, std::ios::binary);
     if (!p) {
@@ -112,9 +171,10 @@ void serialize_engine(unsigned int max_batchsize, bool& is_p6, float& gd, float&
     }
     p.write(reinterpret_cast<const char*>(serialized_engine->data()), serialized_engine->size());
 
-    // Close everything down
+    // Close everything down (the config references the timing cache, so it has to go first)
     delete serialized_engine;
     delete config;
+    delete timing_cache;  // PATCH (yolov5-node)
     delete builder;
 }
 
@@ -143,6 +203,23 @@ void deserialize_engine(std::string& engine_name, IRuntime** runtime, ICudaEngin
     delete[] serialized_engine;
 }
 
+// PATCH (yolov5-node): added for the new --timing-cache option.
+// Removes the pair from argv, so parse_args only sees positional arguments.
+std::string extract_timing_cache_arg(int& argc, char** argv) {
+    for (int i = 1; i + 1 < argc; i++) {
+        if (std::string(argv[i]) != "--timing-cache") {
+            continue;
+        }
+        std::string cache_name = std::string(argv[i + 1]);
+        for (int j = i; j + 2 < argc; j++) {
+            argv[j] = argv[j + 2];
+        }
+        argc -= 2;
+        return cache_name;
+    }
+    return "";
+}
+
 int main(int argc, char** argv) {
     // -s ../models/yolov5n.wts ../models/yolov5n.fp32.trt n
     // -d ../models/yolov5n.fp32.trt ../images
@@ -154,10 +231,13 @@ int main(int argc, char** argv) {
     float gd = 0.0f, gw = 0.0f;
     std::string img_dir;
 
+    // PATCH (yolov5-node): consume --timing-cache before the upstream argument parsing runs.
+    std::string timing_cache_name = extract_timing_cache_arg(argc, argv);
+
     if (!parse_args(argc, argv, wts_name, engine_name, is_p6, gd, gw, img_dir)) {
         std::cerr << "arguments not right!" << std::endl;
-        std::cerr << "./yolov5_det -s [.wts] [.engine] [n/s/m/l/x/n6/s6/m6/l6/x6 or c/c6 gd gw]  // serialize model to "
-                     "plan file"
+        std::cerr << "./yolov5_det -s [.wts] [.engine] [n/s/m/l/x/n6/s6/m6/l6/x6 or c/c6 gd gw] [--timing-cache "
+                     "[.cache]]  // serialize model to plan file"
                   << std::endl;
         std::cerr << "./yolov5_det -d [.engine] ../images  // deserialize plan file and run inference" << std::endl;
         return -1;
@@ -165,7 +245,7 @@ int main(int argc, char** argv) {
 
     // Create a model using the API directly and serialize it to a file
     if (!wts_name.empty()) {
-        serialize_engine(kBatchSize, is_p6, gd, gw, wts_name, engine_name);
+        serialize_engine(kBatchSize, is_p6, gd, gw, wts_name, engine_name, timing_cache_name);
         return 0;
     }
 

@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Literal, final
 
 import numpy as np
-from learning_loop_node import DetectorLogic, DetectorLogicFactory
+from learning_loop_node import GLOBALS, DetectorLogic, DetectorLogicFactory
 from learning_loop_node.data_classes import (
     BoxDetection,
     ImageMetadata,
@@ -51,6 +51,7 @@ _BUILD_DIR = Path('/tensorrtx/yolov5/build')
 _LIB_FILE = _BUILD_DIR / 'libmyplugins.so'
 _DET_BIN = _BUILD_DIR / 'yolov5_det'
 _LIB_CONFIG_FILE = _BUILD_DIR / 'build.json'
+_TIMING_CACHE_FILE = Path(GLOBALS.data_folder) / 'trt_timing.cache'
 
 
 @final
@@ -261,5 +262,6 @@ def _create_engine(wts_file: str, model_variant: str) -> str:
 
     _LOG.info('Building engine %s from %s', engine_file, wts_file)
     os.chdir(_BUILD_DIR)
-    subprocess.run(f'{_DET_BIN} -s {wts_file} {engine_file} {model_variant}', shell=True, check=True)
+    subprocess.run(f'{_DET_BIN} -s {wts_file} {engine_file} {model_variant} --timing-cache {_TIMING_CACHE_FILE}',
+                   shell=True, check=True)
     return str(engine_file)

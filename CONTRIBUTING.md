@@ -16,6 +16,13 @@ Then set it as the project interpreter in your IDE (e.g. Python: Select Interpre
 To publish a new release of the software (trainer and detectors), create a new release via github and use the [version number](https://semver.org/) as name and tag name with the pattern `v<MAJOR>.<MINOR>.<PATCH>`.
 This will automatically trigger a pipeline action that builds and publishes docker containers as defined in the [workflow file](.github/workflows/docker-deploy.yml).
 
+## Vendored Upstream Code
+
+[detector/tensorrtx](detector/tensorrtx) is a copy of [wang-xinyu/tensorrtx](https://github.com/wang-xinyu/tensorrtx) (trt10 branch).
+Avoid changing it, so that upstream patches can still be merged.
+
+If a change is unavoidable, mark it with a `PATCH (yolov5-node)` comment at the place it applies, so that `grep -rn "PATCH (yolov5-node)"` lists every deviation.
+
 ## Data Team Standards
 
 ## Linting
