@@ -138,13 +138,19 @@ void save_timing_cache(ITimingCache* cache, const std::string& cache_name) {
 }
 
 void serialize_engine(unsigned int max_batchsize, bool& is_p6, float& gd, float& gw, std::string& wts_name,
-                      std::string& engine_name, const std::string& cache_name) {
+                      std::string& engine_name, const std::string& cache_name, int optimization_level) {
     // Create builder
     IBuilder* builder = createInferBuilder(gLogger);
     IBuilderConfig* config = builder->createBuilderConfig();
 
     // PATCH (yolov5-node): cache_name parameter added; an empty name keeps the upstream behaviour.
     ITimingCache* timing_cache = cache_name.empty() ? nullptr : load_timing_cache(config, cache_name);
+
+    // PATCH (yolov5-node): a negative value keeps the TensorRT default.
+    if (optimization_level >= 0) {
+        std::cout << "Building at optimization level " << optimization_level << std::endl;
+        config->setBuilderOptimizationLevel(optimization_level);
+    }
 
     // Create model to populate the network, then set the outputs and create an engine
     IHostMemory* serialized_engine = nullptr;
@@ -203,19 +209,19 @@ void deserialize_engine(std::string& engine_name, IRuntime** runtime, ICudaEngin
     delete[] serialized_engine;
 }
 
-// PATCH (yolov5-node): added for the new --timing-cache option.
-// Removes the pair from argv, so parse_args only sees positional arguments.
-std::string extract_timing_cache_arg(int& argc, char** argv) {
+// PATCH (yolov5-node): added for the new --timing-cache and --optimization-level options.
+// Removes the pair from argv, so parse_args only sees positional arguments. Returns "" if the option is absent.
+std::string extract_option(int& argc, char** argv, const std::string& option) {
     for (int i = 1; i + 1 < argc; i++) {
-        if (std::string(argv[i]) != "--timing-cache") {
+        if (std::string(argv[i]) != option) {
             continue;
         }
-        std::string cache_name = std::string(argv[i + 1]);
+        std::string value = std::string(argv[i + 1]);
         for (int j = i; j + 2 < argc; j++) {
             argv[j] = argv[j + 2];
         }
         argc -= 2;
-        return cache_name;
+        return value;
     }
     return "";
 }
@@ -231,13 +237,16 @@ int main(int argc, char** argv) {
     float gd = 0.0f, gw = 0.0f;
     std::string img_dir;
 
-    // PATCH (yolov5-node): consume --timing-cache before the upstream argument parsing runs.
-    std::string timing_cache_name = extract_timing_cache_arg(argc, argv);
+    // PATCH (yolov5-node): consume our options before the upstream argument parsing runs.
+    std::string timing_cache_name = extract_option(argc, argv, "--timing-cache");
+    std::string optimization_level_arg = extract_option(argc, argv, "--optimization-level");
+    // A missing option keeps the TensorRT default.
+    int optimization_level = optimization_level_arg.empty() ? -1 : atoi(optimization_level_arg.c_str());
 
     if (!parse_args(argc, argv, wts_name, engine_name, is_p6, gd, gw, img_dir)) {
         std::cerr << "arguments not right!" << std::endl;
         std::cerr << "./yolov5_det -s [.wts] [.engine] [n/s/m/l/x/n6/s6/m6/l6/x6 or c/c6 gd gw] [--timing-cache "
-                     "[.cache]]  // serialize model to plan file"
+                     "[.cache]] [--optimization-level [0-5]]  // serialize model to plan file"
                   << std::endl;
         std::cerr << "./yolov5_det -d [.engine] ../images  // deserialize plan file and run inference" << std::endl;
         return -1;
@@ -245,7 +254,7 @@ int main(int argc, char** argv) {
 
     // Create a model using the API directly and serialize it to a file
     if (!wts_name.empty()) {
-        serialize_engine(kBatchSize, is_p6, gd, gw, wts_name, engine_name, timing_cache_name);
+        serialize_engine(kBatchSize, is_p6, gd, gw, wts_name, engine_name, timing_cache_name, optimization_level);
         return 0;
     }
 
