@@ -33,7 +33,7 @@ class Yolov5DetectorParams(DetectorLogicFactory):
     weight_type: Literal['FP16', 'FP32', 'INT8']
     iou_threshold: float
     conf_threshold: float
-    builder_optimization_level: int = 4
+    builder_optimization_level: int
 
     @property
     @override
