@@ -1,0 +1,24 @@
+name: Build
+
+on: [push]
+
+jobs:
+  detector_tensorrtx:
+    runs-on: [self-hosted, gpu, X64]
+    steps:
+      - uses: actions/checkout@v4
+      - name: build image
+        run: |
+          docker build detector/ \
+            -f detector/Dockerfile \
+            --build-arg BASE_IMAGE=nvcr.io/nvidia/tensorrt:26.05-py3 \
+            --build-arg INSTALL_OPENCV=true \
+            -t zauberzeug/yolov5-detector:test_latest-cloud
+      - name: compile tensorrtx
+        # same cmake/make invocation as _build_module_lib in detector/yolov5_detector.py
+        run: |
+          docker run --rm zauberzeug/yolov5-detector:test_latest-cloud bash -c '
+            cd /tensorrtx/yolov5/build &&
+            cmake -DCMAKE_CUDA_FLAGS="--diag-suppress=997 -Xcompiler=-Wno-deprecated-declarations" \
+                  -DCMAKE_CXX_FLAGS="-Wno-deprecated-declarations" .. &&
+            make -j$(nproc)'
