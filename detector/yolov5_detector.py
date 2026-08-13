@@ -262,7 +262,6 @@ def _create_engine(wts_file: str, model_variant: str) -> str:
 
     _LOG.info('Building engine %s from %s', engine_file, wts_file)
     os.chdir(_BUILD_DIR)
-    _TIMING_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(f'{_DET_BIN} -s {wts_file} {engine_file} {model_variant} --timing-cache {_TIMING_CACHE_FILE}',
                    shell=True, check=True)
     return str(engine_file)
