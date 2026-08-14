@@ -216,6 +216,11 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             logging.exception('Error during batch size calculation:')
             raise NodeNeedsRestartError() from e
 
+        trainer_version = os.environ.get('NODE_VERSION') or 'unknown'
+        logging.info('Training with trainer version %s and batch size %d', trainer_version, batch_size)
+        self.training.hyperparameters['trainer_version'] = trainer_version
+        self.training.hyperparameters['batch_size'] = batch_size
+
         p_sizes_by_id = ""
         for i, category in enumerate(self.training.categories):
             if category.type == CategoryType.Point:

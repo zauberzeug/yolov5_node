@@ -32,4 +32,8 @@ ENV PATH="/uv_venv/bin:${PATH}"
 
 # Run from /uv_venv
 ENV TZ=Europe/Amsterdam
+
+ARG VERSION=unknown
+ENV NODE_VERSION=$VERSION
+
 CMD ["python", "/app/main.py"]
