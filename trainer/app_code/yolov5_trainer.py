@@ -90,16 +90,6 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     async def _resume(self) -> None:
         await self._start(model=str(self.training.training_folder_path / 'result/weights/published/latest.pt'))
 
-    def _get_executor_error_from_log(self) -> str | None:
-        if self._executor is None:
-            return None
-        for line in self._executor.get_log_by_lines(tail=50):
-            if 'CUDA out of memory' in line:
-                return 'graphics card is out of memory'
-            if 'CUDA error: invalid device ordinal' in line:
-                return 'graphics card not found'
-        return None
-
     def _get_new_best_training_state(self) -> TrainingStateData | None:
         weightfile = model_files.get_new(self.training.training_folder_path)
         if not weightfile:
