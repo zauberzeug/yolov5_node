@@ -70,6 +70,10 @@ Besides, the following parameters may be set:
 | CONF_THRESHOLD              | Confidence threshold for NMS              | Float                     | 0.2     | No                             |
 | BUILDER_OPTIMIZATION_LEVEL  | TensorRT builder optimization level       | Integer [0-5]             | 4       | No                             |
 
+Each of these is also a command line flag — `--weight-type`, `--iou-threshold`, `--conf-threshold`,
+`--builder-optimization-level`; run the node with `--help` to see them. `NODE_HOST` and `NODE_PORT`
+set the interface and port the node binds to inside the container.
+
 Higher `BUILDER_OPTIMIZATION_LEVEL` values let the TensorRT builder benchmark more kernel tactics, which can yield faster inference at the cost of a longer engine build (the timing cache described below keeps later builds fast). The level only applies while an engine is built, so changing it takes effect for the next model that has no engine yet — delete `model.engine` in the model folder to rebuild an existing one.
 
 Pulled images can be run with the `docker.sh` script by calling `./docker.sh run-image`.

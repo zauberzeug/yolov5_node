@@ -64,7 +64,7 @@ as index-based command line arguments.
 **The TensorRT detector compiles itself at model load.** `_build_module_lib` rewrites `kNumClass`,
 `kInputH/W` and `USE_FP16` in `tensorrtx/src/config.h` and runs cmake+make *inside the running
 container*, guarded by a `build.json` holding the last `_LibConfig`. A changed resolution, category
-count or `WEIGHT_TYPE` thus forces a recompile, while an existing `model.engine` is reused until it
+count or the weight type thus forces a recompile, while an existing `model.engine` is reused until it
 is deleted. This is why detector changes can only really be verified on a device.
 
 ## Running and testing
