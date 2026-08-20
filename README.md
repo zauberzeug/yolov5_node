@@ -23,6 +23,11 @@ Further, we support the following hyperparameters for point detection:
 - `point_sizes_by_id`: A dictionary that maps from point category uuids to the size of the points in the output (fractional size 0-1).
 - `flip_label_pairs`: A list of pairs of point uuids that should be swapped when a horizontal flip is applied during data augmentation.
 
+The trainer reports two more hyperparameters back to the Learning Loop. They are output only and never read as input:
+
+- `batch_size`: The batch size the training actually ran with, computed from the available GPU memory.
+- `trainer_version`: The version of the trainer node, which the release build bakes into the docker image as `NODE_VERSION`. Locally built images report `unknown`.
+
 ## Images
 
 Trainer Docker-Images are published on https://hub.docker.com/r/zauberzeug/yolov5-trainer
