@@ -12,13 +12,13 @@ import numpy as np
 import torch  # type: ignore # pylint: disable=import-error
 from learning_loop_node import DetectorLogic, DetectorLogicFactory
 from learning_loop_node.data_classes import (
-    BoxDetection,
     ImageMetadata,
     ImagesMetadata,
     ModelInformation,
-    PointDetection,
 )
-from learning_loop_node.enums import CategoryType
+from learning_loop_node.detector.postprocess import bbox_iou, detections_from_xyxy, to_image_metadata
+
+MAX_DETECTIONS = 1000
 
 
 @final
@@ -60,104 +60,26 @@ class Yolov5Detector(DetectorLogic):
 
         self.yolov5.eval()
 
-    @staticmethod
-    def clip_box(
-            x1: float, y1: float, width: float, height: float, img_width: int, img_height: int) -> tuple[
-            int, int, int, int]:
-        '''Clips a box defined by top-left corner (x1, y1), width, and height
-           to stay within image boundaries (img_width, img_height).
-           Returns the clipped (x1, y1, width, height) as ints.
-        '''
-        x2 = x1 + width
-        y2 = y1 + height
-
-        # Clip coordinates
-        clipped_x1 = round(max(0.0, x1))
-        clipped_y1 = round(max(0.0, y1))
-        clipped_x2 = round(min(float(img_width), x2))
-        clipped_y2 = round(min(float(img_height), y2))
-
-        # Recalculate dimensions
-        clipped_width = clipped_x2 - clipped_x1
-        clipped_height = clipped_y2 - clipped_y1
-
-        # Ensure width and height are non-negative
-        if clipped_width < 0:
-            clipped_width = 0
-        if clipped_height < 0:
-            clipped_height = 0
-
-        return clipped_x1, clipped_y1, clipped_width, clipped_height
-
-    @staticmethod
-    def clip_point(x: float, y: float, img_width: int, img_height: int) -> tuple[float, float]:
-        x = min(max(0, x), img_width)
-        y = min(max(0, y), img_height)
-        return x, y
-
     @override
     def evaluate(self, image: np.ndarray) -> ImageMetadata:
-        image_metadata = ImageMetadata()
-
         try:
             t = time.time()
             input_image, origin_h, origin_w = self._preprocess_image(image)
 
-            im_height = origin_h
-            im_width = origin_w
-
-            # Inference
             det = self.yolov5(torch.from_numpy(input_image))[0].numpy()[0]
-
-            # NMS with lower confidence threshold
-            conf_thres = self.conf_threshold
-            iou_thres = self.iou_threshold
-            max_det = 1000
-
             if len(det) == 0:
-                return image_metadata
+                return ImageMetadata()
 
             result_boxes, result_scores, result_classid = self._post_process(
-                det, origin_h, origin_w, conf_thres, iou_thres)
+                det, origin_h, origin_w, self.conf_threshold, self.iou_threshold)
 
-            for j, box in enumerate(result_boxes[:max_det]):
-                x, y, br_x, br_y = box
-                w = br_x - x
-                h = br_y - y
-                category_idx = result_classid[j]
-                if category_idx < 0 or category_idx >= len(self.model_info.categories):
-                    self.log.warning('invalid category index: %d for %d classes',
-                                     category_idx, len(self.model_info.categories))
-                    continue
-                category = self.model_info.categories[category_idx]
-                probability = round(float(result_scores[j]), 2)
-
-                if category.type == CategoryType.Box:
-                    clipped_x1, clipped_y1, clipped_w, clipped_h = self.clip_box(
-                        x, y, w, h, im_width, im_height)
-                    image_metadata.box_detections.append(
-                        BoxDetection(category_name=category.name,
-                                     x=clipped_x1,
-                                     y=clipped_y1,
-                                     width=clipped_w,
-                                     height=clipped_h,
-                                     category_id=category.id,
-                                     model_name=self.model_info.version,
-                                     confidence=probability))
-
-                elif category.type == CategoryType.Point:
-                    cx, cy = x + w/2, y + h/2
-                    cx, cy = self.clip_point(cx, cy, im_width, im_height)
-                    image_metadata.point_detections.append(
-                        PointDetection(category_name=category.name,
-                                       x=cx,
-                                       y=cy,
-                                       category_id=category.id,
-                                       model_name=self.model_info.version,
-                                       confidence=probability))
-
+            detections = detections_from_xyxy(
+                labels=result_classid[:MAX_DETECTIONS].tolist(),
+                boxes=result_boxes[:MAX_DETECTIONS].tolist(),
+                scores=[round(float(score), 2) for score in result_scores[:MAX_DETECTIONS]],
+            )
             self.log.debug('took %f s', time.time() - t)
-            return image_metadata
+            return to_image_metadata(detections, self.model_info, origin_h, origin_w)
 
         except Exception as e:
             raise RuntimeError('Error during inference') from e
@@ -267,7 +189,7 @@ class Yolov5Detector(DetectorLogic):
         # Perform non-maximum suppression
         keep_boxes = []
         while boxes.shape[0]:
-            large_overlap = self.bbox_iou(np.expand_dims(
+            large_overlap = bbox_iou(np.expand_dims(
                 boxes[0, :4], 0), boxes[:, :4]) > nms_thres
             if num_classes > 1:
                 label_match = np.argmax(boxes[:, 5:], axis=1) == np.argmax(boxes[0, 5:])
@@ -279,49 +201,6 @@ class Yolov5Detector(DetectorLogic):
             boxes = boxes[~invalid]
         boxes = np.stack(keep_boxes, 0) if len(keep_boxes) else np.array([])
         return boxes
-
-    def bbox_iou(self, box1, box2, x1y1x2y2=True):
-        """
-        description: compute the IoU of two bounding boxes
-        param:
-            box1: A box coordinate (can be (x1, y1, x2, y2) or (x, y, w, h))
-            box2: A box coordinate (can be (x1, y1, x2, y2) or (x, y, w, h))            
-            x1y1x2y2: select the coordinate format
-        return:
-            iou: computed iou
-        """
-        if not x1y1x2y2:
-            # Transform from center and width to exact coordinates
-            b1_x1, b1_x2 = box1[:, 0] - box1[:, 2] / \
-                2, box1[:, 0] + box1[:, 2] / 2
-            b1_y1, b1_y2 = box1[:, 1] - box1[:, 3] / \
-                2, box1[:, 1] + box1[:, 3] / 2
-            b2_x1, b2_x2 = box2[:, 0] - box2[:, 2] / \
-                2, box2[:, 0] + box2[:, 2] / 2
-            b2_y1, b2_y2 = box2[:, 1] - box2[:, 3] / \
-                2, box2[:, 1] + box2[:, 3] / 2
-        else:
-            # Get the coordinates of bounding boxes
-            b1_x1, b1_y1, b1_x2, b1_y2 = box1[:,
-                                              0], box1[:, 1], box1[:, 2], box1[:, 3]
-            b2_x1, b2_y1, b2_x2, b2_y2 = box2[:,
-                                              0], box2[:, 1], box2[:, 2], box2[:, 3]
-
-        # Get the coordinates of the intersection rectangle
-        inter_rect_x1 = np.maximum(b1_x1, b2_x1)
-        inter_rect_y1 = np.maximum(b1_y1, b2_y1)
-        inter_rect_x2 = np.minimum(b1_x2, b2_x2)
-        inter_rect_y2 = np.minimum(b1_y2, b2_y2)
-        # Intersection area
-        inter_area = np.clip(inter_rect_x2 - inter_rect_x1 + 1, 0, None) * \
-            np.clip(inter_rect_y2 - inter_rect_y1 + 1, 0, None)
-        # Union Area
-        b1_area = (b1_x2 - b1_x1 + 1) * (b1_y2 - b1_y1 + 1)
-        b2_area = (b2_x2 - b2_x1 + 1) * (b2_y2 - b2_y1 + 1)
-
-        iou = inter_area / (b1_area + b2_area - inter_area + 1e-16)
-
-        return iou
 
     def xywh2xyxy(self, origin_h, origin_w, x):
         """

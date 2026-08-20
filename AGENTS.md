@@ -19,8 +19,15 @@ Three independent uv sub-projects, each with its own `pyproject.toml`, `uv.lock`
 - `detector/` — the TensorRT detector. `detector/tensorrtx/` is **vendored upstream code**; see the
   CONTRIBUTING section before changing anything in it.
 - `detector_cpu/` — the CPU detector, a second implementation of the same detector contract on top
-  of torch/ultralytics that shares no code with `detector/`. The only sub-project that installs on
-  macOS, which is why CONTRIBUTING points the root `.venv` at it.
+  of torch/ultralytics. It shares no *yolov5* code with `detector/`; what the two do have in common
+  — NMS geometry, clipping, building the loop's detection dataclasses — comes from
+  `learning_loop_node.detector.postprocess`. The only sub-project that installs on macOS, which is
+  why CONTRIBUTING points the root `.venv` at it.
+
+The model-agnostic half of a detector lives in the node library: `postprocess.to_image_metadata`
+turns detections into what the loop expects, `postprocess.bbox_iou` and `geometry.clip_*` are the
+shared primitives. Only the yolov5-specific parts — the packed `[cx,cy,w,h,conf,probs...]` output
+layout, the letterbox correction in `xywh2xyxy`, the tensorrtx engine build — belong here.
 
 `sync.py` live-syncs this repository *and* `../learning_loop_node` onto a robot for on-device
 debugging, so the library is expected beside this checkout.

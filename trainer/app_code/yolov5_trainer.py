@@ -18,6 +18,7 @@ from learning_loop_node.data_classes import (
     PretrainedModel,
     TrainingStateData,
 )
+from learning_loop_node.detector.geometry import clip_box_centered, clip_point
 from learning_loop_node.enums import CategoryType
 from learning_loop_node.trainer import trainer_logic
 from learning_loop_node.trainer.exceptions import CriticalError, NodeNeedsRestartError
@@ -317,30 +318,6 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     # ---------------------------------------- HELPER METHODS ----------------------------------------
 
     @staticmethod
-    def clip_box(x: float, y: float, width: float, height: float, img_width: int, img_height: int
-                 ) -> tuple[float, float, float, float]:
-        '''make sure the box is within the image
-            x,y is the center of the box
-        '''
-        left = max(0, x - 0.5 * width)
-        top = max(0, y - 0.5 * height)
-        right = min(img_width, x + 0.5 * width)
-        bottom = min(img_height, y + 0.5 * height)
-
-        x = 0.5 * (left + right)
-        y = 0.5 * (top + bottom)
-        width = right - left
-        height = bottom - top
-
-        return x, y, width, height
-
-    @staticmethod
-    def clip_point(x: float, y: float, img_width: int, img_height: int) -> tuple[float, float]:
-        x = min(max(0, x), img_width)
-        y = min(max(0, y), img_height)
-        return x, y
-
-    @staticmethod
     def _parse_file(model_info: ModelInformation, images_folder: str, filename: str
                     ) -> tuple[list[BoxDetection], list[PointDetection]]:
         uuid = os.path.splitext(os.path.basename(filename))[0]
@@ -364,7 +341,8 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             probability = float(probability_str) * 100
 
             if category.type == CategoryType.Box:
-                x, y, width, height = Yolov5TrainerLogic.clip_box(x, y, width, height, img_width, img_height)
+                x, y, width, height = clip_box_centered(x=x, y=y, width=width, height=height,
+                                                        img_width=img_width, img_height=img_height)
                 box_detections.append(
                     BoxDetection(category_name=category.name, x=int(x - 0.5 * width),
                                  y=int(y - 0.5 * height),
@@ -372,7 +350,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
                                  height=int(height),
                                  model_name=model_info.version, confidence=probability, category_id=category.id))
             elif category.type == CategoryType.Point:
-                x, y = Yolov5TrainerLogic.clip_point(x, y, img_width, img_height)
+                x, y = clip_point(x, y, img_width, img_height)
                 point_detections.append(
                     PointDetection(category_name=category.name, x=x, y=y, model_name=model_info.version,
                                    confidence=probability, category_id=category.id))
