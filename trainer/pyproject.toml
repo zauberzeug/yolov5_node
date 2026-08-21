@@ -8,7 +8,7 @@ requires-python = ">=3.12"
 
 dependencies = [
     "ruamel.yaml",
-    "learning_loop_node==0.21.0",
+    "learning_loop_node==0.22.0",
     "torchinfo>=1.8.0",
 ]
 
@@ -31,18 +31,19 @@ yolo = [
     "pandas>=1.1.4",
     "seaborn>=0.11.0",
     "albumentations>=1.0.3",
-    "gitpython",
+    "gitpython>=3.1.58",
     "ipython",  # interactive notebook
     "matplotlib>=3.2.2",
     "numpy>=1.18.5",
     "opencv-python-headless>=4.10.0",
-    "Pillow>=7.1.2",
+    "Pillow>=12.3.0",
     "psutil",  # system resources
     "PyYAML>=5.3.1",
-    "requests>=2.23.0",
+    "requests>=2.33.0",
     "scipy>=1.4.1",
+    "setuptools<82",  # NOTE: the vendored yolov5 imports pkg_resources, removed in setuptools 82
     "thop>=0.1.1",  # FLOPs computation
-    "torch>=1.7.0",
+    "torch>=2.13.0",
     "torchvision>=0.8.1",
     "tqdm>=4.64.0",
 ]
