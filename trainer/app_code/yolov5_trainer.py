@@ -6,9 +6,9 @@ import re
 import shutil
 from dataclasses import asdict
 from pathlib import Path
+from typing import Any
 
 import cv2  # type: ignore # pylint: disable=import-error
-import yaml  # type: ignore
 from fastapi.encoders import jsonable_encoder
 from learning_loop_node.data_classes import (
     BoxDetection,
@@ -23,8 +23,10 @@ from learning_loop_node.enums import CategoryType
 from learning_loop_node.trainer import trainer_logic
 from learning_loop_node.trainer.exceptions import CriticalError, NodeNeedsRestartError
 from learning_loop_node.trainer.executor import Executor
+from learning_loop_node.trainer.hyperparameters import DETECT_NMS_CONF_THRES, DETECT_NMS_IOU_THRES, validate
 
 from . import batch_size_calculation, model_files, yolov5_format
+from .hyperparameters import DETECTION_HYPERPARAMETERS, HYPERPARAMETERS
 
 
 class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
@@ -37,14 +39,12 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         self.patience = 300
         self.inference_batch_size = 100  # yolo processes images one by one
 
-        # Following will be overwritten by hyp.yaml
+        # overwritten from the loop's hyperparameters by _read_hyperparameters
         self.epochs = 0
-        self.detect_nms_conf_thres = 0.2
-        self.detect_nms_iou_thres = 0.45
+        self.detect_nms_conf_thres = DETECT_NMS_CONF_THRES
+        self.detect_nms_iou_thres = DETECT_NMS_IOU_THRES
         self.point_sizes_by_uuid: dict[str, float] = {}
         self.flip_label_uuid_pairs: list[tuple[str, str]] = []
-
-        self.additional_hyperparameters_parsed = False
 
     # ---------------------------------------- IMPLEMENTED ABSTRACT PROPERTIES ----------------------------------------
 
@@ -137,7 +137,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     async def _detect(self, model_information: ModelInformation, images: list[str],
                       model_folder: str) -> list[Detections]:
 
-        self._save_additional_hyperparameters()
+        self._read_hyperparameters(require_resolution=False)
 
         images_folder = '/tmp/imagelinks_for_detecting'
         shutil.rmtree(images_folder, ignore_errors=True)
@@ -196,9 +196,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         await self._start(model, additional_params)
 
     async def _start(self, model: str, additional_parameters: str = ''):
-        resolution = self.training.hyperparameters['resolution']
-
-        self._save_additional_hyperparameters()
+        resolution = self._read_hyperparameters(require_resolution=True)['resolution']
 
         try:
             batch_size = await batch_size_calculation.calc(self.training.training_folder, model, self.hyperparameter_path,
@@ -242,40 +240,30 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
         await self.executor.start(cmd, env={'WANDB_MODE': 'disabled'})
 
-    def _save_additional_hyperparameters(self) -> None:
-        """Save additional hyperparameters to attributes of self.
-        These parameters are not passed to the yolov5 trainer, but are used to modify the training (and inference) process.
+    def _read_hyperparameters(self, *, require_resolution: bool) -> dict[str, Any]:
+        """Read the knobs this node acts on itself, coerced and range-checked before use.
+
+        These do not reach the vendored training through its yaml file; they become command line
+        arguments or shape the dataset here. What the loop configured but nothing reads is
+        reported by `set_hyperparameters_in_file`, so no warning is repeated here.
+
+        :param require_resolution: A training needs one; a detection pass over a finished model
+            does not.
         """
-        if self.additional_hyperparameters_parsed:
-            return
-        self.additional_hyperparameters_parsed = True
+        schema = HYPERPARAMETERS if require_resolution else DETECTION_HYPERPARAMETERS
+        values = validate(schema, self.hyperparameters, also_known=self.hyperparameters)
 
-        if not os.path.exists(self.hyperparameter_path):
-            logging.warning('No hyperparameter file found at %s', self.hyperparameter_path)
-            raise CriticalError(f'No hyperparameter file found at {self.hyperparameter_path}')
+        self.epochs = values['epochs']
+        self.detect_nms_conf_thres = values['detect_nms_conf_thres']
+        self.detect_nms_iou_thres = values['detect_nms_iou_thres']
+        self.point_sizes_by_uuid = dict(values['point_sizes_by_id'])
+        self.flip_label_uuid_pairs = [(a, b) for a, b in values['flip_label_pairs']]
 
-        with open(self.hyperparameter_path, errors='ignore') as f:
-            hyp = dict(yaml.safe_load(f))  # load hyps dict
-
-        self.epochs = int(hyp.get('epochs', self.epochs))
-        self.detect_nms_conf_thres = float(hyp.get('detect_nms_conf_thres', self.detect_nms_conf_thres))
-        self.detect_nms_iou_thres = float(hyp.get('detect_nms_iou_thres', self.detect_nms_iou_thres))
-
-        if point_sizes_by_id_str := str(hyp.get('point_sizes_by_id', '')):
-            for item in point_sizes_by_id_str.split(','):
-                k, v = item.split(':')
-                self.point_sizes_by_uuid[str(k)] = float(v)
-
-        if flip_label_pairs_str := str(hyp.get('flip_label_pairs', '')):
-            for item in flip_label_pairs_str.split(','):
-                k, v = item.split(':')
-                self.flip_label_uuid_pairs.append((str(k), str(v)))
-
-        hyp_str = ', '.join(f'{k}={v}' for k, v in hyp.items())
-        logging.info('parsed hyperparameters %s: epochs: %d, detect_nms_conf_thres: %f, detect_nms_iou_thres: %f',
-                     hyp_str, self.epochs, self.detect_nms_conf_thres, self.detect_nms_iou_thres)
+        logging.info('hyperparameters: epochs=%d, detect_nms_conf_thres=%f, detect_nms_iou_thres=%f',
+                     self.epochs, self.detect_nms_conf_thres, self.detect_nms_iou_thres)
         logging.info('point_sizes_by_id: %s', self.point_sizes_by_uuid)
         logging.info('flip_label_pairs: %s', self.flip_label_uuid_pairs)
+        return values
 
     def _parse(self, labels_path: str, images_folder: str, model_information: ModelInformation) -> list[Detections]:
         detections = []

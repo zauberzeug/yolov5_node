@@ -6,11 +6,10 @@ from typing import Any
 
 from learning_loop_node.data_classes import Training
 from learning_loop_node.trainer.exceptions import CriticalError
+from learning_loop_node.trainer.hyperparameters import FLIP_ALIASES, merge_into_yaml
 from ruamel.yaml import YAML
-from ruamel.yaml.scalarbool import ScalarBoolean
-from ruamel.yaml.scalarfloat import ScalarFloat
-from ruamel.yaml.scalarint import ScalarInt
-from ruamel.yaml.scalarstring import LiteralScalarString
+
+from .hyperparameters import NAMES as HYPERPARAMETER_NAMES
 
 yaml = YAML()
 
@@ -112,43 +111,16 @@ def create_file_structure(training: Training) -> None:
 
 
 def set_hyperparameters_in_file(yaml_path: str, hyperparameter: dict[str, Any]) -> None:
-    """Override the hyperparameters in the yaml file used by the yolov5 trainer with the ones from the hyperparameter dict (coming from the loop configuration).
-    The yaml file is modified in place."""
+    """Write the loop's hyperparameters into the yolov5 trainer's yaml template, in place.
 
-    with open(yaml_path) as f:
-        content = yaml.load(f)
+    Only the template's own keys are written -- they are the ones the vendored training reads.
+    Anything the loop configured that neither the template nor this node's declaration covers is
+    named in the log rather than dropped in silence.
+    """
+    hyperparameter = dict(hyperparameter)
+    for name, yaml_name in FLIP_ALIASES.items():
+        if name in hyperparameter:  # the loop sends a flag; yolov5 wants a probability
+            hyperparameter[yaml_name] = 0.5 if hyperparameter[name] else 0.0
 
-    if 'flip_rl' in hyperparameter:
-        hyperparameter['fliplr'] = 0.5 if hyperparameter['flip_rl'] else 0.0
-    if 'flip_lr' in hyperparameter:
-        hyperparameter['fliplr'] = 0.5 if hyperparameter['flip_lr'] else 0.0
-    if 'flip_ud' in hyperparameter:
-        hyperparameter['flipud'] = 0.5 if hyperparameter['flip_ud'] else 0.0
-
-    for param in content:
-        if (hp_value := hyperparameter.get(param)) is not None:
-            yaml_value = content[param]
-            content[param] = convert_type(hp_value, yaml_value)
-
-    logging.info('Hyps after update: %s', content)
-
-    try:
-        with open(yaml_path, 'w') as f:
-            yaml.dump(content, f)
-    except Exception as e:
-        logging.error('Error writing to %s: %s', yaml_path, e)
-        raise CriticalError(f'Error writing to {yaml_path}') from None
-
-
-def convert_type(value, reference: Any):
-
-    if isinstance(reference, (LiteralScalarString, str)):
-        return str(value)
-    if isinstance(reference, (ScalarFloat, float)):
-        return float(value)
-    if isinstance(reference, (ScalarInt, int)):
-        return int(value)
-    if isinstance(reference, (ScalarBoolean, bool)):
-        return bool(value)
-
-    raise CriticalError(f'Unknown type: {type(reference)}')
+    merge_into_yaml(yaml_path, hyperparameter,
+                    ignore=(*HYPERPARAMETER_NAMES, *FLIP_ALIASES))
