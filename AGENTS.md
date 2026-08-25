@@ -11,8 +11,14 @@ documents the supported hyperparameters and the published docker images.
 
 ## Layout
 
-Three independent uv sub-projects, each with its own `pyproject.toml`, `uv.lock`, `Dockerfile` and
-`docker.sh`:
+Three independent uv sub-projects, each with its own `pyproject.toml`, `uv.lock`, `Dockerfile`,
+`docker.sh` and `docker.conf`; `scripts/node-docker.sh` at the root drives all three. That driver is
+copied verbatim from `dfine_node` and `classification_node` and kept in step by hand, so a fix
+belongs in all three. `.env` is passed whole into the container, so a setting the node declares in
+`main.py` needs no change to either file; `CONTAINER_NAME`, `HOST_PORT` and `LINKLL` are read by
+`docker.sh` itself and never reach the node.
+
+Sub-projects:
 
 - `trainer/` — the training node. Runs on GPU in an NVIDIA PyTorch image; `app_code/` holds the
   trainer logic, `app_code/yolov5/` the upstream code, `app_code/tests/` the suite.
