@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# node-docker-version: v1.0.0
+# NOTE this file is duplicated verbatim in dfine_node, yolov5_node and classification_node.
+# Nothing enforces that today, so a change here has to be copied to the other two by hand.
 # Shared driver for every node sub-project's docker.sh.
 #
 # Each sub-project has a 5-line docker.sh that sources .env, then its docker.conf, then this
