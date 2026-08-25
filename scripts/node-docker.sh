@@ -9,7 +9,7 @@
 # Required in docker.conf:  IMAGE_REPO, CONTAINER_NAME
 # Optional:                 IMAGE_TAG_SUFFIX, TEST_LATEST_TAG, DATA_VOLUME, HOST_PORT,
 #                           CONTAINER_PORT, BUILD_CONTEXT, DOCKERFILE, GPU, IPC_HOST, ENV_FILE,
-#                           FORWARD_ENV, EXTRA_RUN_ARGS, EXTRA_BUILD_ARGS, LINKLL_SITE_PACKAGES
+#                           EXTRA_RUN_ARGS, EXTRA_BUILD_ARGS, LINKLL_SITE_PACKAGES
 #                           and a select_image function for host-dependent image choices
 #
 # NOTE the conf is sourced before this file, so it cannot reference SEMANTIC_VERSION or
@@ -82,31 +82,7 @@ fi
 run_args="-it"
 [ -n "${DATA_VOLUME:-}" ] && run_args+=" -v $DATA_VOLUME:/data"
 run_args+=" -h ${HOSTNAME}_DEV"
-[ "$ENV_FILE" = "TRUE" ] && run_args+=" --env-file .env"
-
-# The library reads LOOP_HOST or HOST, LOOP_ORGANIZATION or ORGANIZATION, and so on
-# (helpers/environment_reader.py). Accept either spelling in .env but forward only the LOOP_ name,
-# so one .env serves every sub-project of a repository. Forwarding one name also avoids
-# read_from_env's conflict case: two spellings that disagree resolve to nothing, and the loop host
-# then falls back to its default, which is production.
-for _name in HOST ORGANIZATION PROJECT USERNAME PASSWORD; do
-    _canonical="LOOP_$_name"
-    if [ -z "${!_canonical:-}" ] && [ -n "${!_name:-}" ]; then
-        eval "$_canonical=\${$_name}"   # the names come from the literal list above
-    fi
-done
-unset _name _canonical
-
-# FORWARD_ENV entries become -e NAME=$NAME, in order. 'NAME=OTHER' reads a differently named
-# variable. A leading '?' means "only when set", so an unset variable is absent rather than
-# handed to the node as an empty string.
-for spec in ${FORWARD_ENV:-}; do
-    optional=FALSE
-    [ "${spec#\?}" != "$spec" ] && { optional=TRUE; spec="${spec#\?}"; }
-    name="${spec%%=*}"; source_name="${spec#*=}"
-    if [ "$optional" = TRUE ] && [ -z "${!source_name:-}" ]; then continue; fi
-    run_args+=" -e $name=${!source_name:-}"
-done
+[ "$ENV_FILE" = "TRUE" ] && [ -f .env ] && run_args+=" --env-file .env"
 
 run_args+=" --name $CONTAINER_NAME"
 [ "$GPU" = "TRUE" ] && run_args+=" --device=nvidia.com/gpu=all"
