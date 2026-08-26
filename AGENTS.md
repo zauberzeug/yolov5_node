@@ -58,7 +58,7 @@ as index-based command line arguments.
 `kInputH/W` and `USE_FP16` in `tensorrtx/src/config.h` and runs cmake+make *inside the running
 container*, guarded by a `build.json` holding the last `_LibConfig`. A changed resolution, category
 count or `WEIGHT_TYPE` thus forces a recompile, while an existing `model.engine` is reused until it
-is deleted. This is why detector changes can only really be verified on a device.
+is deleted. This is why detector changes need final validation on a device.
 
 ## Running and testing
 
@@ -76,8 +76,8 @@ trainer and detector lines in it are commented out because they need a GPU and a
 trainer suite additionally generates and deletes a project in the loop from its `conftest.py`
 fixtures, so it cannot run offline. **CI is therefore the only real check of the trainer code** —
 `.github/workflows/pytest.yml` builds the trainer image on a self-hosted GPU runner and runs
-`pytest -vv` inside it against a live loop, `build.yml` compiles the TensorRT detector. Report the CI
-result rather than claiming the trainer was verified locally.
+`pytest -vv` inside it against a live loop, `build.yml` compiles the TensorRT detector. When asked,
+report the CI result rather than claiming the trainer was verified locally.
 
 There is no `.pre-commit-config.yaml` here. Lint per sub-project, where the ruff config lives:
 
@@ -89,7 +89,7 @@ cd trainer && uv run --no-sync ruff check .
 
 ## Working in this repository
 
-- **Hyperparameters are the cheap way to report a value to the loop.** Anything a trainer writes to
+- **Hyperparameters are a cheap way to report a value to the loop.** Anything a trainer writes to
   `training.hyperparameters` lands on the model and shows up in its hyperparameter view — no new
   plumbing in the loop needed. `batch_size` and `trainer_version` already use this.
 - **Keep upstream mergeable.** Changes in `detector/tensorrtx` (and in the vendored yolov5 code)
