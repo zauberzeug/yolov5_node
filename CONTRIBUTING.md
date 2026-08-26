@@ -144,6 +144,8 @@ We use the reStructuredText (reST) or Sphinx-style docstring format.
 We don't declare types in the docstring but use type hints.
 While type hints are mandatory, parameter descriptions and docstrings should only
 be used if the function and parameter names are not self-explanatory.
+We write them in the modern annotation style — `list[x]`, not `List[x]` — and import from
+`collections.abc` rather than `typing` wherever both offer the name (e.g. `Sequence`).
 Examples are listed below:
 
 #### One-line Docstring without parameters
@@ -220,4 +222,45 @@ from .numpad import Numpad
 from app import config
 from app.system import System
 from app.ui.numpad import Numpad
+```
+
+### 9. Dataclasses and constructor defaults
+
+We declare dataclasses with `kw_only=True` and `slots=True`, so every field is named at the call site
+and typos become errors instead of new attributes.
+
+```python
+# preferred
+@dataclass(kw_only=True, slots=True)
+class Detection:
+    category: str
+    confidence: float
+
+# avoid
+@dataclass
+class Detection:
+    category: str
+    confidence: float
+```
+
+Be conservative with default `__init__` parameters.
+A parameter that no caller ever varies is a constant, not a parameter, and hiding it in the signature
+suggests a flexibility that nobody uses.
+
+### 10. Logging and debug output
+
+We log through the module-level logger, never through the root logger, and with lazy formatting, so
+the arguments are only rendered when the record is actually emitted.
+For temporary debug output we use `print` with `flush=True`, so the line shows up in the log right
+away instead of sitting in the buffer.
+
+```python
+# preferred
+logger = logging.getLogger('mypackage.mymodule')
+logger.info('loaded %s images', count)
+print(f'reached the empty-category branch with {count} images', flush=True)
+
+# avoid
+logging.info(f'loaded {count} images')
+print(f'reached the empty-category branch with {count} images')
 ```
