@@ -13,10 +13,10 @@ documents the supported hyperparameters and the published docker images.
 
 Three independent uv sub-projects, each with its own `pyproject.toml`, `uv.lock`, `Dockerfile`,
 `docker.sh` and `docker.conf`; `scripts/node-docker.sh` at the root drives all three. That driver is
-copied verbatim from `dfine_node` and `classification_node` and kept in step by hand, so a fix
-belongs in all three. `.env` is passed whole into the container, so a setting the node declares in
-`main.py` needs no change to either file; `CONTAINER_NAME`, `HOST_PORT` and `LINKLL` are read by
-`docker.sh` itself and never reach the node.
+shared verbatim with the other node repositories and kept in step by hand, so a fix belongs in all
+of them. `.env` is passed whole into the container, so a setting the node declares in `main.py`
+needs no change to either file; `CONTAINER_NAME`, `HOST_PORT` and `LINKLL` are read by `docker.sh`
+itself and never reach the node.
 
 Sub-projects:
 
