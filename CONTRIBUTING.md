@@ -27,19 +27,31 @@ If a change is unavoidable, mark it with a `PATCH (yolov5-node)` comment at the 
 
 ## Linting
 
-We use ruff and [pre-commit](https://github.com/pre-commit/pre-commit) to make sure the coding style is enforced.
-You first need to install pre-commit and the corresponding git commit hooks by running the following commands:
+We use [ruff](https://docs.astral.sh/ruff/) to enforce the coding style.
+Its rules live in the `pyproject.toml` of the respective (sub-)project.
+
+Repositories that ship a `.pre-commit-config.yaml` run ruff through
+[pre-commit](https://github.com/pre-commit/pre-commit).
+Install the git hooks once:
 
 ```bash
 python3 -m pip install pre-commit
 pre-commit install
 ```
 
-After that you can make sure your code satisfies the coding style by running the following command:
+After that you can check the whole repository with:
 
 ```bash
 pre-commit run --all-files
 ```
+
+Repositories without a `.pre-commit-config.yaml` run ruff directly:
+
+```bash
+uvx ruff check .
+```
+
+The repository-specific part of this file names the exact command wherever it differs.
 
 ## Style Guide
 
@@ -51,8 +63,8 @@ Double quotes may also be used for strings if the string contains a single quote
 ### 2. String formatting
 
 We use f-strings if possible (due to their readability).
-Logs shell use the lazy formatting provided by the logging (performance optimization).
-When diverging from above rules, please provide a short comment with `# NOTE: ...` to explaining the reason.
+Logs shall use the lazy formatting provided by logging (performance optimization).
+When diverging from above rules, please provide a short comment with `# NOTE: ...` to explain the reason.
 
 ### 3. Line continuation
 
@@ -97,7 +109,7 @@ def parse_config(path: Path) -> Config | None:
     ...
 ```
 
-## 6. Ordering: Important things first
+### 6. Ordering: Important things first
 
 We want to have main classes and functions at the top of the file, while helper functions and classes should be placed below. This allows to quickly understand the main purpose of the file without having to scroll through a lot of code.
 
@@ -126,23 +138,25 @@ class ReportGenerator:
         ...
 ```
 
-## 7. Docstrings and type hints
+### 7. Docstrings and type hints
 
 We use the reStructuredText (reST) or Sphinx-style docstring format.
 We don't declare types in the docstring but use type hints.
 While type hints are mandatory, parameter descriptions and docstrings should only
 be used if the function and parameter names are not self-explanatory.
-Examples are listetd below:
+We write them in the modern annotation style — `list[x]`, not `List[x]` — and import from
+`collections.abc` rather than `typing` wherever both offer the name (e.g. `Sequence`).
+Examples are listed below:
 
-### One-line Docstring without parameters
+#### One-line Docstring without parameters
 
 ```python
 def greet() -> None:
     """Print a friendly greeting."""
-    print("Hello!")
+    print('Hello!')
 ```
 
-### One-line Docstring with parameters
+#### One-line Docstring with parameters
 
 ```python
 def square(x: int | float) -> int | float:
@@ -154,7 +168,7 @@ def square(x: int | float) -> int | float:
     return x * x
 ```
 
-### Multi-line Docstring without parameters
+#### Multi-line Docstring without parameters
 
 ```python
 def get_timestamp() -> str:
@@ -165,10 +179,10 @@ def get_timestamp() -> str:
     as "YYYY-MM-DD HH:MM:SS". It can be useful for logging or
     displaying time information in user interfaces.
     """
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 ```
 
-### Multi-line Docstring with parameters
+#### Multi-line Docstring with parameters
 
 ```python
 def save_data(data: str | bytes, filename: str, overwrite: bool = False) -> None:
@@ -182,12 +196,71 @@ def save_data(data: str | bytes, filename: str, overwrite: bool = False) -> None
     :param data: The content to be saved. Can be text or bytes.
     :param filename: Path to the destination file.
     :param overwrite: Whether to overwrite an existing file.
-    :return: True if the data was saved successfully, False otherwise.
     :raises FileExistsError: If the file exists and overwrite is False.
     """
     if os.path.exists(filename) and not overwrite:
-        raise FileExistsError(f"{filename} already exists.")
-    mode = "wb" if isinstance(data, bytes) else "w"
+        raise FileExistsError(f'{filename} already exists.')
+    mode = 'wb' if isinstance(data, bytes) else 'w'
     with open(filename, mode) as f:
         f.write(data)
+```
+
+### 8. Relative imports within a package
+
+Inside a package we import other modules of the same package with relative imports, not with the package name.
+This way the package can be renamed or moved without touching its imports.
+We use the shortest path: siblings with a single dot, no going up and back down (`from ..ui.numpad import ...` in a module that lives in `ui/` itself).
+Code outside the package — scripts, tests — has no choice and uses absolute imports.
+
+```python
+# preferred (in app/ui/scan_view.py)
+from .. import config
+from ..system import System
+from .numpad import Numpad
+
+# avoid
+from app import config
+from app.system import System
+from app.ui.numpad import Numpad
+```
+
+### 9. Dataclasses and constructor defaults
+
+We declare dataclasses with `kw_only=True` and `slots=True`, so every field is named at the call site
+and typos become errors instead of new attributes.
+
+```python
+# preferred
+@dataclass(kw_only=True, slots=True)
+class Detection:
+    category: str
+    confidence: float
+
+# avoid
+@dataclass
+class Detection:
+    category: str
+    confidence: float
+```
+
+Be conservative with default `__init__` parameters.
+A parameter that no caller ever varies is a constant, not a parameter, and hiding it in the signature
+suggests a flexibility that nobody uses.
+
+### 10. Logging and debug output
+
+We log through the module-level logger, never through the root logger, and with lazy formatting, so
+the arguments are only rendered when the record is actually emitted.
+For temporary debug output we use `print` with `flush=True`, so the line shows up in the log right
+away instead of sitting in the buffer.
+
+```python
+# preferred
+logger = logging.getLogger('mypackage.mymodule')
+logger.info('loaded %s images', count)
+print(f'reached the empty-category branch with {count} images', flush=True)
+
+# avoid
+logging.info(f'loaded {count} images')
+print(f'reached the empty-category branch with {count} images')
 ```
