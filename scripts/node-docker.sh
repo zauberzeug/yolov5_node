@@ -38,6 +38,7 @@ Usage:
   $self (bnc | build-no-cache) Build or rebuild without cache
   $self (p | push)             Push image
   ------------------------------
+  $self (U | update)           Download the image from the registry
   $self (r | run)              Run
   $self (u | up)               Start detached
   $self (s | stop)             Stop
@@ -113,6 +114,7 @@ case $cmd in
     b | build)              docker build $build_args -t $image ${EXTRA_BUILD_ARGS:-} $cmd_args ;;
     bnc | build-no-cache)   docker build --no-cache $build_args -t $image ${EXTRA_BUILD_ARGS:-} $cmd_args ;;
     p | push)               docker push $image ;;
+    U | update)             docker pull $image ;;
     r | run)                docker run $run_args $image $cmd_args ;;
     u | up)                 docker run -d  --restart always $run_args $image $cmd_args ;;
     s | stop)               docker stop $CONTAINER_NAME $cmd_args ;;
