@@ -121,7 +121,8 @@ class Yolov5Detector(DetectorLogic):
                 det, origin_h, origin_w, conf_thres, iou_thres)
 
             for j, box in enumerate(result_boxes[:max_det]):
-                x, y, br_x, br_y = box
+                # Convert to Python floats: numpy scalars cannot be serialized by jsonable_encoder
+                x, y, br_x, br_y = (float(v) for v in box)
                 w = br_x - x
                 h = br_y - y
                 category_idx = result_classid[j]
