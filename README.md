@@ -34,12 +34,15 @@ Trainer Docker-Images are published on https://hub.docker.com/r/zauberzeug/yolov
 
 New images can be pulled with `docker pull zauberzeug/yolov5-trainer:A.B.C-nlvX.Y.Z`, where `A.B.C` is the version of the trainer node and `X.Y.Z` is the version of the learning loop node library.
 
-During development, i.e. when building the container from code it is recommended to use the script `docker.sh` in the folder `training` to build/start/interact with the image.
-When using the script it is required to set up a .env file in the training folder that contains the loop-related configuration. The following variables should be set (note that some are inherited from the [Zauberzeug Learning Loop Node Library](https://github.com/zauberzeug/learning_loop_node) ):
+During development, i.e. when building the container from code it is recommended to use the script `docker.sh` in the folder `trainer` to build/start/interact with the image.
+It is a thin wrapper: what differs about the sub-project is in `docker.conf` next to it, and the rest is `scripts/node-docker.sh`, a copy of which each node repository holds.
+When using the script it is required to set up a .env file in the trainer folder that contains the loop-related configuration.
+**Every variable in `.env` is passed into the container**, so a setting the node declares in `main.py` is set simply by naming it there. The following variables should be set (note that some are inherited from the [Zauberzeug Learning Loop Node Library](https://github.com/zauberzeug/learning_loop_node) ):
 
 | Name                        | Purpose                                              | Value          | Default | Requi. only with ./docker.sh |
 | --------------------------- | ---------------------------------------------------- | -------------- | ------- | ---------------------------- |
-| TRAINER_NAME                | Will be the name of the container                    | String         | -       | Yes                          |
+| CONTAINER_NAME              | Name of the docker container, not of the node in the loop | String    | yolov5_trainer | Yes                |
+| HOST_PORT                   | Port on this machine mapped to the container         | Integer        | 7443    | Yes                          |
 | LINKLL                      | Link the node library into the container?            | TRUE/FALSE     | FALSE   | Yes                          |
 | UVICORN_RELOAD              | Enable hot-reload                                    | TRUE/FALSE/0/1 | FALSE   | No                           |
 | RESTART_AFTER_TRAINING      | Auto-restart after training                          | TRUE/FALSE/0/1 | FALSE   | No                           |
@@ -64,16 +67,20 @@ Besides, the following parameters may be set:
 | Name                        | Purpose                                   | Value                     | Default | Required only with ./docker.sh |
 | --------------------------- | ----------------------------------------- | ------------------------- | ------- | ------------------------------ |
 | LINKLL                      | Link the node library into the container? | TRUE or FALSE             | FALSE   | Yes                            |
-| DETECTOR_NAME               | Will be the name of the container         | String                    | -       | Yes                            |
+| CONTAINER_NAME              | Name of the docker container, not of the node in the loop | String     | yolov5_detector | Yes                  |
+| HOST_PORT                   | Port on this machine mapped to the container | Integer               | 8004    | Yes                            |
 | WEIGHT_TYPE                 | Data type to convert weights to           | String [FP32, FP16, INT8] | FP16    | No                             |
 | IOU_THRESHOLD               | IoU threshold for NMS                     | Float                     | 0.45    | No                             |
 | CONF_THRESHOLD              | Confidence threshold for NMS              | Float                     | 0.2     | No                             |
 | BUILDER_OPTIMIZATION_LEVEL  | TensorRT builder optimization level       | Integer [0-5]             | 4       | No                             |
 
+Each of these is also a command line flag — `--weight-type`, `--iou-threshold`, `--conf-threshold`,
+`--builder-optimization-level`; run the node with `--help` to see them. `NODE_HOST` and `NODE_PORT`
+set the interface and port the node binds to inside the container.
+
 Higher `BUILDER_OPTIMIZATION_LEVEL` values let the TensorRT builder benchmark more kernel tactics, which can yield faster inference at the cost of a longer engine build (the timing cache described below keeps later builds fast). The level only applies while an engine is built, so changing it takes effect for the next model that has no engine yet — delete `model.engine` in the model folder to rebuild an existing one.
 
-Pulled images can be run with the `docker.sh` script by calling `./docker.sh run-image`.
-Local builds can be run with `./docker.sh run`.
+Local builds can be run with `./docker.sh run` (or `./docker.sh r`).
 
 ### Cloud-Detector (For Linux computers with Nvidia GPU)
 

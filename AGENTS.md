@@ -11,16 +11,36 @@ documents the supported hyperparameters and the published docker images.
 
 ## Layout
 
-Three independent uv sub-projects, each with its own `pyproject.toml`, `uv.lock`, `Dockerfile` and
-`docker.sh`:
+Three independent uv sub-projects, each with its own `pyproject.toml`, `uv.lock`, `Dockerfile`,
+`docker.sh` and `docker.conf`; `scripts/node-docker.sh` at the root drives all three. That driver is
+shared verbatim with the other node repositories and kept in step by hand, so a fix belongs in all
+of them. `.env` is passed whole into the container, so a setting the node declares in `main.py`
+needs no change to either file; `CONTAINER_NAME`, `HOST_PORT` and `LINKLL` are read by `docker.sh`
+itself and never reach the node.
+
+Sub-projects:
 
 - `trainer/` — the training node. Runs on GPU in an NVIDIA PyTorch image; `app_code/` holds the
   trainer logic, `app_code/yolov5/` the upstream code, `app_code/tests/` the suite.
 - `detector/` — the TensorRT detector. `detector/tensorrtx/` is **vendored upstream code**; see the
   CONTRIBUTING section before changing anything in it.
 - `detector_cpu/` — the CPU detector, a second implementation of the same detector contract on top
-  of torch/ultralytics that shares no code with `detector/`. The only sub-project that installs on
-  macOS, which is why CONTRIBUTING points the root `.venv` at it.
+  of torch/ultralytics. It shares no *yolov5* code with `detector/`; what the two do have in common
+  — NMS geometry, clipping, building the loop's detection dataclasses — comes from
+  `learning_loop_node.detector.postprocess`. The only sub-project that installs on macOS, which is
+  why CONTRIBUTING points the root `.venv` at it.
+
+The model-agnostic half of a detector lives in the node library: `postprocess.to_image_metadata`
+turns detections into what the loop expects, `postprocess.bbox_iou` and `geometry.clip_*` are the
+shared primitives. Only the yolov5-specific parts — the packed `[cx,cy,w,h,conf,probs...]` output
+layout, the letterbox correction in `xywh2xyxy`, the tensorrtx engine build — belong here.
+
+The trainer's auto-detection pass goes through the same module: `_parse_file` reads the label
+files into `postprocess.Detection` values and `postprocess.to_detections` builds the loop's
+dataclasses from them. **Nothing in this repository constructs `BoxDetection` or `PointDetection`
+itself**, so detector and trainer cannot drift apart in how they resolve a category, clip to the
+image, or drop a degenerate prediction. Note what that shared step does: predictions of 2 px or
+less are dropped, points included, since a point is carried as the box around it.
 
 `sync.py` live-syncs this repository *and* `../learning_loop_node` onto a robot for on-device
 debugging, so the library is expected beside this checkout.

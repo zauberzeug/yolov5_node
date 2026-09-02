@@ -11,13 +11,12 @@ import cv2  # type: ignore # pylint: disable=import-error
 import yaml  # type: ignore
 from fastapi.encoders import jsonable_encoder
 from learning_loop_node.data_classes import (
-    BoxDetection,
     Detections,
     ModelInformation,
-    PointDetection,
     PretrainedModel,
     TrainingStateData,
 )
+from learning_loop_node.detector.postprocess import Detection, to_detections
 from learning_loop_node.enums import CategoryType
 from learning_loop_node.trainer import trainer_logic
 from learning_loop_node.trainer.exceptions import CriticalError, NodeNeedsRestartError
@@ -88,16 +87,6 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
     async def _resume(self) -> None:
         await self._start(model=str(self.training.training_folder_path / 'result/weights/published/latest.pt'))
-
-    def _get_executor_error_from_log(self) -> str | None:
-        if self._executor is None:
-            return None
-        for line in self._executor.get_log_by_lines(tail=50):
-            if 'CUDA out of memory' in line:
-                return 'graphics card is out of memory'
-            if 'CUDA error: invalid device ordinal' in line:
-                return 'graphics card not found'
-        return None
 
     def _get_new_best_training_state(self) -> TrainingStateData | None:
         weightfile = model_files.get_new(self.training.training_folder_path)
@@ -291,9 +280,9 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         if os.path.exists(labels_path):
             for filename in os.scandir(labels_path):
                 uuid = os.path.splitext(os.path.basename(filename.path))[0]
-                box_detections, point_detections = self._parse_file(model_information, images_folder, filename.path)
-                detections.append(Detections(box_detections=box_detections,
-                                  point_detections=point_detections, image_id=uuid))
+                predictions, img_height, img_width = self._parse_file(images_folder, filename.path)
+                detections.append(to_detections(predictions, model_information, img_height, img_width,
+                                                image_id=uuid))
         return detections
 
     def _get_progress_from_log(self) -> float:
@@ -317,32 +306,16 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     # ---------------------------------------- HELPER METHODS ----------------------------------------
 
     @staticmethod
-    def clip_box(x: float, y: float, width: float, height: float, img_width: int, img_height: int
-                 ) -> tuple[float, float, float, float]:
-        '''make sure the box is within the image
-            x,y is the center of the box
-        '''
-        left = max(0, x - 0.5 * width)
-        top = max(0, y - 0.5 * height)
-        right = min(img_width, x + 0.5 * width)
-        bottom = min(img_height, y + 0.5 * height)
+    def _parse_file(images_folder: str, filename: str) -> tuple[list[Detection], int, int]:
+        """Read one YOLOv5 label file, with the size of the image it belongs to.
 
-        x = 0.5 * (left + right)
-        y = 0.5 * (top + bottom)
-        width = right - left
-        height = bottom - top
+        A label line is ``<class> <cx> <cy> <w> <h> <confidence>``, the four coordinates
+        normalised to the image and anchored on the box centre. :class:`Detection` is anchored
+        on the top-left corner and measured in pixels, which is what :func:`to_detections` takes;
+        resolving the category, clipping and building the loop's dataclasses happen there.
 
-        return x, y, width, height
-
-    @staticmethod
-    def clip_point(x: float, y: float, img_width: int, img_height: int) -> tuple[float, float]:
-        x = min(max(0, x), img_width)
-        y = min(max(0, y), img_height)
-        return x, y
-
-    @staticmethod
-    def _parse_file(model_info: ModelInformation, images_folder: str, filename: str
-                    ) -> tuple[list[BoxDetection], list[PointDetection]]:
+        :return: ``(predictions, img_height, img_width)``
+        """
         uuid = os.path.splitext(os.path.basename(filename))[0]
 
         # TODO change to approach that does not require to read the image
@@ -350,33 +323,24 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         img_height, img_width, _ = cv2.imread(image_path).shape
         with open(filename, 'r') as f:
             content = f.readlines()
-        box_detections = []
-        point_detections = []
 
+        predictions = []
         for line in content:
             c, x_, y_, w_, h_, probability_str = line.split(' ')
-
-            category = model_info.categories[int(c)]
-            x = float(x_) * img_width
-            y = float(y_) * img_height
             width = float(w_) * img_width
             height = float(h_) * img_height
-            probability = float(probability_str) * 100
-
-            if category.type == CategoryType.Box:
-                x, y, width, height = Yolov5TrainerLogic.clip_box(x, y, width, height, img_width, img_height)
-                box_detections.append(
-                    BoxDetection(category_name=category.name, x=int(x - 0.5 * width),
-                                 y=int(y - 0.5 * height),
-                                 width=int(width),
-                                 height=int(height),
-                                 model_name=model_info.version, confidence=probability, category_id=category.id))
-            elif category.type == CategoryType.Point:
-                x, y = Yolov5TrainerLogic.clip_point(x, y, img_width, img_height)
-                point_detections.append(
-                    PointDetection(category_name=category.name, x=x, y=y, model_name=model_info.version,
-                                   confidence=probability, category_id=category.id))
-        return box_detections, point_detections
+            predictions.append(Detection(
+                x=float(x_) * img_width - 0.5 * width,
+                y=float(y_) * img_height - 0.5 * height,
+                w=width,
+                h=height,
+                category=int(c),
+                # NOTE percent, not the 0..1 every other node reports. The loop accepts both --
+                # it scales a confidence of 1.0 or less -- so this stays as it was rather than
+                # changing what a deployed trainer uploads.
+                probability=float(probability_str) * 100,
+            ))
+        return predictions, img_height, img_width
 
     @staticmethod
     def infer_image(model_folder: str, image_path: str) -> None:
