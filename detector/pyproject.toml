@@ -20,7 +20,7 @@ dependencies = [
     "numpy",
     "pyyaml",
     "pycuda==2025.1.2",
-    "learning_loop_node==0.21.0",
+    "learning_loop_node==0.22.0",
     "typing_extensions",
 ]
 
