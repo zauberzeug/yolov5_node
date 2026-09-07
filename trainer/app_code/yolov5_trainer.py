@@ -16,7 +16,7 @@ from learning_loop_node.data_classes import (
     PretrainedModel,
     TrainingStateData,
 )
-from learning_loop_node.detector.postprocess import Detection, to_detections
+from learning_loop_node.detector.postprocess import Prediction, to_detections
 from learning_loop_node.enums import CategoryType
 from learning_loop_node.trainer import trainer_logic
 from learning_loop_node.trainer.exceptions import CriticalError, NodeNeedsRestartError
@@ -306,11 +306,11 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     # ---------------------------------------- HELPER METHODS ----------------------------------------
 
     @staticmethod
-    def _parse_file(images_folder: str, filename: str) -> tuple[list[Detection], int, int]:
+    def _parse_file(images_folder: str, filename: str) -> tuple[list[Prediction], int, int]:
         """Read one YOLOv5 label file, with the size of the image it belongs to.
 
         A label line is ``<class> <cx> <cy> <w> <h> <confidence>``, the four coordinates
-        normalised to the image and anchored on the box centre. :class:`Detection` is anchored
+        normalised to the image and anchored on the box centre. :class:`Prediction` is anchored
         on the top-left corner and measured in pixels, which is what :func:`to_detections` takes;
         resolving the category, clipping and building the loop's dataclasses happen there.
 
@@ -329,16 +329,16 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             c, x_, y_, w_, h_, probability_str = line.split(' ')
             width = float(w_) * img_width
             height = float(h_) * img_height
-            predictions.append(Detection(
+            predictions.append(Prediction(
                 x=float(x_) * img_width - 0.5 * width,
                 y=float(y_) * img_height - 0.5 * height,
-                w=width,
-                h=height,
-                category=int(c),
+                width=width,
+                height=height,
+                category_index=int(c),
                 # NOTE percent, not the 0..1 every other node reports. The loop accepts both --
                 # it scales a confidence of 1.0 or less -- so this stays as it was rather than
                 # changing what a deployed trainer uploads.
-                probability=float(probability_str) * 100,
+                confidence=float(probability_str) * 100,
             ))
         return predictions, img_height, img_width
 

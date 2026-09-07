@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import numpy as np
 import pycuda.driver as cuda  # type: ignore # pylint: disable=import-error
 import tensorrt as trt  # type: ignore # pylint: disable=import-error
-from learning_loop_node.detector.postprocess import Detection, bbox_iou
+from learning_loop_node.detector.postprocess import Prediction, bbox_iou
 from PIL import Image
 from pycuda import gpuarray  # type: ignore # pylint: disable=import-error
 from pycuda._driver import (  # type: ignore # pylint: disable=import-error, no-name-in-module
@@ -246,7 +246,7 @@ class YoLov5TRT:
 
     # ============================================ PUBLIC METHODS ============================================
 
-    def infer(self, image_raw: np.ndarray) -> tuple[list[Detection], float]:
+    def infer(self, image_raw: np.ndarray) -> tuple[list[Prediction], float]:
         threading.Thread.__init__(self)  # type: ignore
 
         with self._active_cuda_context():
@@ -270,7 +270,7 @@ class YoLov5TRT:
         self.inference_slots.append(inference_slot)
         return detections, end - start
 
-    def infer_batch(self, images: list[np.ndarray]) -> tuple[list[list[Detection]], float]:
+    def infer_batch(self, images: list[np.ndarray]) -> tuple[list[list[Prediction]], float]:
         threading.Thread.__init__(self)  # type: ignore
         assert self.ctx is not None
 
@@ -452,16 +452,20 @@ class YoLov5TRT:
 
 
 def _pack_detection_results(
-        result_boxes: np.ndarray, result_scores: np.ndarray, result_classid: np.ndarray) -> list[Detection]:
-    """Pack detection array results into a list of Detection namedtuples, suitable for returning from node"""
-    detections = []
+        result_boxes: np.ndarray, result_scores: np.ndarray, result_classid: np.ndarray) -> list[Prediction]:
+    """Pack the detection arrays into predictions, for the node to turn into image metadata."""
+    predictions = []
     for j, box in enumerate(result_boxes):
         x, y, br_x, br_y = box
-        w = br_x - x
-        h = br_y - y
-        detections.append(Detection(int(x), int(y), int(w), int(h),
-                                    int(result_classid[j]), round(float(result_scores[j]), 2)))
-    return detections
+        predictions.append(Prediction(
+            x=float(x),
+            y=float(y),
+            width=float(br_x - x),
+            height=float(br_y - y),
+            category_index=int(result_classid[j]),
+            confidence=float(result_scores[j]),
+        ))
+    return predictions
 
 
 class WarmUpThread(threading.Thread):

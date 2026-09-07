@@ -16,7 +16,7 @@ from learning_loop_node.data_classes import (
     ImagesMetadata,
     ModelInformation,
 )
-from learning_loop_node.detector.postprocess import bbox_iou, detections_from_xyxy, to_image_metadata
+from learning_loop_node.detector.postprocess import bbox_iou, predictions_from_xyxy, to_image_metadata
 
 MAX_DETECTIONS = 1000
 
@@ -73,13 +73,13 @@ class Yolov5Detector(DetectorLogic):
             result_boxes, result_scores, result_classid = self._post_process(
                 det, origin_h, origin_w, self.conf_threshold, self.iou_threshold)
 
-            detections = detections_from_xyxy(
+            predictions = predictions_from_xyxy(
                 labels=result_classid[:MAX_DETECTIONS].tolist(),
                 boxes=result_boxes[:MAX_DETECTIONS].tolist(),
-                scores=[round(float(score), 2) for score in result_scores[:MAX_DETECTIONS]],
+                scores=result_scores[:MAX_DETECTIONS].tolist(),
             )
             self.log.debug('took %f s', time.time() - t)
-            return to_image_metadata(detections, self.model_info, origin_h, origin_w)
+            return to_image_metadata(predictions, self.model_info, origin_h, origin_w)
 
         except Exception as e:
             raise RuntimeError('Error during inference') from e
