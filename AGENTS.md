@@ -36,7 +36,7 @@ shared primitives. Only the yolov5-specific parts — the packed `[cx,cy,w,h,con
 layout, the letterbox correction in `xywh2xyxy`, the tensorrtx engine build — belong here.
 
 The trainer's auto-detection pass goes through the same module: `_parse_file` reads the label
-files into `postprocess.Detection` values and `postprocess.to_detections` builds the loop's
+files into `postprocess.Prediction` values and `postprocess.to_detections` builds the loop's
 dataclasses from them. **Nothing in this repository constructs `BoxDetection` or `PointDetection`
 itself**, so detector and trainer cannot drift apart in how they resolve a category, clip to the
 image, or drop a degenerate prediction. Note what that shared step does: predictions of 2 px or

@@ -89,7 +89,7 @@ run_args+=" --name $CONTAINER_NAME"
 [ "$GPU" = "TRUE" ] && run_args+=" --device=nvidia.com/gpu=all"
 [ "$IPC_HOST" = "TRUE" ] && run_args+=" --ipc host"
 [ -n "${HOST_PORT:-}" ] && run_args+=" -p $HOST_PORT:$CONTAINER_PORT"
-run_args+="${EXTRA_RUN_ARGS:-}"
+[ -n "${EXTRA_RUN_ARGS:-}" ] && run_args+=" $EXTRA_RUN_ARGS"
 
 # Link Learning Loop Node library if requested
 if [ "${LINKLL:-FALSE}" == "TRUE" ]; then
