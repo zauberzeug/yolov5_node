@@ -16,7 +16,7 @@ jobs:
       - name: build
         run: |
           cd trainer
-          ./docker.sh b test_latest
+          bash ./docker.sh b test_latest
       - name: run
         env:
           LOOP_HOST: ${{ secrets.LOOP_HOST }}
