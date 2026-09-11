@@ -335,10 +335,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
                 width=width,
                 height=height,
                 category_index=int(c),
-                # NOTE percent, not the 0..1 every other node reports. The loop accepts both --
-                # it scales a confidence of 1.0 or less -- so this stays as it was rather than
-                # changing what a deployed trainer uploads.
-                confidence=float(probability_str) * 100,
+                confidence=float(probability_str) * 100,  # The loop interprets values <= 1 as fractions.
             ))
         return predictions, img_height, img_width
 

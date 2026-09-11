@@ -57,8 +57,7 @@ fi
 
 # ========================== BUILD CONFIGURATION / IMAGE SELECTION =======================
 # The version pair every image tag is built from: A.B.C-nlvX.Y.Z
-# NOTE sed, not `grep -oP`: -P is a GNU extension, so on a host whose PATH finds BSD grep
-# first both lookups failed silently and every image was tagged ":-nlv".
+# Host tools may be BSD implementations.
 SEMANTIC_VERSION=$(sed -n 's/^version[[:space:]]*=[[:space:]]*"\([0-9.]*\)".*/\1/p' pyproject.toml | head -1)
 NODE_LIB_VERSION=$(sed -n 's/.*learning_loop_node==\([0-9.]*\).*/\1/p' pyproject.toml | head -1)
 : "${SEMANTIC_VERSION:?no version found in pyproject.toml}"
