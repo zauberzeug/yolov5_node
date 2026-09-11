@@ -332,6 +332,15 @@ wheels = [
 ]
 
 [[package]]
+name = "configargparse"
+version = "1.7.7"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/9b/b4/7065677004d4ec8728da15a70580f431f1a4a079e0e8e8b7aa4ffee4e972/configargparse-1.7.7.tar.gz", hash = "sha256:607bea276a219912158afa1e5a716c3f8f88d542f9997dfd43bbd0b492a9f5a6", size = 73397, upload-time = "2026-09-06T20:58:06.387Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b6/e6/cf29a5b21528779fa335c860c66a915d2254bbf77c1fb2c67160c56c3b58/configargparse-1.7.7-py3-none-any.whl", hash = "sha256:61107bb1de0b53c4eb7a475a12de6783b0dc6c51bc9859f5accbe97d66f8a4b7", size = 34277, upload-time = "2026-09-06T20:58:05.125Z" },
+]
+
+[[package]]
 name = "contourpy"
 version = "1.3.3"
 source = { registry = "https://pypi.org/simple" }
@@ -998,11 +1007,12 @@ wheels = [
 
 [[package]]
 name = "learning-loop-node"
-version = "0.22.0"
+version = "0.23.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles" },
     { name = "aiohttp" },
+    { name = "configargparse" },
     { name = "dacite" },
     { name = "fastapi" },
     { name = "httpx" },
@@ -1016,9 +1026,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "uvicorn", extra = ["standard"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/14/81/358e120358828a5964dd781b62637704c85a9b69c4b17c5efa31720eb5a9/learning_loop_node-0.22.0.tar.gz", hash = "sha256:1bd5bb8222bb7e997b17858d2082984023bf7fc444e313fd0729e797fb55c0c4", size = 63753, upload-time = "2026-08-19T08:14:07.557Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d2/31/f86903408d6173ebd837a7236f6ad3ecac796e9f2aa3c91dc11493308b15/learning_loop_node-0.23.0.tar.gz", hash = "sha256:61caa353c922cf52e4b19c16cb0cb7a43bb900d32843d683bfc3d0f3bb3af5c1", size = 74090, upload-time = "2026-09-10T05:27:48.691Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/70/e5/4d91990f93d174dad62e0c18f020aa2e43786a87dbf79760fad133e209c0/learning_loop_node-0.22.0-py3-none-any.whl", hash = "sha256:5d129a078cf2409f75f37c494e69a5fc9e7290ecf2e20a3c00185aaefa106302", size = 77528, upload-time = "2026-08-19T08:14:06.35Z" },
+    { url = "https://files.pythonhosted.org/packages/71/9c/062b35ed5231add37c4023c5cec989c695f16e0cd34c6beadce45846a438/learning_loop_node-0.23.0-py3-none-any.whl", hash = "sha256:4775f0f11a8932adced9b59731f1852e7d6339d00079cc7a2ff1f67f835bbb71", size = 89629, upload-time = "2026-09-10T05:27:47.538Z" },
 ]
 
 [[package]]
@@ -3080,7 +3090,7 @@ yolo = [
 
 [package.metadata]
 requires-dist = [
-    { name = "learning-loop-node", specifier = "==0.22.0" },
+    { name = "learning-loop-node", specifier = "==0.23.0" },
     { name = "ruamel-yaml" },
     { name = "torchinfo", specifier = ">=1.8.0" },
 ]

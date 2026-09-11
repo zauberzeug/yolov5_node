@@ -15,13 +15,11 @@ from typing import Any, Literal, final
 import numpy as np
 from learning_loop_node import GLOBALS, DetectorLogic, DetectorLogicFactory
 from learning_loop_node.data_classes import (
-    BoxDetection,
     ImageMetadata,
     ImagesMetadata,
     ModelInformation,
-    PointDetection,
 )
-from learning_loop_node.enums import CategoryType
+from learning_loop_node.detector.postprocess import to_image_metadata
 from typing_extensions import override
 
 import yolov5
@@ -57,7 +55,6 @@ _TIMING_CACHE_FILE = Path(GLOBALS.data_folder) / 'trt_timing.cache'
 
 @final
 class Yolov5Detector(DetectorLogic):
-    MIN_BOX_SIZE = 2
 
     def __init__(self, model_info: ModelInformation, params: Yolov5DetectorParams) -> None:
         self.model_info = model_info
@@ -94,46 +91,13 @@ class Yolov5Detector(DetectorLogic):
 
         _LOG.info('Yolov5Detector initialized successfully')
 
-    @staticmethod
-    def clip_box(x1: float, y1: float, width: float, height: float, img_width: int, img_height: int) -> tuple[int, int, int, int]:  # noqa: PLR0913
-        """
-        Clips a box defined by top-left corner (x1, y1), width, and height
-        to stay within image boundaries (img_width, img_height).
-        Returns the clipped (x1, y1, width, height) as ints.
-        """
-
-        x2 = x1 + width
-        y2 = y1 + height
-
-        # Clip coordinates
-        clipped_x1 = round(max(0.0, x1))
-        clipped_y1 = round(max(0.0, y1))
-        clipped_x2 = round(min(float(img_width), x2))
-        clipped_y2 = round(min(float(img_height), y2))
-
-        # Recalculate dimensions
-        clipped_width = clipped_x2 - clipped_x1
-        clipped_height = clipped_y2 - clipped_y1
-
-        # Ensure width and height are non-negative
-        clipped_width = max(clipped_width, 0)
-        clipped_height = max(clipped_height, 0)
-
-        return clipped_x1, clipped_y1, clipped_width, clipped_height
-
-    @staticmethod
-    def clip_point(x: float, y: float, img_width: int, img_height: int) -> tuple[float, float]:
-        x = min(max(0, x), img_width)
-        y = min(max(0, y), img_height)
-        return x, y
-
     @override
     def evaluate(self, image: np.ndarray) -> ImageMetadata:
         try:
             t = time.time()
             results, inference_ms = self.yolov5.infer(image)
             _LOG.debug('took %f s, overall %f s', inference_ms, time.time() - t)
-            return self._collect_detections(results, image.shape[0], image.shape[1])
+            return to_image_metadata(results, self.model_info, image.shape[0], image.shape[1])
 
         except Exception as e:
             raise RuntimeError('Error during inference') from e
@@ -149,7 +113,8 @@ class Yolov5Detector(DetectorLogic):
             t = time.time()
             results, total_ms = self.yolov5.infer_batch(images)
 
-            detections = [self._collect_detections(result, shape[0], shape[1]) for result in results]
+            detections = [to_image_metadata(result, self.model_info, shape[0], shape[1])
+                          for result in results]
 
             _LOG.debug('batch infer took %f s, overall %f s', total_ms, time.time() - t)
             return ImagesMetadata(items=detections)
@@ -157,43 +122,6 @@ class Yolov5Detector(DetectorLogic):
         except Exception as e:
             raise RuntimeError('Error during inference') from e
 
-    def _collect_detections(self, detections: list[yolov5.Detection], im_height: int, im_width: int) -> ImageMetadata:
-        image_metadata = ImageMetadata()
-        skipped_detections = []
-
-        for detection in detections:
-            x, y, w, h, category_idx, probability = detection
-            category = self.model_info.categories[category_idx]
-            if w <= self.MIN_BOX_SIZE or h <= self.MIN_BOX_SIZE:  # skip very small boxes.
-                skipped_detections.append((category.name, detection))
-                continue
-            if category.type == CategoryType.Box:
-                clipped_x1, clipped_y1, clipped_w, clipped_h = self.clip_box(
-                    x, y, w, h, im_width, im_height)
-                image_metadata.box_detections.append(
-                    BoxDetection(category_name=category.name,
-                                 x=clipped_x1,
-                                 y=clipped_y1,
-                                 width=clipped_w,
-                                 height=clipped_h,
-                                 category_id=category.id,
-                                 model_name=self.model_info.version,
-                                 confidence=probability))
-            elif category.type == CategoryType.Point:
-                cx, cy = x + w/2, y + h/2
-                cx, cy = self.clip_point(cx, cy, im_width, im_height)
-                image_metadata.point_detections.append(
-                    PointDetection(category_name=category.name,
-                                   x=cx,
-                                   y=cy,
-                                   category_id=category.id,
-                                   model_name=self.model_info.version,
-                                   confidence=probability))
-        if skipped_detections:
-            log_msg = '\n'.join([str(d) for d in skipped_detections])
-            _LOG.warning('Removed %d small detections from result: \n%s', len(skipped_detections), log_msg)
-
-        return image_metadata
 
 
 

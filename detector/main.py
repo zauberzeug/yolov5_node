@@ -1,28 +1,31 @@
 import os
 
-import uvicorn
 from learning_loop_node import DetectorNode
+from learning_loop_node.helpers.entrypoint import node_parser, run_node
 
 from yolov5_detector import Yolov5DetectorParams
 
-reload = os.getenv("UVICORN_RELOAD", "FALSE").lower() == "true"
-print(f'Uvicorn reload is set to: {reload}')
-
-weight_type = os.getenv('WEIGHT_TYPE', 'FP16')
-assert weight_type in ('FP16', 'FP32', 'INT8'), 'WEIGHT_TYPE must be one of FP16, FP32, INT8'
-
 MAX_BUILDER_OPTIMIZATION_LEVEL = 5
-builder_optimization_level = int(os.getenv('BUILDER_OPTIMIZATION_LEVEL', '4'))
-assert 0 <= builder_optimization_level <= MAX_BUILDER_OPTIMIZATION_LEVEL, \
-    f'BUILDER_OPTIMIZATION_LEVEL must be between 0 and {MAX_BUILDER_OPTIMIZATION_LEVEL}'
+
+parser = node_parser(description='Run the YOLOv5 detector node')
+parser.add_argument('--weight-type', default='FP16', choices=['FP16', 'FP32', 'INT8'],
+                    help='Inference weight type')
+parser.add_argument('--builder-optimization-level', type=int, default=4,
+                    choices=range(MAX_BUILDER_OPTIMIZATION_LEVEL + 1),
+                    help='TensorRT builder optimization level; higher levels search more kernel '
+                         'tactics for potentially faster inference at the cost of longer engine builds')
+parser.add_argument('--iou-threshold', type=float, default=0.45, help='Threshold for non-maximum-suppression')
+parser.add_argument('--conf-threshold', type=float, default=0.2, help='Minimum confidence for detections')
+
+args = parser.parse_args()
 
 params = Yolov5DetectorParams(
-    weight_type=weight_type,
-    iou_threshold=float(os.getenv('IOU_THRESHOLD', '0.45')),
-    conf_threshold=float(os.getenv('CONF_THRESHOLD', '0.2')),
-    builder_optimization_level=builder_optimization_level,
+    weight_type=args.weight_type,
+    iou_threshold=args.iou_threshold,
+    conf_threshold=args.conf_threshold,
+    builder_optimization_level=args.builder_optimization_level,
 )
 node = DetectorNode(name='YOLOv5 Detector ' + os.uname()[1], detector_factory=params)
 
-if __name__ == "__main__":
-    uvicorn.run("main:node", host="0.0.0.0", port=80, lifespan='on', reload=reload)
+if __name__ == '__main__':
+    run_node('main:node', args)
