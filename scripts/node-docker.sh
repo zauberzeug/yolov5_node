@@ -82,7 +82,21 @@ fi
 run_args="-it"
 [ -n "${DATA_VOLUME:-}" ] && run_args+=" -v $DATA_VOLUME:/data"
 run_args+=" -h ${HOSTNAME}_DEV"
-[ "$ENV_FILE" = "TRUE" ] && [ -f .env ] && run_args+=" --env-file .env"
+# NOTE not `--env-file .env`: docker's env-file reader passes the raw line through -- it strips
+# no quotes and expands nothing, so PASSWORD='secret' would reach the container with its quotes
+# and an int-typed setting such as NODE_PORT="80" would fail to parse. docker.sh has already
+# sourced .env, so forward every name it declares as `--env NAME` and let docker read the value
+# the shell evaluated -- spaces and special characters included, new settings picked up on their
+# own. The name alone is passed, so no value has to survive the unquoted $run_args expansion.
+if [ "$ENV_FILE" = "TRUE" ] && [ -f .env ]; then
+    while IFS= read -r env_line || [ -n "$env_line" ]; do
+        if [[ $env_line =~ ^[[:space:]]*(export[[:space:]]+)?([a-zA-Z_][a-zA-Z0-9_]*)= ]]; then
+            env_name=${BASH_REMATCH[2]}
+            export "${env_name?}"
+            run_args+=" --env $env_name"
+        fi
+    done < .env
+fi
 
 run_args+=" --name $CONTAINER_NAME"
 [ "$GPU" = "TRUE" ] && run_args+=" --device=nvidia.com/gpu=all"
