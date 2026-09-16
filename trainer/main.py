@@ -2,21 +2,18 @@ import logging
 import multiprocessing
 import os
 
-import uvicorn
 from learning_loop_node import TrainerNode
+from learning_loop_node.helpers.entrypoint import node_parser, run_node
 
 from app_code.yolov5_trainer import Yolov5TrainerLogic
 
-print(f'Uvicorn reload is set to: {os.getenv("UVICORN_RELOAD", "FALSE").lower() == "true"}')
-logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
-                    datefmt='%Y-%m-%d:%H:%M:%S', level=logging.INFO)
+args = node_parser(description='Run the YOLOv5 trainer node').parse_args()
 
 trainer_logic = Yolov5TrainerLogic()
 node = TrainerNode(name='Yolov5 Trainer ' + os.uname()[1], trainer_logic=trainer_logic)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     multiprocessing.set_start_method('spawn', force=True)
     logging.info('using multiprocessing start method %s', multiprocessing.get_start_method())
 
-    uvicorn.run("main:node", host="0.0.0.0", port=80, lifespan='on',
-                reload=os.getenv('UVICORN_RELOAD', 'FALSE').lower() in ['true', '1'])
+    run_node('main:node', args)
