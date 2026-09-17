@@ -50,6 +50,12 @@ debugging, so the library is expected beside this checkout.
 Each `main.py` only builds a `TrainerNode`/`DetectorNode` from the library and hands it one class of
 ours; everything below is our side of that contract.
 
+**The batch size is measured, not configured.** `batch_size_calculation.calc` builds the model
+`train_det.py` would build and runs a step resembling its own — EMA copy, three-group SGD, AMP,
+the real `ComputeLoss`, backward, clipping, optimizer step — at doubling sizes, and releases
+everything before the subprocess starts. It never searches below `MIN_BATCH_SIZE`, because
+`train_det.py` validates at `batch_size // 2`.
+
 **The trainer never trains in-process.** `Yolov5TrainerLogic` (`trainer/app_code/yolov5_trainer.py`)
 implements the library's abstract `TrainerLogic` hooks and shells out through the library's
 `Executor` to `trainer/train_det.py` (and `pred_det.py` for `_detect`). What a hook has to return is
@@ -105,10 +111,11 @@ There is no `.pre-commit-config.yaml` here. Lint per sub-project, where the ruff
 cd trainer && uv run --no-sync ruff check .
 ```
 
-`trainer/benchmark_batch_size.py` is a measurement, not a test: it runs the estimate of
-`batch_size_calculation` and the library's probe against the same model and prints what each picks,
-plus whether the estimate survives a real training step. It needs a GPU box — its module docstring
-carries the docker invocation — and changes nothing about the trainer.
+`trainer/benchmark_batch_size.py` is a measurement, not a test: it runs the estimate that
+`batch_size_calculation` used before the probe — kept alive in the benchmark, gone from the trainer
+— against the probe that replaced it, and checks whether the estimate's pick survives a real step.
+It needs a GPU box, its module docstring carries the docker invocation, and it must have the card
+to itself: two of these in parallel measure each other's memory.
 
 `docker-deploy.yml` publishes the images on a GitHub release tagged `v<MAJOR>.<MINOR>.<PATCH>`.
 

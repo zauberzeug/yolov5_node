@@ -37,6 +37,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
         # Following will be overwritten by hyp.yaml
         self.epochs = 0
+        self.max_batch_size = 0  # 0 leaves the bound of the batch-size probe to the library
         self.detect_nms_conf_thres = 0.2
         self.detect_nms_iou_thres = 0.45
         self.point_sizes_by_uuid: dict[str, float] = {}
@@ -199,8 +200,9 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         self._save_additional_hyperparameters()
 
         try:
-            batch_size = await batch_size_calculation.calc(self.training.training_folder, model, self.hyperparameter_path,
-                                                           f'{self.training.training_folder}/dataset.yaml', resolution)
+            batch_size = await batch_size_calculation.calc(self.training.training_folder, model,
+                                                           self.hyperparameter_path, resolution,
+                                                           max_batch_size=self.max_batch_size)
         except Exception as e:
             logging.exception('Error during batch size calculation:')
             raise NodeNeedsRestartError() from e
@@ -256,6 +258,9 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             hyp = dict(yaml.safe_load(f))  # load hyps dict
 
         self.epochs = int(hyp.get('epochs', self.epochs))
+        self.max_batch_size = int(hyp.get('max_batch_size', self.max_batch_size))
+        if self.max_batch_size < 0:
+            raise CriticalError(f'max_batch_size must be >= 0, got {self.max_batch_size}')
         self.detect_nms_conf_thres = float(hyp.get('detect_nms_conf_thres', self.detect_nms_conf_thres))
         self.detect_nms_iou_thres = float(hyp.get('detect_nms_iou_thres', self.detect_nms_iou_thres))
 
@@ -270,8 +275,10 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
                 self.flip_label_uuid_pairs.append((str(k), str(v)))
 
         hyp_str = ', '.join(f'{k}={v}' for k, v in hyp.items())
-        logging.info('parsed hyperparameters %s: epochs: %d, detect_nms_conf_thres: %f, detect_nms_iou_thres: %f',
-                     hyp_str, self.epochs, self.detect_nms_conf_thres, self.detect_nms_iou_thres)
+        logging.info('parsed hyperparameters %s: epochs: %d, max_batch_size: %d, '
+                     'detect_nms_conf_thres: %f, detect_nms_iou_thres: %f',
+                     hyp_str, self.epochs, self.max_batch_size, self.detect_nms_conf_thres,
+                     self.detect_nms_iou_thres)
         logging.info('point_sizes_by_id: %s', self.point_sizes_by_uuid)
         logging.info('flip_label_pairs: %s', self.flip_label_uuid_pairs)
 

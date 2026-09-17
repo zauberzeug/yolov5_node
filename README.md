@@ -14,6 +14,7 @@ We support all native hyperparameters of YOLOv5 (cf. `hyp_det.yaml` for referenc
 In addition, we support the following hyperparameters:
 
 - `epochs`: The number of epochs to train the model.
+- `max_batch_size`: Upper bound of the batch-size probe, rounded down to a power of two. `0` (the default) leaves the bound to the Learning Loop Node library.
 - `detect_nms_conf_thres`: The confidence threshold for the NMS during inference and validation (not relevant for training).
 - `detect_nms_iou_thres`: The IoU threshold for the NMS during inference and validation (not used for training).
 
@@ -25,7 +26,7 @@ Further, we support the following hyperparameters for point detection:
 
 The trainer reports two more hyperparameters back to the Learning Loop. They are output only and never read as input:
 
-- `batch_size`: The batch size the training actually ran with, computed from the available GPU memory.
+- `batch_size`: The batch size the training actually ran with, measured before the training starts by running a training step at doubling sizes until one runs out of memory.
 - `trainer_version`: The version of the trainer node, which the release build bakes into the docker image as `NODE_VERSION`. Locally built images report `unknown`.
 
 ## Images
