@@ -6,16 +6,17 @@ optimizer, AMP with a gradient scaler, the real ``ComputeLoss``, backward, gradi
 optimizer step. Everything it allocates is released before the subprocess starts.
 
 Validation is deliberately not measured. ``train_det.py`` validates at ``batch_size // 2``, in half
-precision and without gradients, so the training step is the peak. That same halving is why nothing
-below :data:`MIN_BATCH_SIZE` is searched: a batch of one would validate with a batch of zero.
+precision and without gradients, so the training step is the peak. That same halving is why the
+probe is given a :data:`MIN_BATCH_SIZE`: a batch of one would validate with a batch of zero.
 """
 import logging
 import os
+from collections.abc import MutableMapping
+from typing import Any
 
 import torch
 import yaml
-from learning_loop_node.trainer.batch_size import MAX_BATCH_SIZE, find_batch_size, smaller_pot
-from learning_loop_node.trainer.cuda import free_cuda_memory, measured_fits, reserve_margin
+from learning_loop_node.trainer.cuda import free_cuda_memory, measure_batch_size
 
 from .yolov5.models.yolo import Model
 from .yolov5.utils.downloads import attempt_download
@@ -33,12 +34,12 @@ TARGETS_PER_IMAGE = 8
 
 
 async def calc(training_path: str, model_file: str, hyp_path: str, img_size: int,
-               max_batch_size: int = 0) -> int:
+               hyperparameters: MutableMapping[str, Any]) -> int:
     """Return the largest power-of-two batch size a training step fits into.
 
     :param training_path: The training folder, which is where `yolov5_format` wrote `dataset.yaml`.
-    :param max_batch_size: Caps the search, rounded down to a power of two; 0 leaves it to the
-        library's own bound.
+    :param hyperparameters: The training's hyperparameters, which `measure_batch_size` reads the
+        bound out of; the caller reports the size this returns.
     :raises InsufficientMemoryError: If not even :data:`MIN_BATCH_SIZE` fits.
     """
     os.chdir('/tmp')  # NOTE: attempt_download writes the weights into the working directory
@@ -54,13 +55,10 @@ async def calc(training_path: str, model_file: str, hyp_path: str, img_size: int
     free_cuda_memory()
 
     step = TrainingStep(model_file, training_path, hyp, dataset.get('nc'), img_size)
-    margin = reserve_margin(0, probe=PROBE)
     try:
-        fits = measured_fits(step, probe=PROBE, on_out_of_memory=step.drop_gradients)
-        pairs = smaller_pot(max_batch_size or MAX_BATCH_SIZE) // MIN_BATCH_SIZE
-        batch_size = MIN_BATCH_SIZE * find_batch_size(lambda n: fits(MIN_BATCH_SIZE * n), limit=max(1, pairs))
+        batch_size = measure_batch_size(step, hyperparameters=hyperparameters, probe=PROBE,
+                                        minimum=MIN_BATCH_SIZE, on_out_of_memory=step.drop_gradients)
     finally:
-        del margin
         step.release()
 
     logging.info('%s: training at %d px with batch size %d', PROBE, img_size, batch_size)

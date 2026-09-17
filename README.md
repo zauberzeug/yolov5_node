@@ -14,7 +14,7 @@ We support all native hyperparameters of YOLOv5 (cf. `hyp_det.yaml` for referenc
 In addition, we support the following hyperparameters:
 
 - `epochs`: The number of epochs to train the model.
-- `max_batch_size`: Upper bound of the batch-size probe, rounded down to a power of two. `0` (the default) leaves the bound to the Learning Loop Node library.
+- `batch_size`: The largest batch size the training may use. It is measured rather than trusted: if it fits it is used as given, and if it does not, the largest power of two below it that does is used instead. `0` (the default) leaves the bound to the card alone. The value that was actually used is reported back (see below).
 - `detect_nms_conf_thres`: The confidence threshold for the NMS during inference and validation (not relevant for training).
 - `detect_nms_iou_thres`: The IoU threshold for the NMS during inference and validation (not used for training).
 
@@ -24,10 +24,10 @@ Further, we support the following hyperparameters for point detection:
 - `point_sizes_by_id`: A dictionary that maps from point category uuids to the size of the points in the output (fractional size 0-1).
 - `flip_label_pairs`: A list of pairs of point uuids that should be swapped when a horizontal flip is applied during data augmentation.
 
-The trainer reports two more hyperparameters back to the Learning Loop. They are output only and never read as input:
+The trainer reports these hyperparameters back to the Learning Loop:
 
-- `batch_size`: The batch size the training actually ran with, measured before the training starts by running a training step at doubling sizes until one runs out of memory.
-- `trainer_version`: The version of the trainer node, which the release build bakes into the docker image as `NODE_VERSION`. Locally built images report `unknown`.
+- `batch_size`: The batch size the training actually ran with, which is at most the one that was asked for.
+- `trainer_version`: The version of the trainer node, which the release build bakes into the docker image as `NODE_VERSION`. Locally built images report `unknown`. Output only; never read as input.
 
 ## Images
 

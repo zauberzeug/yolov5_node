@@ -52,9 +52,10 @@ ours; everything below is our side of that contract.
 
 **The batch size is measured, not configured.** `batch_size_calculation.calc` builds the model
 `train_det.py` would build and runs a step resembling its own — EMA copy, three-group SGD, AMP,
-the real `ComputeLoss`, backward, clipping, optimizer step — at doubling sizes, and releases
-everything before the subprocess starts. It never searches below `MIN_BATCH_SIZE`, because
-`train_det.py` validates at `batch_size // 2`.
+the real `ComputeLoss`, backward, clipping, optimizer step — and releases everything before the
+subprocess starts. The step is all this repository supplies: the library's `measure_batch_size`
+reads `batch_size` as the upper bound, measures against it and returns what fits. The
+`MIN_BATCH_SIZE` it is given is ours, because `train_det.py` validates at `batch_size // 2`.
 
 **The trainer never trains in-process.** `Yolov5TrainerLogic` (`trainer/app_code/yolov5_trainer.py`)
 implements the library's abstract `TrainerLogic` hooks and shells out through the library's
