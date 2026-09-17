@@ -1,103 +1,137 @@
-import asyncio
+"""Choosing the training batch size by probing, rather than by estimating one.
+
+The training runs in a subprocess (:mod:`train_det`), so the probe builds its own model here and
+measures a step resembling the one that subprocess runs: the EMA copy, the three-group SGD
+optimizer, AMP with a gradient scaler, the real ``ComputeLoss``, backward, gradient clipping and an
+optimizer step. Everything it allocates is released before the subprocess starts.
+
+Validation is deliberately not measured. ``train_det.py`` validates at ``batch_size // 2``, in half
+precision and without gradients, so the training step is the peak. That same halving is why nothing
+below :data:`MIN_BATCH_SIZE` is searched: a batch of one would validate with a batch of zero.
+"""
 import logging
 import os
 
 import torch
 import yaml
-from learning_loop_node.helpers.misc import get_free_memory_mb
-from learning_loop_node.trainer.exceptions import CriticalError
-from torch.multiprocessing import Process, Queue, set_start_method
-from torchinfo import Verbosity, summary
+from learning_loop_node.trainer.batch_size import MAX_BATCH_SIZE, find_batch_size, smaller_pot
+from learning_loop_node.trainer.cuda import free_cuda_memory, measured_fits, reserve_margin
 
 from .yolov5.models.yolo import Model
 from .yolov5.utils.downloads import attempt_download
+from .yolov5.utils.loss import ComputeLoss
+from .yolov5.utils.torch_utils import ModelEMA, smart_optimizer
+
+PROBE = 'batch-size probe'
+"""Names the probe in the log, so its lines are greppable next to the training's own."""
+
+MIN_BATCH_SIZE = 2
+"""Smallest batch a training may use, because validation halves it."""
+
+TARGETS_PER_IMAGE = 8
+"""Boxes per synthetic image; the loss allocates per target, so this is not free."""
 
 
-async def calc(training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int,
-               init_clear_cuda: bool = True) -> int:
+async def calc(training_path: str, model_file: str, hyp_path: str, img_size: int,
+               max_batch_size: int = 0) -> int:
+    """Return the largest power-of-two batch size a training step fits into.
 
-    os.chdir('/tmp')
+    :param training_path: The training folder, which is where `yolov5_format` wrote `dataset.yaml`.
+    :param max_batch_size: Caps the search, rounded down to a power of two; 0 leaves it to the
+        library's own bound.
+    :raises InsufficientMemoryError: If not even :data:`MIN_BATCH_SIZE` fits.
+    """
+    os.chdir('/tmp')  # NOTE: attempt_download writes the weights into the working directory
 
     with open(hyp_path) as f:
         hyp = yaml.safe_load(f)
-    with open(dataset_path) as f:
+    with open(f'{training_path}/dataset.yaml') as f:
         dataset = yaml.safe_load(f)
 
     attempt_download(model_file)  # Download pretrained yolov5 model from ultralytics to .pt
 
-    if init_clear_cuda:
-        torch.cuda.init()
-        torch.cuda.empty_cache()
-    device = torch.device('cuda', 0)
+    torch.cuda.init()
+    free_cuda_memory()
 
-    free_mem_mb = get_free_memory_mb()
-    fraction = 0.95
-    free_mem_mb *= fraction
-
+    step = TrainingStep(model_file, training_path, hyp, dataset.get('nc'), img_size)
+    margin = reserve_margin(0, probe=PROBE)
     try:
-        ckpt = torch.load(model_file, map_location=device, weights_only=False)
-    except FileNotFoundError:
-        ckpt = torch.load(f'{training_path}/{model_file}', map_location=device, weights_only=False)
+        fits = measured_fits(step, probe=PROBE, on_out_of_memory=step.drop_gradients)
+        pairs = smaller_pot(max_batch_size or MAX_BATCH_SIZE) // MIN_BATCH_SIZE
+        batch_size = MIN_BATCH_SIZE * find_batch_size(lambda n: fits(MIN_BATCH_SIZE * n), limit=max(1, pairs))
+    finally:
+        del margin
+        step.release()
 
-    model = Model(ckpt['model'].yaml, ch=3, nc=dataset.get('nc'), anchors=hyp.get('anchors')).to(device)  # create
-
-    best_batch_size = None
-    for batch_size in [128, 96, 64, 48, 32, 24, 16, 12, 8, 6, 4, 2, 1]:
-        try:
-            stats = summary(model, input_size=(batch_size, 3, img_size, img_size), verbose=Verbosity.QUIET)
-        except RuntimeError as e:
-            logging.error(f'Got RuntimeError for batch_size {batch_size} and image_size {img_size}: {str(e)}')
-            continue
-
-        estimated_model_size_mb = float(str(stats).split('Estimated Total Size (MB): ')[1].split('\n')[0])
-        logging.info(f'Model size for batch size {batch_size} and image size {img_size}: {estimated_model_size_mb} mb')
-
-        if estimated_model_size_mb < free_mem_mb:
-            logging.info(f'batch size {batch_size} and image size {img_size} fits to {free_mem_mb} mb')
-            best_batch_size = batch_size
-            break
-
-    model = model.cpu()  # TODO WTF??
-    del model, ckpt
-
-    if init_clear_cuda:
-        torch.cuda.empty_cache()
-
-    if not best_batch_size:
-        logging.error('Did not find best matching batch size')
-        raise CriticalError('Did not find best matching batch size')
-    return best_batch_size
-
-
-# -------------------------------- BELOW IMPLEMENTATION RESULTS IN  RuntimeError: Cannot re-initialize CUDA in forked subprocess. To use CUDA with multiprocessing, you must use the 'spawn' start method
-
-async def calc_on_thread(training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int) -> int:
-    logging.info('Calculating best batch size on thread.....')
-    set_start_method('spawn')
-
-    queue = Queue()  # type: Queue[int]
-    p = Process(target=_calc_batch_size, args=(queue, training_path, model_file, hyp_path, dataset_path, img_size))
-    p.start()
-
-    try:
-        while p.is_alive():
-            await asyncio.sleep(1)
-            logging.warning('Still calculating best batch size')
-    except asyncio.CancelledError:
-        logging.warning('Training cancelled during batch size calculation')
-        p.kill()
-        raise
-
-    p.join()
-    if p.exitcode != 0:
-        raise Exception('calc_batch_size failed')
-
-    batch_size = queue.get()
-    logging.info(f'best batch size is {batch_size}')
+    logging.info('%s: training at %d px with batch size %d', PROBE, img_size, batch_size)
     return batch_size
 
 
-def _calc_batch_size(
-        queue: Queue, training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int) -> None:
-    best_batch_size = calc(training_path, model_file, hyp_path, dataset_path, img_size, init_clear_cuda=False)
-    queue.put(best_batch_size)
+class TrainingStep:
+    """One training step, as close to what :mod:`train_det` runs as a synthetic batch gets.
+
+    Built once and called at several batch sizes, the way a training builds its model once and then
+    steps: the model, the EMA copy and the optimizer state are already resident when the first
+    batch arrives, and only the activations scale with the batch size.
+    """
+
+    def __init__(self, model_file: str, training_path: str, hyp: dict, categories: int, img_size: int) -> None:
+        self.img_size = img_size
+        self.categories = categories
+        self.device = torch.device('cuda', 0)
+
+        try:
+            ckpt = torch.load(model_file, map_location=self.device, weights_only=False)
+        except FileNotFoundError:
+            ckpt = torch.load(f'{training_path}/{model_file}', map_location=self.device, weights_only=False)
+        self.model = Model(ckpt['model'].yaml, ch=3, nc=categories, anchors=hyp.get('anchors')).to(self.device)
+        del ckpt
+
+        hyp = dict(hyp)
+        nl = self.model.model[-1].nl  # detection layers; the loss gains are scaled per layer
+        hyp['box'] *= 3 / nl
+        hyp['cls'] *= categories / 80 * 3 / nl
+        hyp['obj'] *= (img_size / 640) ** 2 * 3 / nl
+
+        self.model.nc = categories
+        self.model.hyp = hyp
+        self.model.train()
+
+        self.ema = ModelEMA(self.model)
+        self.optimizer = smart_optimizer(self.model, 'SGD', hyp['lr0'], hyp['momentum'], hyp['weight_decay'])
+        self.scaler = torch.amp.GradScaler('cuda')
+        self.compute_loss = ComputeLoss(self.model)
+
+    def __call__(self, batch_size: int) -> str:
+        images = torch.rand(batch_size, 3, self.img_size, self.img_size, device=self.device)
+        targets = self._targets(batch_size)
+
+        with torch.amp.autocast('cuda'):
+            loss, _ = self.compute_loss(self.model(images), targets)
+
+        self.scaler.scale(loss).backward()
+        self.scaler.unscale_(self.optimizer)
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=10.0)
+        self.scaler.step(self.optimizer)
+        self.scaler.update()
+        self.optimizer.zero_grad(set_to_none=True)
+        self.ema.update(self.model)
+        return f'{self.img_size} px'
+
+    def drop_gradients(self) -> None:
+        """Release what a failed step left behind, so the next trial starts from the same state."""
+        self.optimizer.zero_grad(set_to_none=True)
+
+    def release(self) -> None:
+        del self.compute_loss, self.scaler, self.optimizer, self.ema, self.model
+        free_cuda_memory()
+
+    def _targets(self, batch_size: int) -> torch.Tensor:
+        """``[image_index, class, cx, cy, w, h]`` per box, normalised, as the dataloader yields."""
+        count = batch_size * TARGETS_PER_IMAGE
+        targets = torch.zeros(count, 6, device=self.device)
+        targets[:, 0] = torch.arange(batch_size, device=self.device).repeat_interleave(TARGETS_PER_IMAGE)
+        targets[:, 1] = torch.randint(0, self.categories, (count,), device=self.device)
+        targets[:, 2:4] = torch.rand(count, 2, device=self.device) * 0.6 + 0.2  # centres, away from the border
+        targets[:, 4:6] = torch.rand(count, 2, device=self.device) * 0.2 + 0.05
+        return targets
