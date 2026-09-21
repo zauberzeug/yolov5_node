@@ -88,7 +88,7 @@ class TrainingStep:
         del ckpt
 
         hyp = dict(hyp)
-        nl = self.model.model[-1].nl  # detection layers; the loss gains are scaled per layer
+        nl = self.model.model[-1].nl  # detection layers
         hyp['box'] *= 3 / nl
         hyp['cls'] *= categories / 80 * 3 / nl
         hyp['obj'] *= (img_size / 640) ** 2 * 3 / nl
