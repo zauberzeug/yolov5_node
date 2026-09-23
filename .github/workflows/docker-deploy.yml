@@ -9,8 +9,9 @@ env:
 
 jobs:
   multi-arch:
-    runs-on: self-hosted
+    runs-on: [self-hosted, cpu, X64]
     strategy:
+      fail-fast: false
       matrix:
         include:
           - context: trainer/
@@ -33,12 +34,18 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        # A persistent builder keeps layers and the uv cache between releases. Every runner has its
+        # own HOME, but the name makes them all attach to one container, shared with dfine_node.
+        run: |
+          docker buildx create --name node-release --driver docker-container 2>/dev/null || true
+          # Parallel jobs race to start the container; the loser finds it running on the retry
+          docker buildx inspect --bootstrap node-release || docker buildx inspect --bootstrap node-release
       - name: Log in to Docker Hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
       - name: Build and push
         run: |
           docker buildx build ${{ matrix.context }} \
+            --builder node-release \
             --platform linux/amd64,linux/arm64 \
             -f ${{ matrix.dockerfile }} \
             ${{ matrix.build_args }} \

@@ -31,7 +31,10 @@ RUN rm -rf /var/lib/apt/lists/* \
 # 2. Install Python dependencies -----------------------------------------------
 
 # Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# Pinned, since every new `latest` invalidates all layers below
+COPY --from=ghcr.io/astral-sh/uv:0.12.18 /uv /usr/local/bin/uv
+# The uv cache is a BuildKit cache mount on another filesystem
+ENV UV_LINK_MODE=copy
 
 # Install Python dependencies
 WORKDIR /uv_env
@@ -40,7 +43,7 @@ WORKDIR /uv_env
 COPY pyproject.toml uv.lock ./
 
 # Install deps into a project-local venv
-RUN uv venv .venv --system-site-packages --no-managed-python --python /usr/bin/python3 && \
+RUN --mount=type=cache,target=/root/.cache/uv uv venv .venv --system-site-packages --no-managed-python --python /usr/bin/python3 && \
     uv sync --frozen
 
 # Ensure the venv is first on PATH for CMD/RUN that follow
