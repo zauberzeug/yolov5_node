@@ -32,6 +32,7 @@ from pathlib import Path
 import torch
 import yaml
 from learning_loop_node.helpers.misc import get_free_memory_mb
+from learning_loop_node.trainer.batch_size import BATCH_SIZE, MIN_TRAIN_STEPS_PER_EPOCH
 from learning_loop_node.trainer.cuda import free_cuda_memory, measured_fits
 from torchinfo import Verbosity, summary
 
@@ -108,6 +109,7 @@ def measure(args: argparse.Namespace, workdir: Path) -> list[Row]:
     spec = Spec(weights=args.model, hyp=yaml.safe_load(Path(args.hyp).read_text()),
                 categories=args.categories, training_path=str(workdir), hyp_path=args.hyp)
     write_dataset_yaml(workdir / 'dataset.yaml', args.categories)
+    write_train_folder(workdir / 'train', args.limit * MIN_TRAIN_STEPS_PER_EPOCH)
     attempt_download(spec.weights)
 
     rows: list[Row] = []
@@ -120,7 +122,7 @@ def measure(args: argparse.Namespace, workdir: Path) -> list[Row]:
                 row.estimated_holds = holds(spec, resolution, row.estimated)
             free_cuda_memory()
             row.probed = asyncio.run(calc(spec.training_path, spec.weights, spec.hyp_path, resolution,
-                                          max_batch_size=args.limit))
+                                          {BATCH_SIZE: args.limit}))
         except Exception as exc:  # the sweep continues with the next resolution
             row.error = f'{type(exc).__name__}: {exc}'
         free_cuda_memory()
@@ -133,6 +135,18 @@ def measure(args: argparse.Namespace, workdir: Path) -> list[Row]:
 def write_dataset_yaml(path: Path, categories: int) -> None:
     """Only `nc` is read back out of the dataset description."""
     path.write_text(yaml.safe_dump({'nc': categories, 'names': [f'class_{i}' for i in range(categories)]}))
+
+
+def write_train_folder(path: Path, count: int) -> None:
+    """Enough empty `.jpg` entries that the dataset bound never becomes the answer.
+
+    `calc` counts this folder so a real training keeps its optimizer steps per epoch. Here the
+    question is what the card holds, so the count is put out of the way and the files stay empty --
+    the probe's images are synthetic and nothing opens them.
+    """
+    path.mkdir(parents=True, exist_ok=True)
+    for i in range(count):
+        (path / f'{i}.jpg').touch()
 
 
 def print_table(rows: list[Row]) -> None:
@@ -157,7 +171,8 @@ def main() -> None:
     parser.add_argument('--model', default='yolov5s.pt', help='weights the trainer starts from')
     parser.add_argument('--categories', type=int, default=10, help='number of classes to build the head for')
     parser.add_argument('--hyp', default=str(Path(__file__).resolve().parent / 'hyp_det.yaml'))
-    parser.add_argument('--limit', type=int, default=512, help='passed to the probe as max_batch_size')
+    parser.add_argument('--limit', type=int, default=512,
+                        help=f'upper bound, passed to the probe as the {BATCH_SIZE} hyperparameter')
     parser.add_argument('--json', help='write the rows to this file as well')
     args = parser.parse_args()
 

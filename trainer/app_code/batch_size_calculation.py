@@ -2,8 +2,9 @@
 
 The training runs in a subprocess (:mod:`train_det`), so the probe builds its own model here and
 measures a step resembling the one that subprocess runs: the EMA copy, the three-group SGD
-optimizer, AMP with a gradient scaler, the real ``ComputeLoss``, backward, gradient clipping and an
-optimizer step. Everything it allocates is released before the subprocess starts.
+optimizer, mixed precision on the same condition ``train_det.py`` puts it on, the real
+``ComputeLoss``, backward, gradient clipping and an optimizer step. Everything it allocates is
+released before the subprocess starts.
 
 Validation is deliberately not measured. ``train_det.py`` validates at ``batch_size // 2``, in half
 precision and without gradients, so the training step is the peak. That same halving is why the
@@ -11,7 +12,9 @@ probe is given a :data:`MIN_BATCH_SIZE`: a batch of one would validate with a ba
 """
 import logging
 import os
+import sys
 from collections.abc import MutableMapping
+from pathlib import Path
 from typing import Any
 
 import torch
@@ -21,8 +24,12 @@ from learning_loop_node.trainer.cuda import free_cuda_memory, measure_batch_size
 
 from .yolov5.models.yolo import Model
 from .yolov5.utils.downloads import attempt_download
+from .yolov5.utils.general import check_amp
 from .yolov5.utils.loss import ComputeLoss
 from .yolov5.utils.torch_utils import ModelEMA, smart_optimizer
+
+YOLOV5_ROOT = Path(__file__).resolve().parent / 'yolov5'
+"""What `train_det.py` puts on `sys.path`, because yolov5 imports its own packages by bare name."""
 
 PROBE = 'batch-size probe'
 """Names the probe in the log, so its lines are greppable next to the training's own."""
@@ -43,6 +50,7 @@ async def calc(training_path: str, model_file: str, hyp_path: str, img_size: int
         bound out of; the caller reports the size this returns.
     :raises InsufficientMemoryError: If not even :data:`MIN_BATCH_SIZE` fits.
     """
+    sample_count = _train_sample_count(training_path)
     os.chdir('/tmp')  # NOTE: attempt_download writes the weights into the working directory
 
     with open(hyp_path) as f:
@@ -58,13 +66,41 @@ async def calc(training_path: str, model_file: str, hyp_path: str, img_size: int
     step = TrainingStep(model_file, training_path, hyp, dataset.get('nc'), img_size)
     try:
         batch_size = measure_batch_size(step, batch_size=int(hyperparameters.get(BATCH_SIZE, 0) or 0),
-                                        probe=PROBE, minimum=MIN_BATCH_SIZE,
-                                        on_out_of_memory=step.drop_gradients)
+                                        sample_count=sample_count, probe=PROBE,
+                                        minimum=MIN_BATCH_SIZE, on_out_of_memory=step.drop_gradients)
     finally:
         step.release()
 
     logging.info('%s: training at %d px with batch size %d', PROBE, img_size, batch_size)
     return batch_size
+
+
+def _train_sample_count(training_path: str) -> int:
+    """How many images the training will see per epoch, so the search leaves an epoch its steps.
+
+    Counts what `yolov5_format.create_file_structure` symlinked into `train/`, which is the same
+    set the dataloader walks; it writes every image as `<id>.jpg` and its labels beside it as
+    `<id>.txt`.
+    """
+    return sum(1 for path in (Path(training_path) / 'train').iterdir() if path.suffix == '.jpg')
+
+
+def _amp_enabled(model: Model) -> bool:
+    """Whether `train_det.py` will train in mixed precision, asked the way it asks.
+
+    The probe has to allocate what the training allocates: measured under autocast, a training
+    that then runs in float32 is promised a batch size that does not fit. `check_amp` reaches for
+    the yolov5 packages by bare name, so the `sys.path` entry `train_det.py` makes has to be here
+    too. A check that cannot run answers no, which is the harmless half of a disagreement -- the
+    probe then measures float32, and a training that does enable AMP needs less than that.
+    """
+    if str(YOLOV5_ROOT) not in sys.path:
+        sys.path.append(str(YOLOV5_ROOT))
+    try:
+        return bool(check_amp(model))
+    except Exception:  # pylint: disable=broad-except
+        logging.exception('%s: could not determine whether AMP is usable; measuring in float32', PROBE)
+        return False
 
 
 class TrainingStep:
@@ -86,6 +122,7 @@ class TrainingStep:
             ckpt = torch.load(f'{training_path}/{model_file}', map_location=self.device, weights_only=False)
         self.model = Model(ckpt['model'].yaml, ch=3, nc=categories, anchors=hyp.get('anchors')).to(self.device)
         del ckpt
+        self.amp = _amp_enabled(self.model)  # before the EMA and the optimizer: `check_amp` copies the model
 
         hyp = dict(hyp)
         nl = self.model.model[-1].nl  # detection layers
@@ -99,14 +136,14 @@ class TrainingStep:
 
         self.ema = ModelEMA(self.model)
         self.optimizer = smart_optimizer(self.model, 'SGD', hyp['lr0'], hyp['momentum'], hyp['weight_decay'])
-        self.scaler = torch.amp.GradScaler('cuda')
+        self.scaler = torch.amp.GradScaler('cuda', enabled=self.amp)
         self.compute_loss = ComputeLoss(self.model)
 
     def __call__(self, batch_size: int) -> str:
         images = torch.rand(batch_size, 3, self.img_size, self.img_size, device=self.device)
         targets = self._targets(batch_size)
 
-        with torch.amp.autocast('cuda'):
+        with torch.amp.autocast('cuda', enabled=self.amp):
             loss, _ = self.compute_loss(self.model(images), targets)
 
         self.scaler.scale(loss).backward()
@@ -116,7 +153,7 @@ class TrainingStep:
         self.scaler.update()
         self.optimizer.zero_grad(set_to_none=True)
         self.ema.update(self.model)
-        return f'{self.img_size} px'
+        return f'{self.img_size} px, {"mixed precision" if self.amp else "float32"}'
 
     def drop_gradients(self) -> None:
         """Release what a failed step left behind, so the next trial starts from the same state."""
