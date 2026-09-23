@@ -27,8 +27,10 @@ from . import batch_size_calculation, model_files, yolov5_format
 
 class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
-    def __init__(self) -> None:
+    def __init__(self, vram_limit_gb: float = 0) -> None:
         super().__init__(model_format='yolov5_pytorch')
+
+        self._vram_limit_gb = vram_limit_gb  # the subprocesses cap themselves with it; it does not survive the spawn
 
         logging.info('------ STARTING YOLOV5 TRAINER LOGIC ------')
         self.latest_epoch = 0
@@ -153,6 +155,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
         cmd = f'python /app/pred_det.py --weights {model_folder}/model.pt --source {images_folder}'
         cmd += f' --img-size {img_size} --conf-thres {self.detect_nms_conf_thres} --iou-thres {self.detect_nms_iou_thres}'
+        cmd += f' --vram-limit-gb {self._vram_limit_gb}'
 
         await executor.start(cmd)
         if await executor.wait() != 0:
@@ -200,8 +203,9 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
         try:
             batch_size = await batch_size_calculation.calc(self.training.training_folder, model,
-                                                           self.hyperparameter_path, resolution,
-                                                           self.training.hyperparameters)
+                                                           self.hyperparameter_path,
+                                                           self.training.hyperparameters,
+                                                           vram_limit_gb=self._vram_limit_gb)
         except Exception as e:
             logging.exception('Error during batch size calculation:')
             raise NodeNeedsRestartError() from e
@@ -233,6 +237,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} \
             --project {self.training.training_folder} --name result --hyp {self.hyperparameter_path} \
             --epochs {self.epochs} --conf-thres {self.detect_nms_conf_thres} --iou-thres {self.detect_nms_iou_thres} \
+            --vram-limit-gb {self._vram_limit_gb} \
             {additional_parameters}'
         if p_sizes_by_id:
             cmd += f' --point_sizes_by_id {p_sizes_by_id[:-1]}'

@@ -57,7 +57,9 @@ step — and releases everything before the subprocess starts. The step is all t
 supplies: the library's `measure_batch_size` reads `batch_size` as the upper bound, measures
 against it and returns what fits. Two of the bounds it gets are ours: `MIN_BATCH_SIZE`, because
 `train_det.py` validates at `batch_size // 2`, and the `sample_count` counted off the `train/`
-folder, which keeps an epoch enough optimizer steps to mean something.
+folder, which keeps an epoch enough optimizer steps to mean something. `--vram-limit-gb` narrows
+the card the probe measures against; because the cap it sets does not survive a spawn, the same
+number is handed to `train_det.py` and `pred_det.py`, which call `limit_cuda_memory` themselves.
 
 **The trainer never trains in-process.** `Yolov5TrainerLogic` (`trainer/app_code/yolov5_trainer.py`)
 implements the library's abstract `TrainerLogic` hooks and shells out through the library's

@@ -20,7 +20,7 @@ from typing import Any
 import torch
 import yaml
 from learning_loop_node.trainer.batch_size import BATCH_SIZE
-from learning_loop_node.trainer.cuda import free_cuda_memory, measure_batch_size
+from learning_loop_node.trainer.cuda import free_cuda_memory, limit_cuda_memory, measure_batch_size
 
 from .yolov5.models.yolo import Model
 from .yolov5.utils.downloads import attempt_download
@@ -41,15 +41,19 @@ TARGETS_PER_IMAGE = 8
 """Boxes per synthetic image; the loss allocates per target, so this is not free."""
 
 
-async def calc(training_path: str, model_file: str, hyp_path: str, img_size: int,
-               hyperparameters: MutableMapping[str, Any]) -> int:
+async def calc(training_path: str, model_file: str, hyp_path: str,
+               hyperparameters: MutableMapping[str, Any], vram_limit_gb: float = 0) -> int:
     """Return the largest power-of-two batch size a training step fits into.
 
     :param training_path: The training folder, which is where `yolov5_format` wrote `dataset.yaml`.
-    :param hyperparameters: The training's hyperparameters, which `measure_batch_size` reads the
-        bound out of; the caller reports the size this returns.
+    :param hyperparameters: The training's hyperparameters, which the probe reads its `resolution`
+        and its `batch_size` bound out of; the caller reports the size this returns.
+    :param vram_limit_gb: Gigabytes of the card this training may use; 0 means the whole card.
+        `train_det.py` is given the same number and caps itself with it, because the cap set here
+        does not survive the spawn.
     :raises InsufficientMemoryError: If not even :data:`MIN_BATCH_SIZE` fits.
     """
+    img_size = int(hyperparameters['resolution'])
     sample_count = _train_sample_count(training_path)
     os.chdir('/tmp')  # NOTE: attempt_download writes the weights into the working directory
 
@@ -61,13 +65,15 @@ async def calc(training_path: str, model_file: str, hyp_path: str, img_size: int
     attempt_download(model_file)  # Download pretrained yolov5 model from ultralytics to .pt
 
     torch.cuda.init()
+    limit_cuda_memory(vram_limit_gb)
     free_cuda_memory()
 
     step = TrainingStep(model_file, training_path, hyp, dataset.get('nc'), img_size)
     try:
         batch_size = measure_batch_size(step, batch_size=int(hyperparameters.get(BATCH_SIZE, 0) or 0),
                                         sample_count=sample_count, probe=PROBE,
-                                        minimum=MIN_BATCH_SIZE, on_out_of_memory=step.drop_gradients)
+                                        minimum=MIN_BATCH_SIZE, vram_limit_gb=vram_limit_gb,
+                                        on_out_of_memory=step.drop_gradients)
     finally:
         step.release()
 

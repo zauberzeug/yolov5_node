@@ -33,6 +33,7 @@ import torch
 import torch.nn as nn
 import yaml
 from PIL import Image, ImageDraw, ImageFont
+from learning_loop_node.trainer.cuda import limit_cuda_memory  # PATCH (yolov5-node): the node's VRAM budget
 from torch.optim import lr_scheduler
 from tqdm import tqdm
 
@@ -557,6 +558,8 @@ def parse_opt(known=False):
     parser.add_argument('--hyp', type=str, default=ROOT / 'data/hyps/hyp.scratch-low.yaml', help='hyperparameters path')
     parser.add_argument('--epochs', type=int, default=300)
     parser.add_argument('--clear', action='store_true', help='clear epochs before starting training')
+    # PATCH (yolov5-node): the batch size was probed against this budget, so the training has to hold to it
+    parser.add_argument('--vram-limit-gb', type=float, default=0, help='gigabytes of GPU memory this process may use; 0 means the whole card')
     parser.add_argument('--batch-size', type=int, default=16, help='total batch size for all GPUs, -1 for autobatch')
     parser.add_argument('--imgsz', '--img', '--img-size', type=int, default=640, help='train, val image size (pixels)')
     parser.add_argument('--rect', action='store_true', help='rectangular training')
@@ -606,6 +609,10 @@ def parse_opt(known=False):
 
 
 def main(opt, callbacks=Callbacks()):
+    # PATCH (yolov5-node): the cap does not survive the spawn, so it is set here rather than inherited.
+    # Before the resume branch below, which replaces `opt` with the one saved beside the checkpoint.
+    limit_cuda_memory(opt.vram_limit_gb)
+
     # Checks
     print_args(vars(opt))
     # check_git_status()

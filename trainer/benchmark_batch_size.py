@@ -121,8 +121,8 @@ def measure(args: argparse.Namespace, workdir: Path) -> list[Row]:
             if row.estimated is not None:
                 row.estimated_holds = holds(spec, resolution, row.estimated)
             free_cuda_memory()
-            row.probed = asyncio.run(calc(spec.training_path, spec.weights, spec.hyp_path, resolution,
-                                          {BATCH_SIZE: args.limit}))
+            row.probed = asyncio.run(calc(spec.training_path, spec.weights, spec.hyp_path,
+                                          {'resolution': resolution, BATCH_SIZE: args.limit}))
         except Exception as exc:  # the sweep continues with the next resolution
             row.error = f'{type(exc).__name__}: {exc}'
         free_cuda_memory()

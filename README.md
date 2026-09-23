@@ -14,7 +14,7 @@ We support all native hyperparameters of YOLOv5 (cf. `hyp_det.yaml` for referenc
 In addition, we support the following hyperparameters:
 
 - `epochs`: The number of epochs to train the model.
-- `batch_size`: The largest batch size the training may use. It is measured rather than trusted: if it fits it is used as given, and if it does not, the largest power of two below it that does is used instead. `0` (the default) leaves the bound to the card alone. The value that was actually used is reported back (see below).
+- `batch_size`: The largest batch size the training may use. It is measured rather than trusted: if it fits it is used as given, and if it does not, the largest power of two below it that does is used instead. `0` (the default) leaves the bound to the card alone, within `VRAM_LIMIT_GB` when that is set. The value that was actually used is reported back (see below).
 - `detect_nms_conf_thres`: The confidence threshold for the NMS during inference and validation (not relevant for training).
 - `detect_nms_iou_thres`: The IoU threshold for the NMS during inference and validation (not used for training).
 
@@ -48,6 +48,7 @@ When using the script it is required to set up a .env file in the trainer folder
 | UVICORN_RELOAD              | Enable hot-reload                                    | TRUE/FALSE/0/1 | FALSE   | No                           |
 | RESTART_AFTER_TRAINING      | Auto-restart after training                          | TRUE/FALSE/0/1 | FALSE   | No                           |
 | KEEP_OLD_TRAININGS          | Do not remove old trainings, when starting a new one | TRUE/FALSE/0/1 | FALSE   | No                           |
+| VRAM_LIMIT_GB               | Gigabytes of GPU memory a training may use. The batch size is probed against this limit instead of the whole card, and `train_det.py` and `pred_det.py` cap themselves to it, so a lower limit yields a smaller batch size rather than an out-of-memory error. Useful to share one GPU between processes. The limit is relative to the card's *total* memory, not to what is currently free | Number | 0 (no limit) | No |
 
 # Detector Node
 
