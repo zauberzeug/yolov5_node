@@ -31,7 +31,6 @@ RUN rm -rf /var/lib/apt/lists/* \
 # 2. Install Python dependencies -----------------------------------------------
 
 # Install uv
-# Pinned, since every new `latest` invalidates all layers below
 COPY --from=ghcr.io/astral-sh/uv:0.12.18 /uv /usr/local/bin/uv
 # The uv cache is a BuildKit cache mount on another filesystem
 ENV UV_LINK_MODE=copy

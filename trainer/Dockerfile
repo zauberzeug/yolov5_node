@@ -14,7 +14,6 @@ RUN apt update && \
 
 WORKDIR /app
 
-# Pinned, since every new `latest` invalidates all layers below
 COPY --from=ghcr.io/astral-sh/uv:0.12.18 /uv /usr/bin/
 
 # Copy only dependency files first (enables layer caching)

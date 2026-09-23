@@ -24,7 +24,6 @@ RUN apt-get update \
 # 2. Install Python dependencies -----------------------------------------------
 
 # Install uv
-# Pinned, since every new `latest` invalidates all layers below
 COPY --from=ghcr.io/astral-sh/uv:0.12.18 /uv /usr/local/bin/uv
 # The uv cache is a BuildKit cache mount on another filesystem
 ENV UV_LINK_MODE=copy
@@ -42,7 +41,7 @@ RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked
 # Ensure the venv is first on PATH for CMD/RUN that follow
 ENV PATH="/uv_env/.venv/bin:${PATH}"
 
-# Install YOLOv5 dependencies before its code, so a code change keeps this layer
+# Install YOLOv5 dependencies before its code
 COPY ./trainer/app_code/yolov5/requirements.txt /app/app_code/yolov5/requirements.txt
 RUN --mount=type=cache,target=/root/.cache/uv uv pip install -r /app/app_code/yolov5/requirements.txt
 ADD ./trainer/app_code/yolov5 /app/app_code/yolov5

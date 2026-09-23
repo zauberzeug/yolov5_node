@@ -34,11 +34,10 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
-        # A persistent builder keeps layers and the uv cache between releases. Every runner has its
-        # own HOME, but the name makes them all attach to one container, shared with the other nodes.
+        # Every runner has its own HOME; the fixed name makes all of them share one builder container
         run: |
           docker buildx create --name node-release --driver docker-container 2>/dev/null || true
-          # Parallel jobs race to start the container; the loser finds it running on the retry
+          # Retried, as parallel jobs race to start the container
           docker buildx inspect --bootstrap node-release || docker buildx inspect --bootstrap node-release
       - name: Log in to Docker Hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
