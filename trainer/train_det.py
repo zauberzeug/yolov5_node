@@ -33,7 +33,10 @@ import torch
 import torch.nn as nn
 import yaml
 from PIL import Image, ImageDraw, ImageFont
-from learning_loop_node.trainer.cuda import limit_cuda_memory  # PATCH (yolov5-node): the node's VRAM budget
+from learning_loop_node.trainer.cuda import (  # PATCH (yolov5-node): the node's VRAM budget
+    add_vram_limit_argument,
+    limit_cuda_memory,
+)
 from torch.optim import lr_scheduler
 from tqdm import tqdm
 
@@ -559,7 +562,7 @@ def parse_opt(known=False):
     parser.add_argument('--epochs', type=int, default=300)
     parser.add_argument('--clear', action='store_true', help='clear epochs before starting training')
     # PATCH (yolov5-node): the batch size was probed against this budget, so the training has to hold to it
-    parser.add_argument('--vram-limit-gb', type=float, default=0, help='gigabytes of GPU memory this process may use; 0 means the whole card')
+    add_vram_limit_argument(parser)
     parser.add_argument('--batch-size', type=int, default=16, help='total batch size for all GPUs, -1 for autobatch')
     parser.add_argument('--imgsz', '--img', '--img-size', type=int, default=640, help='train, val image size (pixels)')
     parser.add_argument('--rect', action='store_true', help='rectangular training')

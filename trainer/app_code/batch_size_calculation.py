@@ -19,7 +19,7 @@ from typing import Any
 
 import torch
 import yaml
-from learning_loop_node.trainer.batch_size import BATCH_SIZE
+from learning_loop_node.trainer.batch_size import requested_batch_size
 from learning_loop_node.trainer.cuda import free_cuda_memory, limit_cuda_memory, measure_batch_size
 
 from .yolov5.models.yolo import Model
@@ -70,7 +70,7 @@ async def calc(training_path: str, model_file: str, hyp_path: str,
 
     step = TrainingStep(model_file, training_path, hyp, dataset.get('nc'), img_size)
     try:
-        batch_size = measure_batch_size(step, batch_size=int(hyperparameters.get(BATCH_SIZE, 0) or 0),
+        batch_size = measure_batch_size(step, batch_size=requested_batch_size(hyperparameters),
                                         sample_count=sample_count, probe=PROBE,
                                         minimum=MIN_BATCH_SIZE, vram_limit_gb=vram_limit_gb,
                                         on_out_of_memory=step.drop_gradients)

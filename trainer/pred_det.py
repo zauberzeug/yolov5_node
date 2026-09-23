@@ -35,7 +35,10 @@ import sys
 from pathlib import Path
 
 import torch
-from learning_loop_node.trainer.cuda import limit_cuda_memory  # PATCH (yolov5-node): the node's VRAM budget
+from learning_loop_node.trainer.cuda import (  # PATCH (yolov5-node): the node's VRAM budget
+    add_vram_limit_argument,
+    limit_cuda_memory,
+)
 
 from app_code.yolov5.models.common import DetectMultiBackend
 from app_code.yolov5.utils.dataloaders import LoadImages
@@ -81,7 +84,7 @@ def parse_opt():
     parser.add_argument('--max-det', type=int, default=1000, help='maximum detections per image')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     # PATCH (yolov5-node): the detection pass shares the card under the same budget as the training
-    parser.add_argument('--vram-limit-gb', type=float, default=0, help='gigabytes of GPU memory this process may use; 0 means the whole card')
+    add_vram_limit_argument(parser)
     parser.add_argument('--classes', nargs='+', type=int, help='filter by class: --classes 0, or --classes 0 2 3')
     parser.add_argument('--agnostic-nms', action='store_true', help='class-agnostic NMS')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
