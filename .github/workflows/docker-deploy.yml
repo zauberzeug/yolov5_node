@@ -35,7 +35,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         # A persistent builder keeps layers and the uv cache between releases. Every runner has its
-        # own HOME, but the name makes them all attach to one container, shared with dfine_node.
+        # own HOME, but the name makes them all attach to one container, shared with the other nodes.
         run: |
           docker buildx create --name node-release --driver docker-container 2>/dev/null || true
           # Parallel jobs race to start the container; the loser finds it running on the retry
