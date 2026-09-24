@@ -24,7 +24,7 @@ from learning_loop_node.trainer.cuda import free_cuda_memory, limit_cuda_memory,
 
 from .yolov5.models.yolo import Model
 from .yolov5.utils.downloads import attempt_download
-from .yolov5.utils.general import check_amp
+from .yolov5.utils.general import check_amp, intersect_dicts
 from .yolov5.utils.loss import ComputeLoss
 from .yolov5.utils.torch_utils import ModelEMA, smart_optimizer
 
@@ -107,11 +107,16 @@ class TrainingStep:
         self.device = torch.device('cuda', 0)
 
         try:
-            ckpt = torch.load(model_file, map_location=self.device, weights_only=False)
+            ckpt = torch.load(model_file, map_location='cpu', weights_only=False)
         except FileNotFoundError:
-            ckpt = torch.load(f'{training_path}/{model_file}', map_location=self.device, weights_only=False)
+            ckpt = torch.load(f'{training_path}/{model_file}', map_location='cpu', weights_only=False)
         self.model = Model(ckpt['model'].yaml, ch=3, nc=categories, anchors=hyp.get('anchors')).to(self.device)
-        del ckpt
+        # NOTE: the checkpoint's weights, as `train_det.py` transfers them: `check_amp` compares detections,
+        # and a randomly initialised model detects nothing, so it would pass for any card
+        exclude = ['anchor'] if hyp.get('anchors') else []
+        weights = intersect_dicts(ckpt['model'].float().state_dict(), self.model.state_dict(), exclude=exclude)
+        self.model.load_state_dict(weights, strict=False)
+        del ckpt, weights
         self.amp = _amp_enabled(self.model)  # before the EMA and the optimizer: `check_amp` copies the model
 
         hyp = dict(hyp)
