@@ -1,14 +1,12 @@
 """Choosing the training batch size by probing, rather than by estimating one.
 
 The training runs in a subprocess (:mod:`train_det`), so the probe builds its own model here and
-measures a step resembling the one that subprocess runs: the EMA copy, the three-group SGD
-optimizer, mixed precision on the same condition ``train_det.py`` puts it on, the real
-``ComputeLoss``, backward, gradient clipping and an optimizer step. Everything it allocates is
-released before the subprocess starts.
+measures a step resembling the one that subprocess runs: EMA copy, three-group SGD, mixed
+precision on the same condition, the real ``ComputeLoss``, backward, clipping, optimizer step.
+Everything it allocates is released before the subprocess starts.
 
-Validation is deliberately not measured. ``train_det.py`` validates at ``batch_size // 2``, in half
-precision and without gradients, so the training step is the peak. That same halving is why the
-probe is given a :data:`MIN_BATCH_SIZE`: a batch of one would validate with a batch of zero.
+Validation is not measured: ``train_det.py`` validates at ``batch_size // 2``, in half precision
+and without gradients, so the training step is the peak.
 """
 import logging
 import os
@@ -34,7 +32,6 @@ YOLOV5_ROOT = Path(__file__).resolve().parent / 'yolov5'
 logger = logging.getLogger(__name__)
 
 PROBE = 'batch-size probe'
-"""Names the probe in the log, so its lines are greppable next to the training's own."""
 
 MIN_BATCH_SIZE = 2
 """Smallest batch a training may use, because validation halves it."""
@@ -48,11 +45,10 @@ async def calc(training_path: str, model_file: str, hyp_path: str,
     """Return the largest power-of-two batch size a training step fits into.
 
     :param training_path: The training folder, which is where `yolov5_format` wrote `dataset.yaml`.
-    :param hyperparameters: The training's hyperparameters, which the probe reads its `resolution`
-        and its `max_batch_size` bound out of; the caller reports the size this returns as `batch_size`.
+    :param hyperparameters: The probe reads `resolution` and the `max_batch_size` bound out of
+        these; the caller reports the size this returns as `batch_size`.
     :param vram_limit_gb: Gigabytes of the card this training may use; 0 means the whole card.
-        `train_det.py` is given the same number and caps itself with it, because the cap set here
-        does not survive the spawn.
+        `train_det.py` is given the same number, because the cap set here does not survive a spawn.
     :raises InsufficientMemoryError: If not even :data:`MIN_BATCH_SIZE` fits.
     """
     img_size = int(hyperparameters['resolution'])
@@ -84,10 +80,9 @@ async def calc(training_path: str, model_file: str, hyp_path: str,
 
 
 def _train_sample_count(training_path: str) -> int:
-    """How many images the training will see per epoch, so the search leaves an epoch its steps.
+    """How many images the training will see per epoch.
 
-    Counts what `yolov5_format.create_file_structure` symlinked into `train/`, which is the same
-    set the dataloader walks; it writes every image as `<id>.jpg` and its labels beside it as
+    `yolov5_format` symlinks them into `train/` as `<id>.jpg`, with the labels beside them as
     `<id>.txt`.
     """
     return sum(1 for path in (Path(training_path) / 'train').iterdir() if path.suffix == '.jpg')
@@ -96,9 +91,8 @@ def _train_sample_count(training_path: str) -> int:
 class TrainingStep:
     """One training step, as close to what :mod:`train_det` runs as a synthetic batch gets.
 
-    Built once and called at several batch sizes, the way a training builds its model once and then
-    steps: the model, the EMA copy and the optimizer state are already resident when the first
-    batch arrives, and only the activations scale with the batch size.
+    Built once and called at several batch sizes: model, EMA copy and optimizer state are resident
+    before the first batch, and only the activations scale with it.
     """
 
     def __init__(self, model_file: str, training_path: str, hyp: dict, categories: int, img_size: int) -> None:
@@ -110,13 +104,13 @@ class TrainingStep:
         except FileNotFoundError:
             ckpt = torch.load(f'{training_path}/{model_file}', map_location='cpu', weights_only=False)
         self.model = Model(ckpt['model'].yaml, ch=3, nc=categories, anchors=hyp.get('anchors')).to(self.device)
-        # NOTE: the checkpoint's weights, as `train_det.py` transfers them: `check_amp` compares detections,
-        # and a randomly initialised model detects nothing, so it would pass for any card
+        # NOTE: the checkpoint's weights, as `train_det.py` transfers them; `check_amp` compares
+        # detections, and a randomly initialised model detects nothing either way
         exclude = ['anchor'] if hyp.get('anchors') else []
         weights = intersect_dicts(ckpt['model'].float().state_dict(), self.model.state_dict(), exclude=exclude)
         self.model.load_state_dict(weights, strict=False)
         del ckpt, weights
-        self.amp = _amp_enabled(self.model)  # before the EMA and the optimizer: `check_amp` copies the model
+        self.amp = _amp_enabled(self.model)  # before the EMA and optimizer: `check_amp` copies the model
 
         gs = max(int(self.model.stride.max()), 32)  # type: ignore[union-attr]  # grid size (max stride)
         # as `train_det.py` rounds `--img`, so 600 is 608; an int in, an int out
@@ -159,11 +153,9 @@ class TrainingStep:
     def zero_gradients(self) -> None:
         """Clear the gradients but keep their memory, so every trial starts from the same state.
 
-        `train_det.py` accumulates over ``round(64 / batch_size)`` steps and only zeroes after the
-        optimizer step, so from its second step on every forward runs with the gradients resident.
-        Released instead (``set_to_none=True``), the next trial would measure without them and
-        promise a batch size the training does not have room for. Also the handler for a trial
-        that ran out of memory, which may have left them half written.
+        `train_det.py` accumulates over ``round(64 / batch_size)`` steps, so from its second step
+        on every forward runs with the gradients resident. Also the handler for a trial that ran
+        out of memory.
         """
         self.optimizer.zero_grad(set_to_none=False)
 
@@ -185,11 +177,9 @@ class TrainingStep:
 def _amp_enabled(model: Model) -> bool:
     """Whether `train_det.py` will train in mixed precision, asked the way it asks.
 
-    The probe has to allocate what the training allocates: measured under autocast, a training
-    that then runs in float32 is promised a batch size that does not fit. `check_amp` reaches for
-    the yolov5 packages by bare name, so the `sys.path` entry `train_det.py` makes has to be here
-    too. A check that cannot run answers no, which is the harmless half of a disagreement -- the
-    probe then measures float32, and a training that does enable AMP needs less than that.
+    `check_amp` reaches for the yolov5 packages by bare name, hence the `sys.path` entry. A check
+    that cannot run answers no, so the probe measures float32 -- more memory than AMP needs, never
+    less.
     """
     if str(YOLOV5_ROOT) not in sys.path:
         sys.path.append(str(YOLOV5_ROOT))

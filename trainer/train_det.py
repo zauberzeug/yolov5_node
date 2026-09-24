@@ -561,7 +561,7 @@ def parse_opt(known=False):
     parser.add_argument('--hyp', type=str, default=ROOT / 'data/hyps/hyp.scratch-low.yaml', help='hyperparameters path')
     parser.add_argument('--epochs', type=int, default=300)
     parser.add_argument('--clear', action='store_true', help='clear epochs before starting training')
-    # PATCH (yolov5-node): the batch size was probed against this budget, so the training has to hold to it
+    # PATCH (yolov5-node): the budget the batch size was probed against
     add_vram_limit_argument(parser)
     parser.add_argument('--batch-size', type=int, default=16, help='total batch size for all GPUs, -1 for autobatch')
     parser.add_argument('--imgsz', '--img', '--img-size', type=int, default=640, help='train, val image size (pixels)')
@@ -612,8 +612,8 @@ def parse_opt(known=False):
 
 
 def main(opt, callbacks=Callbacks()):
-    # PATCH (yolov5-node): the cap does not survive the spawn, so it is set here rather than inherited.
-    # Before the resume branch below, which replaces `opt` with the one saved beside the checkpoint.
+    # PATCH (yolov5-node): apply the node's VRAM cap, which does not survive a spawn.
+    # Before the resume branch below, which replaces `opt`.
     limit_cuda_memory(opt.vram_limit_gb)
 
     # Checks

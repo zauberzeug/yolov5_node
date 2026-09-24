@@ -1,10 +1,8 @@
 """Re-measure the batch-size decision that `app_code.batch_size_calculation` now makes by probing.
 
-Until this branch the trainer estimated: it read `Estimated Total Size (MB)` off
-`torchinfo.summary()` and compared it against 95 % of the free memory, without optimizer state,
-gradients or fragmentation, and never ran a step. :func:`legacy_estimate` keeps that method alive
-here -- it is gone from the trainer -- so the comparison that justified the change can be re-run
-rather than taken on trust.
+The trainer used to read `Estimated Total Size (MB)` off `torchinfo.summary()` and compare it
+against 95 % of the free memory, without ever running a step. :func:`legacy_estimate` keeps that
+method alive here, gone from the trainer, so the comparison can be re-run.
 
 Three numbers per resolution: what the estimate picked, whether that pick survives a real training
 step, and what the probe picks now.
@@ -70,7 +68,7 @@ class Row:
     resolution: int
     estimated: int | None
     estimated_holds: bool | None
-    """Whether one real step at `estimated` fits -- the question the estimate never asked."""
+    """Whether one real step at `estimated` fits."""
     probed: int | None
     error: str | None = None
 
@@ -99,7 +97,7 @@ def legacy_estimate(spec: Spec, resolution: int) -> int | None:
 
 
 def holds(spec: Spec, resolution: int, batch_size: int) -> bool:
-    """Whether one real step at `batch_size` fits -- with no margin, the benefit of the doubt."""
+    """Whether one real step at `batch_size` fits, measured without a safety margin."""
     step = TrainingStep(spec.weights, spec.training_path, spec.hyp, spec.categories, resolution)
     try:
         return measured_fits(step, probe=f'verify {resolution}px', on_out_of_memory=step.zero_gradients)(batch_size)
@@ -140,11 +138,9 @@ def write_dataset_yaml(path: Path, categories: int) -> None:
 
 
 def write_train_folder(path: Path, count: int) -> None:
-    """Enough empty `.jpg` entries that the dataset bound never becomes the answer.
+    """Enough empty `.jpg` entries that the dataset bound `calc` derives never binds.
 
-    `calc` counts this folder so a real training keeps its optimizer steps per epoch. Here the
-    question is what the card holds, so the count is put out of the way and the files stay empty --
-    the probe's images are synthetic and nothing opens them.
+    The files stay empty; the probe's images are synthetic and nothing opens them.
     """
     path.mkdir(parents=True, exist_ok=True)
     for i in range(count):
