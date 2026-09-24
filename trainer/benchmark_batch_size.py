@@ -32,7 +32,7 @@ from pathlib import Path
 import torch
 import yaml
 from learning_loop_node.helpers.misc import get_free_memory_mb
-from learning_loop_node.trainer.batch_size import BATCH_SIZE, MIN_TRAIN_STEPS_PER_EPOCH
+from learning_loop_node.trainer.batch_size import MIN_TRAIN_STEPS_PER_EPOCH, REQUESTED_BATCH_SIZE
 from learning_loop_node.trainer.cuda import free_cuda_memory, measured_fits
 from torchinfo import Verbosity, summary
 
@@ -124,7 +124,7 @@ def measure(args: argparse.Namespace, workdir: Path) -> list[Row]:
                 row.estimated_holds = holds(spec, resolution, row.estimated)
             free_cuda_memory()
             row.probed = asyncio.run(calc(spec.training_path, spec.weights, spec.hyp_path,
-                                          {'resolution': resolution, BATCH_SIZE: args.limit}))
+                                          {'resolution': resolution, REQUESTED_BATCH_SIZE: args.limit}))
         except Exception as exc:  # the sweep continues with the next resolution
             row.error = f'{type(exc).__name__}: {exc}'
         free_cuda_memory()
@@ -174,7 +174,7 @@ def main() -> None:
     parser.add_argument('--categories', type=int, default=10, help='number of classes to build the head for')
     parser.add_argument('--hyp', default=str(Path(__file__).resolve().parent / 'hyp_det.yaml'))
     parser.add_argument('--limit', type=int, default=512,
-                        help=f'upper bound, passed to the probe as the {BATCH_SIZE} hyperparameter')
+                        help=f'upper bound, passed to the probe as the {REQUESTED_BATCH_SIZE} hyperparameter')
     parser.add_argument('--json', help='write the rows to this file as well')
     args = parser.parse_args()
 

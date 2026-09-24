@@ -54,7 +54,7 @@ ours; everything below is our side of that contract.
 `train_det.py` would build and runs a step resembling its own — EMA copy, three-group SGD, mixed
 precision on the same `check_amp` verdict, the real `ComputeLoss`, backward, clipping, optimizer
 step — and releases everything before the subprocess starts. The step is all this repository
-supplies: the library's `measure_batch_size` reads `batch_size` as the upper bound, measures
+supplies: the library's `measure_batch_size` reads `max_batch_size` as the upper bound, measures
 against it and returns what fits. Two of the bounds it gets are ours: `MIN_BATCH_SIZE`, because
 `train_det.py` validates at `batch_size // 2`, and the `sample_count` counted off the `train/`
 folder, which keeps an epoch enough optimizer steps to mean something. `--vram-limit-gb` narrows
@@ -128,7 +128,9 @@ to itself: two of these in parallel measure each other's memory.
 
 - **Hyperparameters are a cheap way to report a value to the loop.** Anything a trainer writes to
   `training.hyperparameters` lands on the model and shows up in its hyperparameter view — no new
-  plumbing in the loop needed. `batch_size` and `trainer_version` already use this.
+  plumbing in the loop needed. `batch_size` and `trainer_version` already use this. Keep such an
+  output apart from any input: the settled size goes to `batch_size`, never back into the
+  `max_batch_size` bound, because the hyperparameters travel on to the next training.
 - **Keep upstream mergeable.** Changes in `detector/tensorrtx` (and in the vendored yolov5 code)
   must carry a `PATCH (yolov5-node)` comment stating what deviates, so `grep -rn "PATCH (yolov5-node)"`
   lists every deviation. Only `detector/tensorrtx` follows this today; the trainer's copy of yolov5

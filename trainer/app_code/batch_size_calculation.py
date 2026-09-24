@@ -49,7 +49,7 @@ async def calc(training_path: str, model_file: str, hyp_path: str,
 
     :param training_path: The training folder, which is where `yolov5_format` wrote `dataset.yaml`.
     :param hyperparameters: The training's hyperparameters, which the probe reads its `resolution`
-        and its `batch_size` bound out of; the caller reports the size this returns.
+        and its `max_batch_size` bound out of; the caller reports the size this returns as `batch_size`.
     :param vram_limit_gb: Gigabytes of the card this training may use; 0 means the whole card.
         `train_det.py` is given the same number and caps itself with it, because the cap set here
         does not survive the spawn.
