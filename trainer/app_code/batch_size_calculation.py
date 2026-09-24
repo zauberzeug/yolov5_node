@@ -15,7 +15,7 @@ import os
 import sys
 from collections.abc import MutableMapping
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import torch
 import yaml
@@ -24,7 +24,7 @@ from learning_loop_node.trainer.cuda import free_cuda_memory, limit_cuda_memory,
 
 from .yolov5.models.yolo import Model
 from .yolov5.utils.downloads import attempt_download
-from .yolov5.utils.general import check_amp, intersect_dicts
+from .yolov5.utils.general import check_amp, check_img_size, intersect_dicts
 from .yolov5.utils.loss import ComputeLoss
 from .yolov5.utils.torch_utils import ModelEMA, smart_optimizer
 
@@ -79,7 +79,7 @@ async def calc(training_path: str, model_file: str, hyp_path: str,
     finally:
         step.release()
 
-    logger.info('%s: training at %d px with batch size %d', PROBE, img_size, batch_size)
+    logger.info('%s: training at %d px with batch size %d', PROBE, step.img_size, batch_size)
     return batch_size
 
 
@@ -102,7 +102,6 @@ class TrainingStep:
     """
 
     def __init__(self, model_file: str, training_path: str, hyp: dict, categories: int, img_size: int) -> None:
-        self.img_size = img_size
         self.categories = categories
         self.device = torch.device('cuda', 0)
 
@@ -119,11 +118,15 @@ class TrainingStep:
         del ckpt, weights
         self.amp = _amp_enabled(self.model)  # before the EMA and the optimizer: `check_amp` copies the model
 
+        gs = max(int(self.model.stride.max()), 32)  # type: ignore[union-attr]  # grid size (max stride)
+        # as `train_det.py` rounds `--img`, so 600 is 608; an int in, an int out
+        self.img_size = cast(int, check_img_size(img_size, gs, floor=gs * 2))
+
         hyp = dict(hyp)
         nl = self.model.model[-1].nl  # detection layers
         hyp['box'] *= 3 / nl
         hyp['cls'] *= categories / 80 * 3 / nl
-        hyp['obj'] *= (img_size / 640) ** 2 * 3 / nl
+        hyp['obj'] *= (self.img_size / 640) ** 2 * 3 / nl
 
         self.model.nc = categories
         self.model.hyp = hyp
