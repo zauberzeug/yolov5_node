@@ -32,11 +32,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 import yaml
-from PIL import Image, ImageDraw, ImageFont
 from learning_loop_node.trainer.cuda import (  # PATCH (yolov5-node): the node's VRAM budget
     add_vram_limit_argument,
     limit_cuda_memory,
 )
+from PIL import Image, ImageDraw, ImageFont
 from torch.optim import lr_scheduler
 from tqdm import tqdm
 
