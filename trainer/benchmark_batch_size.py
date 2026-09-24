@@ -102,7 +102,7 @@ def holds(spec: Spec, resolution: int, batch_size: int) -> bool:
     """Whether one real step at `batch_size` fits -- with no margin, the benefit of the doubt."""
     step = TrainingStep(spec.weights, spec.training_path, spec.hyp, spec.categories, resolution)
     try:
-        return measured_fits(step, probe=f'verify {resolution}px', on_out_of_memory=step.drop_gradients)(batch_size)
+        return measured_fits(step, probe=f'verify {resolution}px', on_out_of_memory=step.zero_gradients)(batch_size)
     finally:
         step.release()
 

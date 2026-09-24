@@ -75,7 +75,7 @@ async def calc(training_path: str, model_file: str, hyp_path: str,
         batch_size = measure_batch_size(step, batch_size=requested_batch_size(hyperparameters),
                                         sample_count=sample_count, probe=PROBE,
                                         minimum=MIN_BATCH_SIZE, vram_limit_gb=vram_limit_gb,
-                                        on_out_of_memory=step.drop_gradients)
+                                        on_out_of_memory=step.zero_gradients)
     finally:
         step.release()
 
@@ -131,6 +131,9 @@ class TrainingStep:
 
         self.ema = ModelEMA(self.model)
         self.optimizer = smart_optimizer(self.model, 'SGD', hyp['lr0'], hyp['momentum'], hyp['weight_decay'])
+        for parameter in self.model.parameters():
+            if parameter.requires_grad:
+                parameter.grad = torch.zeros_like(parameter)  # resident from the first trial on, see `zero_gradients`
         self.scaler = torch.amp.GradScaler('cuda', enabled=self.amp)
         self.compute_loss = ComputeLoss(self.model)
 
@@ -146,13 +149,20 @@ class TrainingStep:
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=10.0)
         self.scaler.step(self.optimizer)
         self.scaler.update()
-        self.optimizer.zero_grad(set_to_none=True)
+        self.zero_gradients()
         self.ema.update(self.model)
         return f'{self.img_size} px, {"mixed precision" if self.amp else "float32"}'
 
-    def drop_gradients(self) -> None:
-        """Release what a failed step left behind, so the next trial starts from the same state."""
-        self.optimizer.zero_grad(set_to_none=True)
+    def zero_gradients(self) -> None:
+        """Clear the gradients but keep their memory, so every trial starts from the same state.
+
+        `train_det.py` accumulates over ``round(64 / batch_size)`` steps and only zeroes after the
+        optimizer step, so from its second step on every forward runs with the gradients resident.
+        Released instead (``set_to_none=True``), the next trial would measure without them and
+        promise a batch size the training does not have room for. Also the handler for a trial
+        that ran out of memory, which may have left them half written.
+        """
+        self.optimizer.zero_grad(set_to_none=False)
 
     def release(self) -> None:
         del self.compute_loss, self.scaler, self.optimizer, self.ema, self.model
