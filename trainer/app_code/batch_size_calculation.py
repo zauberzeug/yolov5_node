@@ -31,6 +31,8 @@ from .yolov5.utils.torch_utils import ModelEMA, smart_optimizer
 YOLOV5_ROOT = Path(__file__).resolve().parent / 'yolov5'
 """What `train_det.py` puts on `sys.path`, because yolov5 imports its own packages by bare name."""
 
+logger = logging.getLogger(__name__)
+
 PROBE = 'batch-size probe'
 """Names the probe in the log, so its lines are greppable next to the training's own."""
 
@@ -77,7 +79,7 @@ async def calc(training_path: str, model_file: str, hyp_path: str,
     finally:
         step.release()
 
-    logging.info('%s: training at %d px with batch size %d', PROBE, img_size, batch_size)
+    logger.info('%s: training at %d px with batch size %d', PROBE, img_size, batch_size)
     return batch_size
 
 
@@ -89,24 +91,6 @@ def _train_sample_count(training_path: str) -> int:
     `<id>.txt`.
     """
     return sum(1 for path in (Path(training_path) / 'train').iterdir() if path.suffix == '.jpg')
-
-
-def _amp_enabled(model: Model) -> bool:
-    """Whether `train_det.py` will train in mixed precision, asked the way it asks.
-
-    The probe has to allocate what the training allocates: measured under autocast, a training
-    that then runs in float32 is promised a batch size that does not fit. `check_amp` reaches for
-    the yolov5 packages by bare name, so the `sys.path` entry `train_det.py` makes has to be here
-    too. A check that cannot run answers no, which is the harmless half of a disagreement -- the
-    probe then measures float32, and a training that does enable AMP needs less than that.
-    """
-    if str(YOLOV5_ROOT) not in sys.path:
-        sys.path.append(str(YOLOV5_ROOT))
-    try:
-        return bool(check_amp(model))
-    except Exception:  # pylint: disable=broad-except
-        logging.exception('%s: could not determine whether AMP is usable; measuring in float32', PROBE)
-        return False
 
 
 class TrainingStep:
@@ -178,3 +162,21 @@ class TrainingStep:
         targets[:, 2:4] = torch.rand(count, 2, device=self.device) * 0.6 + 0.2  # centres, away from the border
         targets[:, 4:6] = torch.rand(count, 2, device=self.device) * 0.2 + 0.05
         return targets
+
+
+def _amp_enabled(model: Model) -> bool:
+    """Whether `train_det.py` will train in mixed precision, asked the way it asks.
+
+    The probe has to allocate what the training allocates: measured under autocast, a training
+    that then runs in float32 is promised a batch size that does not fit. `check_amp` reaches for
+    the yolov5 packages by bare name, so the `sys.path` entry `train_det.py` makes has to be here
+    too. A check that cannot run answers no, which is the harmless half of a disagreement -- the
+    probe then measures float32, and a training that does enable AMP needs less than that.
+    """
+    if str(YOLOV5_ROOT) not in sys.path:
+        sys.path.append(str(YOLOV5_ROOT))
+    try:
+        return bool(check_amp(model))
+    except Exception:  # pylint: disable=broad-except
+        logger.exception('%s: could not determine whether AMP is usable; measuring in float32', PROBE)
+        return False

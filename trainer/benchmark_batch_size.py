@@ -42,6 +42,8 @@ from app_code.batch_size_calculation import TrainingStep, calc
 from app_code.yolov5.models.yolo import Model
 from app_code.yolov5.utils.downloads import attempt_download
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_RESOLUTIONS = [320, 416, 640, 800, 1024]
 LEGACY_CANDIDATES = [128, 96, 64, 48, 32, 24, 16, 12, 8, 6, 4, 2, 1]
 """The fixed, descending list the estimate walked; note the non-powers of two."""
@@ -50,7 +52,7 @@ LEGACY_FRACTION = 0.95
 """Share of the free memory the estimate allowed itself."""
 
 
-@dataclass
+@dataclass(kw_only=True, slots=True)
 class Spec:
     """What it takes to rebuild the model under test, unchanged across the sweep."""
 
@@ -61,7 +63,7 @@ class Spec:
     hyp_path: str
 
 
-@dataclass
+@dataclass(kw_only=True, slots=True)
 class Row:
     """One resolution, measured three ways."""
 
@@ -87,8 +89,8 @@ def legacy_estimate(spec: Spec, resolution: int) -> int | None:
                 continue
             size_mb = float(str(stats).split('Estimated Total Size (MB): ')[1].split('\n')[0])
             if size_mb < budget_mb:
-                logging.info('estimate: %d px, batch size %d, %.0f of %.0f MB', resolution, batch_size,
-                             size_mb, budget_mb)
+                logger.info('estimate: %d px, batch size %d, %.0f of %.0f MB', resolution, batch_size,
+                            size_mb, budget_mb)
                 return batch_size
         return None
     finally:
@@ -114,7 +116,7 @@ def measure(args: argparse.Namespace, workdir: Path) -> list[Row]:
 
     rows: list[Row] = []
     for resolution in args.resolutions:
-        logging.info('=== %d px ===', resolution)
+        logger.info('=== %d px ===', resolution)
         row = Row(resolution=resolution, estimated=None, estimated_holds=None, probed=None)
         try:
             row.estimated = legacy_estimate(spec, resolution)
@@ -127,8 +129,8 @@ def measure(args: argparse.Namespace, workdir: Path) -> list[Row]:
             row.error = f'{type(exc).__name__}: {exc}'
         free_cuda_memory()
         rows.append(row)
-        logging.info('%d px: estimated %s (holds: %s), probed %s',
-                     resolution, row.estimated, row.estimated_holds, row.probed)
+        logger.info('%d px: estimated %s (holds: %s), probed %s',
+                    resolution, row.estimated, row.estimated_holds, row.probed)
     return rows
 
 
@@ -179,8 +181,8 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
     if not torch.cuda.is_available():
         raise SystemExit('no CUDA device -- this benchmark only says something on a GPU box')
-    logging.info('%s, %.1f GB', torch.cuda.get_device_name(0),
-                 torch.cuda.get_device_properties(0).total_memory / 1024**3)
+    logger.info('%s, %.1f GB', torch.cuda.get_device_name(0),
+                torch.cuda.get_device_properties(0).total_memory / 1024**3)
 
     cwd = os.getcwd()
     with tempfile.TemporaryDirectory() as tmp:
