@@ -7,9 +7,9 @@ from learning_loop_node.helpers.entrypoint import node_parser, run_node
 
 from app_code.yolov5_trainer import Yolov5TrainerLogic
 
-args = node_parser(description='Run the YOLOv5 trainer node').parse_args()
+args = node_parser(description='Run the YOLOv5 trainer node', vram_limit=True).parse_args()
 
-trainer_logic = Yolov5TrainerLogic()
+trainer_logic = Yolov5TrainerLogic(vram_limit_gb=args.vram_limit_gb)
 node = TrainerNode(name='Yolov5 Trainer ' + os.uname()[1], trainer_logic=trainer_logic)
 
 if __name__ == '__main__':

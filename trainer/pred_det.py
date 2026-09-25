@@ -35,6 +35,11 @@ import sys
 from pathlib import Path
 
 import torch
+from learning_loop_node.trainer.cuda import (  # PATCH (yolov5-node): the node's VRAM budget
+    add_vram_limit_argument,
+    limit_cuda_memory,
+)
+
 from app_code.yolov5.models.common import DetectMultiBackend
 from app_code.yolov5.utils.dataloaders import LoadImages
 from app_code.yolov5.utils.general import (
@@ -78,6 +83,8 @@ def parse_opt():
     parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
     parser.add_argument('--max-det', type=int, default=1000, help='maximum detections per image')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
+    # PATCH (yolov5-node): the detection pass runs under the trainer's budget
+    add_vram_limit_argument(parser)
     parser.add_argument('--classes', nargs='+', type=int, help='filter by class: --classes 0, or --classes 0 2 3')
     parser.add_argument('--agnostic-nms', action='store_true', help='class-agnostic NMS')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
@@ -176,6 +183,10 @@ def run(
 
 
 def main(opt):
+    # PATCH (yolov5-node): apply the node's VRAM cap; `run` takes only its own arguments
+    limit_cuda_memory(opt.vram_limit_gb)
+    del opt.vram_limit_gb
+
     check_requirements(exclude=('tensorboard', 'thop'))
     run(**vars(opt))
 

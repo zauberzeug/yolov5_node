@@ -19,16 +19,21 @@ from learning_loop_node.data_classes import (
 from learning_loop_node.detector.postprocess import Prediction, to_detections
 from learning_loop_node.enums import CategoryType
 from learning_loop_node.trainer import trainer_logic
+from learning_loop_node.trainer.batch_size import requested_batch_size
 from learning_loop_node.trainer.exceptions import CriticalError, NodeNeedsRestartError
 from learning_loop_node.trainer.executor import Executor
 
-from . import batch_size_calculation, model_files, yolov5_format
+from . import model_files, yolov5_format
+
+logger = logging.getLogger(__name__)
 
 
 class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
-    def __init__(self) -> None:
+    def __init__(self, vram_limit_gb: float = 0) -> None:
         super().__init__(model_format='yolov5_pytorch')
+
+        self._vram_limit_gb = vram_limit_gb  # handed to the subprocesses; the cap does not survive a spawn
 
         logging.info('------ STARTING YOLOV5 TRAINER LOGIC ------')
         self.latest_epoch = 0
@@ -153,6 +158,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
         cmd = f'python /app/pred_det.py --weights {model_folder}/model.pt --source {images_folder}'
         cmd += f' --img-size {img_size} --conf-thres {self.detect_nms_conf_thres} --iou-thres {self.detect_nms_iou_thres}'
+        cmd += f' --vram-limit-gb {self._vram_limit_gb}'
 
         await executor.start(cmd)
         if await executor.wait() != 0:
@@ -198,12 +204,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
         self._save_additional_hyperparameters()
 
-        try:
-            batch_size = await batch_size_calculation.calc(self.training.training_folder, model, self.hyperparameter_path,
-                                                           f'{self.training.training_folder}/dataset.yaml', resolution)
-        except Exception as e:
-            logging.exception('Error during batch size calculation:')
-            raise NodeNeedsRestartError() from e
+        batch_size = await self._measure_batch_size(model, int(resolution))
 
         trainer_version = os.environ.get('NODE_VERSION') or 'unknown'
         logging.info('Training with trainer version %s and batch size %d', trainer_version, batch_size)
@@ -232,6 +233,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} \
             --project {self.training.training_folder} --name result --hyp {self.hyperparameter_path} \
             --epochs {self.epochs} --conf-thres {self.detect_nms_conf_thres} --iou-thres {self.detect_nms_iou_thres} \
+            --vram-limit-gb {self._vram_limit_gb} \
             {additional_parameters}'
         if p_sizes_by_id:
             cmd += f' --point_sizes_by_id {p_sizes_by_id[:-1]}'
@@ -239,6 +241,33 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             cmd += f' --flip_label_pairs {flip_label_pairs[:-1]}'
 
         await self.executor.start(cmd, env={'WANDB_MODE': 'disabled'})
+
+    async def _measure_batch_size(self, model: str, resolution: int) -> int:
+        """Run `probe_batch_size.py` and return the batch size it settled on.
+
+        A subprocess rather than a call, because the CUDA context a probe opens lives as long as
+        its process: in the node it would stay beside `train_det.py` for the whole training.
+        """
+        result_path = Path(self.training.training_folder) / 'batch_size.json'
+        result_path.unlink(missing_ok=True)
+
+        executor = Executor(self.training.training_folder, 'batch_size.log')
+        cmd = f'python /app/probe_batch_size.py --training-path {self.training.training_folder} \
+            --weights {model} --img {resolution} \
+            --max-batch-size {requested_batch_size(self.training.hyperparameters)} \
+            --vram-limit-gb {self._vram_limit_gb} --output {result_path}'
+        await executor.start(cmd)
+        try:
+            return_code = await executor.wait()
+        except asyncio.CancelledError:
+            logger.warning('Training cancelled during batch size calculation')
+            await executor.stop_and_wait()
+            raise
+
+        if return_code != 0 or not result_path.exists():
+            logger.error('Error during batch size calculation: %s', executor.get_log())
+            raise NodeNeedsRestartError()
+        return int(json.loads(result_path.read_text())['batch_size'])
 
     def _save_additional_hyperparameters(self) -> None:
         """Save additional hyperparameters to attributes of self.
