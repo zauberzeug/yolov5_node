@@ -26,7 +26,7 @@ Further, we support the following hyperparameters for point detection:
 
 The trainer reports these hyperparameters back to the Learning Loop:
 
-- `batch_size`: The batch size the training actually ran with, which is at most `max_batch_size` when that is set. Output only; never read as input, so a follow-up training measures again instead of inheriting an earlier card's result.
+- `batch_size`: The batch size the training actually ran with, which is at most `max_batch_size` when that is set. Output only; never read as input, so a training resumed after a restart of the node measures again instead of taking its first run's result as its bound.
 - `trainer_version`: The version of the trainer node, which the release build bakes into the docker image as `NODE_VERSION`. Locally built images report `unknown`. Output only; never read as input.
 
 ## Images

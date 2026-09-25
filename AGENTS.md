@@ -133,7 +133,9 @@ to itself: two of these in parallel measure each other's memory.
   `training.hyperparameters` lands on the model and shows up in its hyperparameter view — no new
   plumbing in the loop needed. `batch_size` and `trainer_version` already use this. Keep such an
   output apart from any input: the settled size goes to `batch_size`, never back into the
-  `max_batch_size` bound, because the hyperparameters travel on to the next training.
+  `max_batch_size` bound, because the node saves `training.hyperparameters` with the training and
+  a training resumed after a restart reads them back; it would otherwise take its first run's
+  measurement as its bound. (The loop itself never hands reported values to a later training.)
 - **Keep upstream mergeable.** Changes in `detector/tensorrtx` (and in the vendored yolov5 code)
   must carry a `PATCH (yolov5-node)` comment stating what deviates, so `grep -rn "PATCH (yolov5-node)"`
   lists every deviation. Only `detector/tensorrtx` follows this today; the trainer's copy of yolov5
