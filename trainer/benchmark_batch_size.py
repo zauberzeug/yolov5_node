@@ -7,10 +7,12 @@ method alive here, gone from the trainer, so the comparison can be re-run.
 Three numbers per resolution: what the estimate picked, whether that pick survives a real training
 step, and what the probe picks now.
 
-Run it inside the trainer image on a GPU box, where the dependencies already are::
+Run it inside the trainer image on a GPU box. The image is built without the dev group, so
+`torchinfo`, which only this script needs, is installed first::
 
     docker run --rm --device nvidia.com/gpu=all -v "$PWD/benchmark_batch_size.py:/app/benchmark_batch_size.py" \
-        -w /app zauberzeug/yolov5-trainer:latest python /app/benchmark_batch_size.py
+        -w /app zauberzeug/yolov5-trainer:latest \
+        sh -c 'uv pip install --python /uv_venv/bin/python torchinfo && python /app/benchmark_batch_size.py'
 
 Run it on an idle card. Two of these in parallel measure each other's memory, not the model's.
 """

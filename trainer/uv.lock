@@ -3051,7 +3051,6 @@ source = { virtual = "." }
 dependencies = [
     { name = "learning-loop-node" },
     { name = "ruamel-yaml" },
-    { name = "torchinfo" },
 ]
 
 [package.dev-dependencies]
@@ -3066,6 +3065,7 @@ dev = [
     { name = "pytest-watch" },
     { name = "pytest-xdist" },
     { name = "ruff" },
+    { name = "torchinfo" },
 ]
 yolo = [
     { name = "albumentations" },
@@ -3092,7 +3092,6 @@ yolo = [
 requires-dist = [
     { name = "learning-loop-node", specifier = "==0.23.0" },
     { name = "ruamel-yaml" },
-    { name = "torchinfo", specifier = ">=1.8.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -3107,6 +3106,7 @@ dev = [
     { name = "pytest-watch" },
     { name = "pytest-xdist" },
     { name = "ruff", specifier = ">=0.13.2,<1.0.0" },
+    { name = "torchinfo", specifier = ">=1.8.0" },
 ]
 types = []
 yolo = [

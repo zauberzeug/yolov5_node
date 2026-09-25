@@ -9,7 +9,6 @@ requires-python = ">=3.12"
 dependencies = [
     "ruamel.yaml",
     "learning_loop_node==0.24.0",
-    "torchinfo>=1.8.0",
 ]
 
 [dependency-groups]
@@ -25,6 +24,7 @@ dev = [
     "pytest-mock",
     "pytest-xdist",
     "pytest-watch",
+    "torchinfo>=1.8.0",  # benchmark_batch_size.py only
 ]
 
 yolo = [
