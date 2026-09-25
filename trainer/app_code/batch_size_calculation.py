@@ -44,7 +44,7 @@ TARGETS_PER_IMAGE = 8
 
 
 def calc(training_path: str, model_file: str, *, img_size: int,
-         max_batch_size: int = 0, vram_limit_gb: float = 0) -> int:
+         max_batch_size: int, vram_limit_gb: float) -> int:
     """Return the largest batch size a training step fits into, within ``max_batch_size``.
 
     Initialises CUDA in the calling process, so call it only where that process ends with the
@@ -84,15 +84,6 @@ def calc(training_path: str, model_file: str, *, img_size: int,
 
     logger.info('%s: training at %d px with batch size %d', PROBE, step.img_size, batch_size)
     return batch_size
-
-
-def _train_sample_count(training_path: str) -> int:
-    """How many images the training will see per epoch.
-
-    `yolov5_format` symlinks them into `train/` as `<id>.jpg`, with the labels beside them as
-    `<id>.txt`.
-    """
-    return sum(1 for path in (Path(training_path) / 'train').iterdir() if path.suffix == '.jpg')
 
 
 class TrainingStep:
@@ -179,6 +170,15 @@ class TrainingStep:
         targets[:, 2:4] = torch.rand(count, 2, device=self.device) * 0.6 + 0.2  # centres, away from the border
         targets[:, 4:6] = torch.rand(count, 2, device=self.device) * 0.2 + 0.05
         return targets
+
+
+def _train_sample_count(training_path: str) -> int:
+    """How many images the training will see per epoch.
+
+    `yolov5_format` symlinks them into `train/` as `<id>.jpg`, with the labels beside them as
+    `<id>.txt`.
+    """
+    return sum(1 for path in (Path(training_path) / 'train').iterdir() if path.suffix == '.jpg')
 
 
 def _amp_enabled(model: Model) -> bool:

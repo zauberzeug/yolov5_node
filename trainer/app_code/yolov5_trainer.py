@@ -25,6 +25,8 @@ from learning_loop_node.trainer.executor import Executor
 
 from . import model_files, yolov5_format
 
+logger = logging.getLogger(__name__)
+
 
 class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
@@ -258,12 +260,12 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         try:
             return_code = await executor.wait()
         except asyncio.CancelledError:
-            logging.warning('Training cancelled during batch size calculation')
+            logger.warning('Training cancelled during batch size calculation')
             await executor.stop_and_wait()
             raise
 
         if return_code != 0 or not result_path.exists():
-            logging.error('Error during batch size calculation: %s', executor.get_log())
+            logger.error('Error during batch size calculation: %s', executor.get_log())
             raise NodeNeedsRestartError()
         return int(json.loads(result_path.read_text())['batch_size'])
 
