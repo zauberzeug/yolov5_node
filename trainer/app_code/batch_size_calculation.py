@@ -48,7 +48,7 @@ def calc(training_path: str, model_file: str, *, img_size: int,
     """Return the largest batch size a training step fits into, within ``max_batch_size``.
 
     Initialises CUDA in the calling process, so call it only where that process ends with the
-    probe (``probe_batch_size.py``, the benchmark), never in the node.
+    probe (``probe_batch_size.py``), never in the node.
 
     :param training_path: The training folder, holding the `dataset.yaml` and `hyp.yaml` that
         `train_det.py` reads.

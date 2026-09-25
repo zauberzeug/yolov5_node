@@ -119,12 +119,6 @@ There is no `.pre-commit-config.yaml` here. Lint per sub-project, where the ruff
 cd trainer && uv run --no-sync ruff check .
 ```
 
-`trainer/benchmark_batch_size.py` is a measurement, not a test: it runs the estimate that
-`batch_size_calculation` used before the probe — kept alive in the benchmark, gone from the trainer
-— against the probe that replaced it, and checks whether the estimate's pick survives a real step.
-It needs a GPU box, its module docstring carries the docker invocation, and it must have the card
-to itself: two of these in parallel measure each other's memory.
-
 `docker-deploy.yml` publishes the images on a GitHub release tagged `v<MAJOR>.<MINOR>.<PATCH>`.
 
 ## Working in this repository

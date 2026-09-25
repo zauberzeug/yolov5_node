@@ -24,7 +24,6 @@ dev = [
     "pytest-mock",
     "pytest-xdist",
     "pytest-watch",
-    "torchinfo>=1.8.0",  # benchmark_batch_size.py only
 ]
 
 yolo = [
