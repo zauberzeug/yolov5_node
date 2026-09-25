@@ -17,11 +17,11 @@ Run it on an idle card. Two of these in parallel measure each other's memory, no
 from __future__ import annotations
 
 import argparse
-import asyncio
 import contextlib
 import json
 import logging
 import os
+import shutil
 import sys
 import tempfile
 from dataclasses import asdict, dataclass
@@ -58,7 +58,6 @@ class Spec:
     hyp: dict
     categories: int
     training_path: str
-    hyp_path: str
 
 
 @dataclass(kw_only=True, slots=True)
@@ -107,8 +106,9 @@ def holds(spec: Spec, resolution: int, batch_size: int) -> bool:
 
 def measure(args: argparse.Namespace, workdir: Path) -> list[Row]:
     spec = Spec(weights=args.model, hyp=yaml.safe_load(Path(args.hyp).read_text()),
-                categories=args.categories, training_path=str(workdir), hyp_path=args.hyp)
+                categories=args.categories, training_path=str(workdir))
     write_dataset_yaml(workdir / 'dataset.yaml', args.categories)
+    shutil.copy(args.hyp, workdir / 'hyp.yaml')  # where `calc` reads it, as in a training folder
     write_train_folder(workdir / 'train', args.limit * MIN_TRAIN_STEPS_PER_EPOCH)
     attempt_download(spec.weights)
 
@@ -121,8 +121,7 @@ def measure(args: argparse.Namespace, workdir: Path) -> list[Row]:
             if row.estimated is not None:
                 row.estimated_holds = holds(spec, resolution, row.estimated)
             free_cuda_memory()
-            row.probed = asyncio.run(calc(spec.training_path, spec.weights, spec.hyp_path,
-                                          {'resolution': resolution, REQUESTED_BATCH_SIZE: args.limit}))
+            row.probed = calc(spec.training_path, spec.weights, img_size=resolution, max_batch_size=args.limit)
         except Exception as exc:  # the sweep continues with the next resolution
             row.error = f'{type(exc).__name__}: {exc}'
         free_cuda_memory()

@@ -53,7 +53,10 @@ ours; everything below is our side of that contract.
 **The batch size is measured, not configured.** `batch_size_calculation.calc` builds the model
 `train_det.py` would build and runs a step resembling its own — EMA copy, three-group SGD, mixed
 precision on the same `check_amp` verdict, the real `ComputeLoss`, backward, clipping, optimizer
-step — and releases everything before the subprocess starts. The step is all this repository
+step. It runs in a subprocess of its own, `probe_batch_size.py`, started through the `Executor`
+before `train_det.py`: a CUDA context lives as long as its process, so a probe in the node would
+leave one beside the training, which then runs against less memory than the probe measured. The
+node reads the result back from `batch_size.json` in the training folder. The step is all this repository
 supplies: the library's `measure_batch_size` reads `max_batch_size` as the upper bound, measures
 against it and returns what fits. Two of the bounds it gets are ours: `MIN_BATCH_SIZE`, because
 `train_det.py` validates at `batch_size // 2`, and the `sample_count` counted off the `train/`

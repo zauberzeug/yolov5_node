@@ -3,7 +3,12 @@
 The training runs in a subprocess (:mod:`train_det`), so the probe builds its own model here and
 measures a step resembling the one that subprocess runs: EMA copy, three-group SGD, mixed
 precision on the same condition, the real ``ComputeLoss``, backward, clipping, optimizer step.
-Everything it allocates is released before the subprocess starts.
+
+The probe runs in a subprocess of its own (``probe_batch_size.py``), never in the node: a CUDA
+context lives as long as its process, so a probe in the node would leave one behind for the whole
+training. ``train_det.py`` would then run beside two contexts where the probe measured beside one,
+and the difference comes out of the safety margin. It would also block the node's event loop for
+as long as the probe runs.
 
 Validation is not measured: ``train_det.py`` validates at ``batch_size // 2``, in half precision
 and without gradients, so the training step is the peak.
@@ -11,13 +16,11 @@ and without gradients, so the training step is the peak.
 import logging
 import os
 import sys
-from collections.abc import MutableMapping
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 import torch
 import yaml
-from learning_loop_node.trainer.batch_size import requested_batch_size
 from learning_loop_node.trainer.cuda import free_cuda_memory, limit_cuda_memory, measure_batch_size
 
 from .yolov5.models.yolo import Model
@@ -40,22 +43,26 @@ TARGETS_PER_IMAGE = 8
 """Boxes per synthetic image; the loss allocates per target, so this is not free."""
 
 
-async def calc(training_path: str, model_file: str, hyp_path: str,
-               hyperparameters: MutableMapping[str, Any], vram_limit_gb: float = 0) -> int:
-    """Return the largest power-of-two batch size a training step fits into.
+def calc(training_path: str, model_file: str, *, img_size: int,
+         max_batch_size: int = 0, vram_limit_gb: float = 0) -> int:
+    """Return the largest batch size a training step fits into, within ``max_batch_size``.
 
-    :param training_path: The training folder, which is where `yolov5_format` wrote `dataset.yaml`.
-    :param hyperparameters: The probe reads `resolution` and the `max_batch_size` bound out of
-        these; the caller reports the size this returns as `batch_size`.
+    Initialises CUDA in the calling process, so call it only where that process ends with the
+    probe (``probe_batch_size.py``, the benchmark), never in the node.
+
+    :param training_path: The training folder, holding the `dataset.yaml` and `hyp.yaml` that
+        `train_det.py` reads.
+    :param img_size: The `resolution` hyperparameter, rounded here as `train_det.py` rounds it.
+    :param max_batch_size: The bound the training asked for; 0 lets the card decide. The caller
+        reports the size this returns as `batch_size`.
     :param vram_limit_gb: Gigabytes of the card this training may use; 0 means the whole card.
         `train_det.py` is given the same number, because the cap set here does not survive a spawn.
     :raises InsufficientMemoryError: If not even :data:`MIN_BATCH_SIZE` fits.
     """
-    img_size = int(hyperparameters['resolution'])
     sample_count = _train_sample_count(training_path)
     os.chdir('/tmp')  # NOTE: attempt_download writes the weights into the working directory
 
-    with open(hyp_path) as f:
+    with open(f'{training_path}/hyp.yaml') as f:
         hyp = yaml.safe_load(f)
     with open(f'{training_path}/dataset.yaml') as f:
         dataset = yaml.safe_load(f)
@@ -68,7 +75,7 @@ async def calc(training_path: str, model_file: str, hyp_path: str,
 
     step = TrainingStep(model_file, training_path, hyp, dataset.get('nc'), img_size)
     try:
-        batch_size = measure_batch_size(step, batch_size=requested_batch_size(hyperparameters),
+        batch_size = measure_batch_size(step, batch_size=max_batch_size,
                                         sample_count=sample_count, probe=PROBE,
                                         minimum=MIN_BATCH_SIZE, vram_limit_gb=vram_limit_gb,
                                         on_out_of_memory=step.zero_gradients)
