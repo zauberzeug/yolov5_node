@@ -34,9 +34,8 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
-        # Every runner has its own HOME; the fixed name makes all of them share one builder container
         run: |
-          docker buildx create --name node-release --driver docker-container 2>/dev/null || true
+          docker buildx create --name node-release --driver docker-container || docker buildx inspect node-release
           # Retried, as parallel jobs race to start the container
           docker buildx inspect --bootstrap node-release || docker buildx inspect --bootstrap node-release
       - name: Log in to Docker Hub
