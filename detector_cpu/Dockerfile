@@ -41,7 +41,7 @@ RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked
 # Ensure the venv is first on PATH for CMD/RUN that follow
 ENV PATH="/uv_env/.venv/bin:${PATH}"
 
-# Install YOLOv5 dependencies before its code
+# Install YOLOv5 dependencies
 COPY ./trainer/app_code/yolov5/requirements.txt /app/app_code/yolov5/requirements.txt
 RUN --mount=type=cache,target=/root/.cache/uv uv pip install -r /app/app_code/yolov5/requirements.txt
 ADD ./trainer/app_code/yolov5 /app/app_code/yolov5
