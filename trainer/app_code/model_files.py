@@ -31,6 +31,13 @@ def delete_older_epochs(training_path: Path, weightfile: Path) -> None:
             delete_json_for_weightfile(f)
 
 
+def delete_newer_epochs(training_path: Path, epoch: int) -> None:
+    for f in get_all_weightfiles(training_path):
+        if epoch_from_weightfile(f) > epoch:
+            _try_remove(f)
+            delete_json_for_weightfile(f)
+
+
 def delete_json_for_weightfile(weightfile: Path) -> None:
     _try_remove(weightfile.with_suffix('.json'))
 

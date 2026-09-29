@@ -48,6 +48,27 @@ When using the script it is required to set up a .env file in the trainer folder
 | RESTART_AFTER_TRAINING      | Auto-restart after training                          | TRUE/FALSE/0/1 | FALSE   | No                           |
 | KEEP_OLD_TRAININGS          | Do not remove old trainings, when starting a new one | TRUE/FALSE/0/1 | FALSE   | No                           |
 
+## Interrupted Training
+
+An incomplete training continues after a node restart when the saved job and training
+folder remain available under the same node identity. The node resumes from
+`result/weights/last.pt` with the saved batch size and options, without another batch-size
+probe. Model weights, optimizer, EMA and its update count, learning-rate scheduler, AMP
+scaler and early-stopping history are restored; an unfinished epoch is repeated, so results
+are not bitwise identical to an uninterrupted run.
+
+Every improving epoch saves only its EMA weights as `best.pt`, linked as the `epoch<n>.pt`
+the node publishes to `published/latest.pt` once the Loop acknowledges it. The best
+checkpoint is written before `last.pt`, and all checkpoints are replaced atomically; a best
+checkpoint of an epoch whose `last.pt` was never written is discarded on resume. A completed
+or early-stopped checkpoint goes straight to publication.
+
+Training folders without `last.pt` fall back to `published/latest.pt`, which lacks the
+scheduler, AMP-scaler and early-stopping records; the patience then starts at that epoch.
+
+The checkpoint tests in `trainer/tests` run offline; `app_code/tests` needs a GPU and a
+reachable Learning Loop.
+
 # Detector Node
 
 This node is used to run Yolov5 Models for object detection.
