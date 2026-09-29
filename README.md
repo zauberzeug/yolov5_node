@@ -14,6 +14,7 @@ We support all native hyperparameters of YOLOv5 (cf. `hyp_det.yaml` for referenc
 In addition, we support the following hyperparameters:
 
 - `epochs`: The number of epochs to train the model.
+- `max_batch_size`: The largest batch size the training may use. It is measured rather than trusted: if it fits it is used as given, and if it does not, the largest power of two below it that does is used instead. `0` (the default) leaves the bound to the card alone, within `VRAM_LIMIT_GB` when that is set. The training never uses fewer than 2 samples per batch, because validation halves the batch, so a `max_batch_size` of 1 is raised to 2. The value that was actually used is reported back as `batch_size` (see below).
 - `detect_nms_conf_thres`: The confidence threshold for the NMS during inference and validation (not relevant for training).
 - `detect_nms_iou_thres`: The IoU threshold for the NMS during inference and validation (not used for training).
 
@@ -23,10 +24,10 @@ Further, we support the following hyperparameters for point detection:
 - `point_sizes_by_id`: A dictionary that maps from point category uuids to the size of the points in the output (fractional size 0-1).
 - `flip_label_pairs`: A list of pairs of point uuids that should be swapped when a horizontal flip is applied during data augmentation.
 
-The trainer reports two more hyperparameters back to the Learning Loop. They are output only and never read as input:
+The trainer reports these hyperparameters back to the Learning Loop:
 
-- `batch_size`: The batch size the training actually ran with, computed from the available GPU memory.
-- `trainer_version`: The version of the trainer node, which the release build bakes into the docker image as `NODE_VERSION`. Locally built images report `unknown`.
+- `batch_size`: The batch size the training actually ran with, which is at most `max_batch_size` when that is set (but never below 2). Output only; never read as input, so a training resumed after a restart of the node measures again instead of taking its first run's result as its bound.
+- `trainer_version`: The version of the trainer node, which the release build bakes into the docker image as `NODE_VERSION`. Locally built images report `unknown`. Output only; never read as input.
 
 ## Images
 
@@ -47,6 +48,7 @@ When using the script it is required to set up a .env file in the trainer folder
 | UVICORN_RELOAD              | Enable hot-reload                                    | TRUE/FALSE/0/1 | FALSE   | No                           |
 | RESTART_AFTER_TRAINING      | Auto-restart after training                          | TRUE/FALSE/0/1 | FALSE   | No                           |
 | KEEP_OLD_TRAININGS          | Do not remove old trainings, when starting a new one | TRUE/FALSE/0/1 | FALSE   | No                           |
+| VRAM_LIMIT_GB               | Gigabytes of GPU memory a training may use. The batch size is probed against this limit instead of the whole card, and `train_det.py` and `pred_det.py` cap themselves to it, so a lower limit yields a smaller batch size rather than an out-of-memory error. Useful to share one GPU between processes. The limit is relative to the card's *total* memory, not to what is currently free | Number | 0 (no limit) | No |
 
 # Detector Node
 

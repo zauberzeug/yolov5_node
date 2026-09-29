@@ -50,6 +50,20 @@ debugging, so the library is expected beside this checkout.
 Each `main.py` only builds a `TrainerNode`/`DetectorNode` from the library and hands it one class of
 ours; everything below is our side of that contract.
 
+**The batch size is measured, not configured.** `batch_size_calculation.calc` builds the model
+`train_det.py` would build and runs a step resembling its own — EMA copy, three-group SGD, mixed
+precision on the same `check_amp` verdict, the real `ComputeLoss`, backward, clipping, optimizer
+step. It runs in a subprocess of its own, `probe_batch_size.py`, started through the `Executor`
+before `train_det.py`: a CUDA context lives as long as its process, so a probe in the node would
+leave one beside the training, which then runs against less memory than the probe measured. The
+node reads the result back from `batch_size.json` in the training folder. The step is all this repository
+supplies: the library's `measure_batch_size` reads `max_batch_size` as the upper bound, measures
+against it and returns what fits. Two of the bounds it gets are ours: `MIN_BATCH_SIZE`, because
+`train_det.py` validates at `batch_size // 2`, and the `sample_count` counted off the `train/`
+folder, which keeps an epoch enough optimizer steps to mean something. `--vram-limit-gb` narrows
+the card the probe measures against; because the cap it sets does not survive a spawn, the same
+number is handed to `train_det.py` and `pred_det.py`, which call `limit_cuda_memory` themselves.
+
 **The trainer never trains in-process.** `Yolov5TrainerLogic` (`trainer/app_code/yolov5_trainer.py`)
 implements the library's abstract `TrainerLogic` hooks and shells out through the library's
 `Executor` to `trainer/train_det.py` (and `pred_det.py` for `_detect`). What a hook has to return is
@@ -111,7 +125,11 @@ cd trainer && uv run --no-sync ruff check .
 
 - **Hyperparameters are a cheap way to report a value to the loop.** Anything a trainer writes to
   `training.hyperparameters` lands on the model and shows up in its hyperparameter view — no new
-  plumbing in the loop needed. `batch_size` and `trainer_version` already use this.
+  plumbing in the loop needed. `batch_size` and `trainer_version` already use this. Keep such an
+  output apart from any input: the settled size goes to `batch_size`, never back into the
+  `max_batch_size` bound, because the node saves `training.hyperparameters` with the training and
+  a training resumed after a restart reads them back; it would otherwise take its first run's
+  measurement as its bound. (The loop itself never hands reported values to a later training.)
 - **Keep upstream mergeable.** Changes in `detector/tensorrtx` (and in the vendored yolov5 code)
   must carry a `PATCH (yolov5-node)` comment stating what deviates, so `grep -rn "PATCH (yolov5-node)"`
   lists every deviation. Only `detector/tensorrtx` follows this today; the trainer's copy of yolov5
