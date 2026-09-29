@@ -3,8 +3,9 @@
 # today, so a change here has to be copied to the other two by hand.
 # Shared driver for every node sub-project's docker.sh.
 #
-# Each sub-project has a 5-line docker.sh that sources .env, then its docker.conf, then this
-# file. The conf declares what differs about that sub-project; everything here is what does not.
+# Each sub-project has a 5-line docker.sh that cds into its own directory, sources .env, then
+# its docker.conf, then this file. Everything below runs with the sub-project as $PWD. The conf
+# declares what differs about that sub-project; everything here is what does not.
 #
 # Required in docker.conf:  IMAGE_REPO, CONTAINER_NAME
 # Optional:                 IMAGE_TAG_SUFFIX, TEST_LATEST_TAG, DATA_VOLUME, HOST_PORT,
@@ -57,7 +58,8 @@ fi
 
 # ========================== BUILD CONFIGURATION / IMAGE SELECTION =======================
 # The version pair every image tag is built from: A.B.C-nlvX.Y.Z
-# Host tools may be BSD implementations.
+# NOTE sed, not `grep -oP`: -P is a GNU extension, so on a host whose PATH finds BSD grep
+# first both lookups failed silently and every image was tagged ":-nlv".
 SEMANTIC_VERSION=$(sed -n 's/^version[[:space:]]*=[[:space:]]*"\([0-9.]*\)".*/\1/p' pyproject.toml | head -1)
 NODE_LIB_VERSION=$(sed -n 's/.*learning_loop_node==\([0-9.]*\).*/\1/p' pyproject.toml | head -1)
 : "${SEMANTIC_VERSION:?no version found in pyproject.toml}"
@@ -106,9 +108,9 @@ run_args+=" --name $CONTAINER_NAME"
 
 # Link Learning Loop Node library if requested
 if [ "${LINKLL:-FALSE}" == "TRUE" ]; then
-    SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[1]}" )" &> /dev/null && pwd )"
-    run_args+=" -v $SCRIPT_DIR/../../learning_loop_node/learning_loop_node:${LINKLL_SITE_PACKAGES:?docker.conf must set LINKLL_SITE_PACKAGES}/learning_loop_node"
-    echo "Linked Learning Loop from $SCRIPT_DIR/../../learning_loop_node"
+    # $PWD is the sub-project: docker.sh cd'd into its own directory before sourcing this.
+    run_args+=" -v $PWD/../../learning_loop_node/learning_loop_node:${LINKLL_SITE_PACKAGES:?docker.conf must set LINKLL_SITE_PACKAGES}/learning_loop_node"
+    echo "Linked Learning Loop from $PWD/../../learning_loop_node"
 fi
 
 # ========================== COMMAND EXECUTION =========================================
