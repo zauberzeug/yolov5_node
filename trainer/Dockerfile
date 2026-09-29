@@ -14,14 +14,16 @@ RUN apt update && \
 
 WORKDIR /app
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.12.18 /uv /usr/bin/
 
 # Copy only dependency files first (enables layer caching)
 COPY pyproject.toml uv.lock ./
 
 # Install deps into a project-local venv
 ENV UV_PROJECT_ENVIRONMENT=/uv_venv
-RUN uv sync --frozen --no-dev
+# The uv cache is a BuildKit cache mount on another filesystem
+ENV UV_LINK_MODE=copy
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev
 
 # Copy the app
 COPY . .
