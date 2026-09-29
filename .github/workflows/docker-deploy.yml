@@ -20,16 +20,16 @@ jobs:
             image: zauberzeug/yolov5-trainer
             tag_suffix: ""
             build_args: ""
-          - context: .
-            dockerfile: detector_cpu/Dockerfile
-            image: zauberzeug/yolov5-detector
-            tag_suffix: "-cloud-cpu"
-            build_args: ""
           - context: detector/
             dockerfile: detector/Dockerfile
             image: zauberzeug/yolov5-detector
             tag_suffix: "-cloud"
             build_args: "--build-arg BASE_IMAGE=nvcr.io/nvidia/tensorrt:26.05-py3 --build-arg INSTALL_OPENCV=true"
+          - context: .
+            dockerfile: detector_cpu/Dockerfile
+            image: zauberzeug/yolov5-detector
+            tag_suffix: "-cloud-cpu"
+            build_args: ""
     steps:
       - uses: actions/checkout@v4
       - name: Set up QEMU
