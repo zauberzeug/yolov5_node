@@ -9,6 +9,7 @@ import pytest
 import torch
 
 import train_det
+from app_code.model_files import resume_checkpoint
 from app_code.training_checkpoint import atomic_save, discard_unfinished_epochs, restore_training_state, save_best
 from app_code.yolov5_trainer import Yolov5TrainerLogic
 
@@ -128,6 +129,16 @@ def test_main_resumes_with_original_batch_size_and_without_clear(tmp_path: Path,
     assert resumed.clear is False
     assert resumed.batch_size == 4
     assert resumed.weights == str(checkpoint)
+
+
+def test_resume_prefers_last_checkpoint_over_published_model(tmp_path: Path) -> None:
+    weights = tmp_path / 'result/weights'
+    assert resume_checkpoint(tmp_path) is None
+    (weights / 'published').mkdir(parents=True)
+    (weights / 'published/latest.pt').touch()
+    assert resume_checkpoint(tmp_path) == weights / 'published/latest.pt'
+    (weights / 'last.pt').touch()
+    assert resume_checkpoint(tmp_path) == weights / 'last.pt'
 
 
 def test_node_uses_last_checkpoint_without_batch_probe(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

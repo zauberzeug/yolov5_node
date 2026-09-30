@@ -27,7 +27,7 @@ def save_best(checkpoint: dict[str, Any], folder: Path, confusion_matrices: dict
 
 def discard_unfinished_epochs(folder: Path, last_epoch: int) -> None:
     """Remove the best checkpoints of an epoch whose `last.pt` was never written."""
-    delete_newer_epochs(folder.parents[1], last_epoch)
+    delete_newer_epochs(folder, last_epoch)
     best = folder / 'best.pt'
     if best.exists() and torch.load(best, map_location='cpu', weights_only=False)['epoch'] > last_epoch:
         best.unlink()

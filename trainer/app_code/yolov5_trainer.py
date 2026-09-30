@@ -83,16 +83,13 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         await self._start_training_from_model(f'yolov5{self.training.model_variant}.pt')
 
     def _can_resume(self) -> bool:
-        weights = self.training.training_folder_path / 'result/weights'
-        return (weights / 'last.pt').exists() or (weights / 'published/latest.pt').exists()
+        return model_files.resume_checkpoint(self.training.training_folder_path) is not None
 
     async def _resume(self) -> None:
-        weights = self.training.training_folder_path / 'result/weights'
-        checkpoint = weights / 'last.pt'
-        if not checkpoint.exists():
-            checkpoint = weights / 'published/latest.pt'
+        checkpoint = model_files.resume_checkpoint(self.training.training_folder_path)
+        assert checkpoint is not None
         self._save_additional_hyperparameters()
-        with (weights.parent / 'opt.yaml').open() as handle:
+        with (self.training.training_folder_path / 'result/opt.yaml').open() as handle:
             options = yaml.safe_load(handle)
         self.training.hyperparameters['batch_size'] = options['batch_size']
         self.training.hyperparameters['trainer_version'] = os.environ.get('NODE_VERSION') or 'unknown'
