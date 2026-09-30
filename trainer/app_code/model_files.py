@@ -4,11 +4,16 @@ from pathlib import Path
 
 
 def get_all_weightfiles(training_path: Path) -> list[Path]:
-    path = (training_path / 'result/weights').absolute()
-    if not path.exists():
-        return []
-    weightfiles = [path / f for f in os.listdir(path) if 'epoch' in f and f.endswith('.pt')]
-    return weightfiles
+    return _weightfiles_in(training_path / 'result/weights')
+
+
+def resume_checkpoint(training_path: Path) -> Path | None:
+    """The checkpoint an interrupted training continues from; older trainings only have the published one."""
+    weights = training_path / 'result/weights'
+    for path in (weights / 'last.pt', weights / 'published/latest.pt'):
+        if path.exists():
+            return path
+    return None
 
 
 def epoch_from_weightfile(weightfile: Path) -> int:
@@ -31,8 +36,22 @@ def delete_older_epochs(training_path: Path, weightfile: Path) -> None:
             delete_json_for_weightfile(f)
 
 
+def delete_newer_epochs(weights_folder: Path, epoch: int) -> None:
+    for f in _weightfiles_in(weights_folder):
+        if epoch_from_weightfile(f) > epoch:
+            _try_remove(f)
+            delete_json_for_weightfile(f)
+
+
 def delete_json_for_weightfile(weightfile: Path) -> None:
     _try_remove(weightfile.with_suffix('.json'))
+
+
+def _weightfiles_in(weights_folder: Path) -> list[Path]:
+    path = weights_folder.absolute()
+    if not path.exists():
+        return []
+    return [path / f for f in os.listdir(path) if 'epoch' in f and f.endswith('.pt')]
 
 
 def _try_remove(file: Path) -> None:

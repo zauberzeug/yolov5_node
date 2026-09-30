@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import re
+import shlex
 import shutil
 from dataclasses import asdict
 from pathlib import Path
@@ -82,11 +83,18 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         await self._start_training_from_model(f'yolov5{self.training.model_variant}.pt')
 
     def _can_resume(self) -> bool:
-        path = self.training.training_folder_path / 'result/weights/published/latest.pt'
-        return path.exists()
+        return model_files.resume_checkpoint(self.training.training_folder_path) is not None
 
     async def _resume(self) -> None:
-        await self._start(model=str(self.training.training_folder_path / 'result/weights/published/latest.pt'))
+        checkpoint = model_files.resume_checkpoint(self.training.training_folder_path)
+        assert checkpoint is not None
+        self._save_additional_hyperparameters()
+        with (self.training.training_folder_path / 'result/opt.yaml').open() as handle:
+            options = yaml.safe_load(handle)
+        self.training.hyperparameters['batch_size'] = options['batch_size']
+        self.training.hyperparameters['trainer_version'] = os.environ.get('NODE_VERSION') or 'unknown'
+        await self.executor.start(f'python /app/train_det.py --resume {shlex.quote(str(checkpoint))}',
+                                  env={'WANDB_MODE': 'disabled'})
 
     def _get_new_best_training_state(self) -> TrainingStateData | None:
         weightfile = model_files.get_new(self.training.training_folder_path)
