@@ -33,18 +33,46 @@ def discard_unfinished_epochs(folder: Path, last_epoch: int) -> None:
         best.unlink()
 
 
-def restore_training_state(checkpoint: dict[str, Any], scheduler: Any, scaler: Any, stopper: Any) -> None:
-    if 'scheduler' in checkpoint:
-        scheduler.load_state_dict(checkpoint['scheduler'])
-    if 'scaler' in checkpoint:
-        scaler.load_state_dict(checkpoint['scaler'])
-    if 'early_stopping' in checkpoint:
-        stopper.best_epoch = checkpoint['early_stopping']['best_epoch']
-        stopper.best_fitness = checkpoint['early_stopping']['best_fitness']
-        stopper.possible_stop = checkpoint['early_stopping']['possible_stop']
+def resume_fields(scheduler: Any, scaler: Any, stopper: Any, last_opt_step: int, stopped_early: bool) -> dict[str, Any]:
+    """The runtime state `last.pt` needs beyond upstream's checkpoint to continue at the next epoch."""
+    return {
+        'scheduler': scheduler.state_dict(),
+        'scaler': scaler.state_dict(),
+        'early_stopping': {'best_epoch': stopper.best_epoch, 'best_fitness': stopper.best_fitness,
+                           'possible_stop': stopper.possible_stop},
+        'last_opt_step': last_opt_step,
+        'stopped_early': stopped_early,
+    }
+
+
+def finished(checkpoint: dict[str, Any], epochs: int) -> bool:
+    return bool(checkpoint.get('stopped_early')) or checkpoint['epoch'] + 1 >= epochs
+
+
+def resume_state(checkpoint: dict[str, Any]) -> dict[str, Any]:
+    """The part of the checkpoint `restore_training_state` needs once the checkpoint itself is released."""
+    keys = ('epoch', 'best_fitness', 'scheduler', 'scaler', 'early_stopping', 'last_opt_step')
+    return {key: checkpoint[key] for key in keys if key in checkpoint}
+
+
+def restore_training_state(state: dict[str, Any], scheduler: Any, scaler: Any, stopper: Any,
+                           default_last_opt_step: int) -> int:
+    """Restore what `resume_fields` saved and return the last optimizer step.
+
+    Checkpoints of older trainer versions lack these fields; their early stopping then starts at the saved epoch.
+    """
+    if 'scheduler' in state:
+        scheduler.load_state_dict(state['scheduler'])
+    if 'scaler' in state:
+        scaler.load_state_dict(state['scaler'])
+    if 'early_stopping' in state:
+        stopper.best_epoch = state['early_stopping']['best_epoch']
+        stopper.best_fitness = state['early_stopping']['best_fitness']
+        stopper.possible_stop = state['early_stopping']['possible_stop']
     else:
-        stopper.best_epoch = checkpoint['epoch']
-        stopper.best_fitness = checkpoint['best_fitness']
+        stopper.best_epoch = state['epoch']
+        stopper.best_fitness = state['best_fitness']
+    return state.get('last_opt_step', default_last_opt_step)
 
 
 def atomic_save(checkpoint: dict[str, Any], path: Path) -> None:

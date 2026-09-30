@@ -35,7 +35,15 @@ from PIL import Image, ImageDraw, ImageFont
 from torch.optim import lr_scheduler
 from tqdm import tqdm
 
-from app_code.training_checkpoint import atomic_save, discard_unfinished_epochs, restore_training_state, save_best
+from app_code.training_checkpoint import (
+    atomic_save,
+    discard_unfinished_epochs,
+    finished,
+    restore_training_state,
+    resume_fields,
+    resume_state,
+    save_best,
+)
 from app_code.yolov5 import val as validate  # for end-of-epoch mAP
 from app_code.yolov5.models.experimental import attempt_load
 from app_code.yolov5.models.yolo import Model
@@ -242,7 +250,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         # PATCH (yolov5-node): resume after the last completed epoch, or only publish when none is left.
         if resume:
             discard_unfinished_epochs(w, ckpt['epoch'])
-        if resume and (ckpt.get('stopped_early') or ckpt['epoch'] + 1 >= epochs):
+        if resume and finished(ckpt, epochs):
             LOGGER.info('Training checkpoint already completed; continuing with model publication.')
             return (0.0,) * 7
         model = Model(cfg or ckpt['model'].yaml, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
@@ -298,8 +306,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         start_epoch = ckpt['epoch'] + 1
         if resume:
             best_fitness, start_epoch, epochs = smart_resume(ckpt, optimizer, ema, weights, epochs, resume)
-            resume_state = {k: ckpt[k] for k in ('epoch', 'best_fitness', 'scheduler', 'scaler', 'early_stopping',
-                                                  'last_opt_step') if k in ckpt}
+            state = resume_state(ckpt)  # PATCH (yolov5-node): what the restore below needs after `del ckpt`
         del ckpt, csd
 
     # Trainloader
@@ -370,8 +377,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     stopper, stop = EarlyStopping(patience=opt.patience), False
     # PATCH (yolov5-node): retain the schedule, AMP scale and early-stopping history across restarts.
     if resume:
-        restore_training_state(resume_state, scheduler, scaler, stopper)
-        last_opt_step = resume_state.get('last_opt_step', start_epoch * nb - 1)
+        last_opt_step = restore_training_state(state, scheduler, scaler, stopper, start_epoch * nb - 1)
     compute_loss = ComputeLoss(model)  # init loss class
     callbacks.run('on_train_start')
     LOGGER.info(f'Image sizes {imgsz} train, {imgsz} val\n'
@@ -494,13 +500,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 'ema': deepcopy(ema.ema).half(),
                 'updates': ema.updates,
                 'optimizer': optimizer.state_dict(),
-                # PATCH (yolov5-node): runtime state needed to resume at an epoch boundary.
-                'scheduler': scheduler.state_dict(),
-                'last_opt_step': last_opt_step,
-                'scaler': scaler.state_dict(),
-                'early_stopping': {'best_epoch': stopper.best_epoch, 'best_fitness': stopper.best_fitness,
-                                   'possible_stop': stopper.possible_stop},
-                'stopped_early': stop,
+                **resume_fields(scheduler, scaler, stopper, last_opt_step, stop),  # PATCH (yolov5-node): runtime state for resume
                 'opt': vars(opt),
                 'git': 'remote',
                 'date': datetime.now().isoformat()}

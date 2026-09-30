@@ -10,7 +10,15 @@ import torch
 
 import train_det
 from app_code.model_files import resume_checkpoint
-from app_code.training_checkpoint import atomic_save, discard_unfinished_epochs, restore_training_state, save_best
+from app_code.training_checkpoint import (
+    atomic_save,
+    discard_unfinished_epochs,
+    finished,
+    restore_training_state,
+    resume_fields,
+    resume_state,
+    save_best,
+)
 from app_code.yolov5_trainer import Yolov5TrainerLogic
 
 
@@ -76,10 +84,8 @@ def test_resume_restores_optimizer_ema_schedule_scaler_and_patience(tmp_path: Pa
         step(model, optimizer, scheduler, scaler, ema)
         stopper(epoch, score)
     checkpoint = {'epoch': 2, 'best_fitness': 0.8, 'model': deepcopy(model), 'ema': deepcopy(ema.ema),
-                  'updates': ema.updates, 'optimizer': optimizer.state_dict(), 'scheduler': scheduler.state_dict(),
-                  'scaler': scaler.state_dict(),
-                  'early_stopping': {'best_epoch': stopper.best_epoch, 'best_fitness': stopper.best_fitness,
-                                     'possible_stop': stopper.possible_stop}}
+                  'updates': ema.updates, 'optimizer': optimizer.state_dict(),
+                  **resume_fields(scheduler, scaler, stopper, last_opt_step=11, stopped_early=False)}
     atomic_save(checkpoint, tmp_path / 'last.pt')
     saved = torch.load(tmp_path / 'last.pt', weights_only=False)
     resumed = deepcopy(saved['model'])
@@ -89,9 +95,10 @@ def test_resume_restores_optimizer_ema_schedule_scaler_and_patience(tmp_path: Pa
     new_ema = train_det.ModelEMA(resumed)
     new_stopper = train_det.EarlyStopping(patience=3)
     best, start, epochs = train_det.smart_resume(saved, new_optimizer, new_ema, epochs=10)
-    restore_training_state(saved, new_scheduler, new_scaler, new_stopper)
+    last_opt_step = restore_training_state(resume_state(saved), new_scheduler, new_scaler, new_stopper, -1)
 
     assert (best, start, epochs) == (0.8, 3, 10)
+    assert last_opt_step == 11
     assert new_stopper(3, 0.5)
     assert new_scaler.state_dict() == scaler.state_dict()
     assert new_scheduler.state_dict() == scheduler.state_dict()
@@ -160,6 +167,19 @@ def test_node_uses_last_checkpoint_without_batch_probe(tmp_path: Path, monkeypat
     assert logic.executor.start.call_args.args[0] == f'python /app/train_det.py --resume {weights / "last.pt"}'
     assert logic.training.hyperparameters['batch_size'] == 4
     probe.assert_not_called()
+
+
+def test_finished_after_early_stop_or_last_epoch() -> None:
+    assert not finished({'epoch': 3, 'stopped_early': False}, epochs=10)
+    assert finished({'epoch': 3, 'stopped_early': True}, epochs=10)
+    assert finished({'epoch': 9}, epochs=10)
+
+
+def test_legacy_checkpoint_restores_patience_from_its_epoch() -> None:
+    stopper = SimpleNamespace(best_epoch=0, best_fitness=0.0, possible_stop=False)
+    last_opt_step = restore_training_state(resume_state({'epoch': 7, 'best_fitness': 0.6, 'model': object()}),
+                                           MagicMock(), MagicMock(), stopper, 42)
+    assert (stopper.best_epoch, stopper.best_fitness, last_opt_step) == (7, 0.6, 42)
 
 
 def test_completed_checkpoint_does_not_start_another_epoch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
