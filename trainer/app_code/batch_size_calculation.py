@@ -21,7 +21,7 @@ from typing import cast
 
 import torch
 import yaml
-from learning_loop_node.trainer.cuda import free_cuda_memory, limit_cuda_memory, measure_batch_size
+from learning_loop_node.trainer.cuda import ProbeStep, free_cuda_memory, limit_cuda_memory, measure_batch_size
 
 from .yolov5.models.yolo import Model
 from .yolov5.utils.downloads import attempt_download
@@ -56,7 +56,8 @@ def calc(training_path: str, model_file: str, *, img_size: int,
     :param max_batch_size: The bound the training asked for; 0 lets the card decide. The caller
         reports the size this returns as `batch_size`.
     :param vram_limit_gb: Gigabytes of the card this training may use; 0 means the whole card.
-        `train_det.py` is given the same number, because the cap set here does not survive a spawn.
+        The cap set here is also the budget the probe measures against. `train_det.py` is given
+        the same number, because the cap does not survive a spawn.
     :raises InsufficientMemoryError: If not even :data:`MIN_BATCH_SIZE` fits.
     """
     sample_count = _train_sample_count(training_path)
@@ -68,51 +69,45 @@ def calc(training_path: str, model_file: str, *, img_size: int,
         dataset = yaml.safe_load(f)
 
     attempt_download(model_file)  # Download pretrained yolov5 model from ultralytics to .pt
+    try:
+        ckpt = torch.load(model_file, map_location='cpu', weights_only=False)
+    except FileNotFoundError:
+        ckpt = torch.load(f'{training_path}/{model_file}', map_location='cpu', weights_only=False)
+    img_size = _training_img_size(ckpt['model'], img_size)
 
     torch.cuda.init()
     limit_cuda_memory(vram_limit_gb)
     free_cuda_memory()
 
-    step = TrainingStep(model_file, training_path, hyp, dataset.get('nc'), img_size)
-    try:
-        batch_size = measure_batch_size(step, batch_size=max_batch_size,
-                                        sample_count=sample_count, probe=PROBE,
-                                        minimum=MIN_BATCH_SIZE, vram_limit_gb=vram_limit_gb,
-                                        on_out_of_memory=step.zero_gradients)
-    finally:
-        step.release()
-
-    logger.info('%s: training at %d px with batch size %d', PROBE, step.img_size, batch_size)
+    batch_size = measure_batch_size(lambda: TrainingStep(ckpt, hyp, dataset.get('nc'), img_size),
+                                    max_batch_size=max_batch_size, sample_count=sample_count,
+                                    probe=PROBE, minimum=MIN_BATCH_SIZE)
+    logger.info('%s: training at %d px with batch size %d', PROBE, img_size, batch_size)
     return batch_size
 
 
-class TrainingStep:
+class TrainingStep(ProbeStep):
     """One training step, as close to what :mod:`train_det` runs as a synthetic batch gets.
 
-    Built once and called at several batch sizes: model, EMA copy and optimizer state are resident
-    before the first batch, and only the activations scale with it.
+    Built once by `measure_batch_size` and run at several batch sizes: model, EMA copy and
+    optimizer state are resident before the first batch, and only the activations scale with it.
+
+    :param img_size: Already rounded, see :func:`_training_img_size`.
     """
 
-    def __init__(self, model_file: str, training_path: str, hyp: dict, categories: int, img_size: int) -> None:
+    def __init__(self, ckpt: dict, hyp: dict, categories: int, img_size: int) -> None:
         self.categories = categories
+        self.img_size = img_size
         self.device = torch.device('cuda', 0)
 
-        try:
-            ckpt = torch.load(model_file, map_location='cpu', weights_only=False)
-        except FileNotFoundError:
-            ckpt = torch.load(f'{training_path}/{model_file}', map_location='cpu', weights_only=False)
         self.model = Model(ckpt['model'].yaml, ch=3, nc=categories, anchors=hyp.get('anchors')).to(self.device)
         # NOTE: the checkpoint's weights, as `train_det.py` transfers them; `check_amp` compares
         # detections, and a randomly initialised model detects nothing either way
         exclude = ['anchor'] if hyp.get('anchors') else []
         weights = intersect_dicts(ckpt['model'].float().state_dict(), self.model.state_dict(), exclude=exclude)
         self.model.load_state_dict(weights, strict=False)
-        del ckpt, weights
+        del weights
         self.amp = _amp_enabled(self.model)  # before the EMA and optimizer: `check_amp` copies the model
-
-        gs = max(int(self.model.stride.max()), 32)  # type: ignore[union-attr]  # grid size (max stride)
-        # as `train_det.py` rounds `--img`, so 600 is 608; an int in, an int out
-        self.img_size = cast(int, check_img_size(img_size, gs, floor=gs * 2))
 
         hyp = dict(hyp)
         nl = self.model.model[-1].nl  # detection layers
@@ -132,7 +127,7 @@ class TrainingStep:
         self.scaler = torch.amp.GradScaler('cuda', enabled=self.amp)
         self.compute_loss = ComputeLoss(self.model)
 
-    def __call__(self, batch_size: int) -> str:
+    def run(self, batch_size: int) -> str:
         images = torch.rand(batch_size, 3, self.img_size, self.img_size, device=self.device)
         targets = self._targets(batch_size)
 
@@ -152,10 +147,12 @@ class TrainingStep:
         """Clear the gradients but keep their memory, so every trial starts from the same state.
 
         `train_det.py` accumulates over ``round(64 / batch_size)`` steps, so from its second step
-        on every forward runs with the gradients resident. Also the handler for a trial that ran
-        out of memory.
+        on every forward runs with the gradients resident.
         """
         self.optimizer.zero_grad(set_to_none=False)
+
+    def on_out_of_memory(self) -> None:
+        self.zero_gradients()
 
     def release(self) -> None:
         del self.compute_loss, self.scaler, self.optimizer, self.ema, self.model
@@ -170,6 +167,12 @@ class TrainingStep:
         targets[:, 2:4] = torch.rand(count, 2, device=self.device) * 0.6 + 0.2  # centres, away from the border
         targets[:, 4:6] = torch.rand(count, 2, device=self.device) * 0.2 + 0.05
         return targets
+
+
+def _training_img_size(model: Model, img_size: int) -> int:
+    """The resolution as `train_det.py` rounds `--img` to the model's stride, so 600 is 608."""
+    gs = max(int(model.stride.max()), 32)  # type: ignore[union-attr]  # grid size (max stride)
+    return cast(int, check_img_size(img_size, gs, floor=gs * 2))  # an int in, an int out
 
 
 def _train_sample_count(training_path: str) -> int:

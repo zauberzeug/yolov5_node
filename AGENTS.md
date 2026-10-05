@@ -57,12 +57,14 @@ step. It runs in a subprocess of its own, `probe_batch_size.py`, started through
 before `train_det.py`: a CUDA context lives as long as its process, so a probe in the node would
 leave one beside the training, which then runs against less memory than the probe measured. The
 node reads the result back from `batch_size.json` in the training folder. The step is all this repository
-supplies: the library's `measure_batch_size` reads `max_batch_size` as the upper bound, measures
-against it and returns what fits. Two of the bounds it gets are ours: `MIN_BATCH_SIZE`, because
-`train_det.py` validates at `batch_size // 2`, and the `sample_count` counted off the `train/`
-folder, which keeps an epoch enough optimizer steps to mean something. `--vram-limit-gb` narrows
-the card the probe measures against; because the cap it sets does not survive a spawn, the same
-number is handed to `train_det.py` and `pred_det.py`, which call `limit_cuda_memory` themselves.
+supplies, as a `ProbeStep` the library's `measure_batch_size` builds through a factory and releases
+itself, so `calc` never holds a reference to it. `measure_batch_size` reads `max_batch_size` as the
+upper bound, measures against it and returns what fits. Two of the bounds it gets are ours:
+`MIN_BATCH_SIZE`, because `train_det.py` validates at `batch_size // 2`, and the `sample_count`
+counted off the `train/` folder, which keeps an epoch enough optimizer steps to mean something.
+`--vram-limit-gb` narrows the card the probe measures against, through the `limit_cuda_memory`
+call `calc` makes before probing; because the cap does not survive a spawn, the same number is
+handed to `train_det.py` and `pred_det.py`, which call `limit_cuda_memory` themselves.
 
 **The trainer never trains in-process.** `Yolov5TrainerLogic` (`trainer/app_code/yolov5_trainer.py`)
 implements the library's abstract `TrainerLogic` hooks and shells out through the library's
