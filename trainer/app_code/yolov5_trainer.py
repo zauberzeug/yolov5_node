@@ -194,7 +194,11 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         await self._start(model, additional_params)
 
     async def _start(self, model: str, additional_parameters: str = ''):
-        resolution = self.training.hyperparameters['resolution']
+        resolution = self.training.hyperparameters.get('resolution')
+        stride = 64 if self.training.model_variant.endswith('6') else 32
+        if not isinstance(resolution, int) or isinstance(resolution, bool) \
+                or resolution < 2 * stride or resolution % stride:
+            raise CriticalError(f'invalid resolution {resolution!r}: must be a multiple of {stride} and at least {2 * stride}')
 
         self._save_additional_hyperparameters()
 

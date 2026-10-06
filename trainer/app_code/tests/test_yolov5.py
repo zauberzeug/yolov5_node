@@ -14,6 +14,7 @@ from learning_loop_node.enums import TrainerState
 from learning_loop_node.helpers.misc import create_image_folder
 from learning_loop_node.loop_communication import LoopCommunicator
 from learning_loop_node.trainer.downloader import TrainingsDownloader
+from learning_loop_node.trainer.exceptions import CriticalError
 from learning_loop_node.trainer.executor import Executor
 from ruamel.yaml import YAML
 
@@ -130,6 +131,19 @@ class TestWithDetection:
 
         assert '0 0.500000 0.600000 0.200000 0.200000' in lines[0]
         assert '1 0.600000 0.700000 0.300000 0.300000' in lines[1]
+
+    @pytest.mark.parametrize('model_variant, resolution',
+                             [('s', 600), ('s', 32), ('s', '640'), ('s', True), ('s', None), ('s6', 672)])
+    async def test_invalid_resolution_is_rejected(self, model_variant: str, resolution):
+        trainer = Yolov5TrainerLogic()
+        trainer._training = Training(
+            id='someid', context=Context(organization='o', project='p'),
+            project_folder='./', images_folder='./', training_folder='./', image_data=[],
+            categories=[], hyperparameters={'resolution': resolution}, model_variant=model_variant,
+            training_number=1, training_state=TrainerState.Initialized.value)
+
+        with pytest.raises(CriticalError, match='invalid resolution'):
+            await trainer._start('model.pt')
 
     @pytest.mark.usefixtures('use_training_dir')
     async def test_new_model_discovery(self):
