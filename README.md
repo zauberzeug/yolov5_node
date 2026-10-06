@@ -32,7 +32,8 @@ The trainer reports two more hyperparameters back to the Learning Loop. They are
 
 Trainer Docker-Images are published on https://hub.docker.com/r/zauberzeug/yolov5-trainer
 
-New images can be pulled with `docker pull zauberzeug/yolov5-trainer:A.B.C-nlvX.Y.Z`, where `A.B.C` is the version of the trainer node and `X.Y.Z` is the version of the learning loop node library.
+Released images can be pulled with `docker pull zauberzeug/yolov5-trainer:A.B.C`, where `A.B.C` is the version of the release.
+`zauberzeug/yolov5-trainer:latest` always points to the newest release; pre-releases do not move it.
 
 During development, i.e. when building the container from code it is recommended to use the script `docker.sh` in the folder `trainer` to build/start/interact with the image.
 It is a thin wrapper: what differs about the sub-project is in `docker.conf` next to it, and the rest is `scripts/node-docker.sh`, a copy of which each node repository holds.
@@ -84,15 +85,15 @@ Local builds can be run with `./docker.sh run` (or `./docker.sh r`).
 
 ### Cloud-Detector (For Linux computers with Nvidia GPU)
 
-Images can be pulled with `docker pull zauberzeug/yolov5-detector:A.B.C-nlvX.Y.Z-cloud`, where `A.B.C` is the version of the detector node and `X.Y.Z` is the version of the learning loop node library.
+Images can be pulled with `docker pull zauberzeug/yolov5-detector:A.B.C-cloud`, where `A.B.C` is the version of the release; `latest-cloud` points to the newest release.
 
 ### Cloud-CPU-Detector (For Linux computers without Nvidia GPU)
 
-Images can be pulled with `docker pull zauberzeug/yolov5-detector:A.B.C-nlvX.Y.Z-cloud-cpu`, where `A.B.C` is the version of the detector node and `X.Y.Z` is the version of the learning loop node library.
+Images can be pulled with `docker pull zauberzeug/yolov5-detector:A.B.C-cloud-cpu`, where `A.B.C` is the version of the release; `latest-cloud-cpu` points to the newest release.
 
 ### L4T-Detector
 
-Images can be pulled with `docker pull zauberzeug/yolov5-detector:A.B.C-nlvX.Y.Z-L.4.T`, where `A.B.C` is the version of the detector node, `X.Y.Z` is the version of the node-lib used and `L.4.T` is the L4T version.
+Images can be pulled with `docker pull zauberzeug/yolov5-detector:A.B.C-jetson`, where `A.B.C` is the version of the release; `latest-jetson` points to the newest release.
 
 ## Get Detections
 
