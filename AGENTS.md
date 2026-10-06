@@ -53,8 +53,10 @@ ours; everything below is our side of that contract.
 **The batch size is measured, not configured.** `batch_size_calculation.calc` builds the model
 `train_det.py` would build and runs a step resembling its own — EMA copy, three-group SGD, mixed
 precision on the same `check_amp` verdict, the real `ComputeLoss`, backward, clipping, optimizer
-step. It runs in a subprocess of its own, `probe_batch_size.py`, started through the `Executor`
-before `train_det.py`: a CUDA context lives as long as its process, so a probe in the node would
+step — and, as `val_step`, the validation `train_det.py` runs between epochs: the EMA copy at
+`batch_size // 2`, on the padded shape of the rectangular validation loader. It runs in a
+subprocess of its own, `probe_batch_size.py`, started through the `Executor` before
+`train_det.py`: a CUDA context lives as long as its process, so a probe in the node would
 leave one beside the training, which then runs against less memory than the probe measured. The
 node reads the result back from `batch_size.json` in the training folder. The step is all this repository
 supplies, as a `ProbeStep` the library's `measure_batch_size` builds through a factory and releases

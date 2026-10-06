@@ -10,10 +10,12 @@ training. ``train_det.py`` would then run beside two contexts where the probe me
 and the difference comes out of the safety margin. It would also block the node's event loop for
 as long as the probe runs.
 
-Validation is not measured: ``train_det.py`` validates at ``batch_size // 2``, in half precision
-and without gradients, so the training step is the peak.
+Validation is measured as well, as ``train_det.py`` runs it between epochs: the EMA copy at
+``batch_size // 2``, on the padded rectangular shape of the validation loader, in half precision
+under AMP, with the loss and NMS of ``val.run``.
 """
 import logging
+import math
 import os
 import sys
 from pathlib import Path
@@ -25,9 +27,9 @@ from learning_loop_node.trainer.cuda import ProbeStep, free_cuda_memory, limit_c
 
 from .yolov5.models.yolo import Model
 from .yolov5.utils.downloads import attempt_download
-from .yolov5.utils.general import check_amp, check_img_size, intersect_dicts
+from .yolov5.utils.general import check_amp, check_img_size, intersect_dicts, non_max_suppression
 from .yolov5.utils.loss import ComputeLoss
-from .yolov5.utils.torch_utils import ModelEMA, smart_optimizer
+from .yolov5.utils.torch_utils import ModelEMA, smart_inference_mode, smart_optimizer
 
 YOLOV5_ROOT = Path(__file__).resolve().parent / 'yolov5'
 """What `train_det.py` puts on `sys.path`, because yolov5 imports its own packages by bare name."""
@@ -41,6 +43,9 @@ MIN_BATCH_SIZE = 2
 
 TARGETS_PER_IMAGE = 8
 """Boxes per synthetic image; the loss allocates per target, so this is not free."""
+
+VAL_PAD = 0.5
+"""The padding, in strides, `train_det.py` gives the validation loader's rectangular batches."""
 
 
 def calc(training_path: str, model_file: str, *, img_size: int,
@@ -87,7 +92,7 @@ def calc(training_path: str, model_file: str, *, img_size: int,
 
 
 class TrainingStep(ProbeStep):
-    """One training step, as close to what :mod:`train_det` runs as a synthetic batch gets.
+    """One training cycle, as close to what :mod:`train_det` runs as a synthetic batch gets.
 
     Built once by `measure_batch_size` and run at several batch sizes: model, EMA copy and
     optimizer state are resident before the first batch, and only the activations scale with it.
@@ -101,6 +106,8 @@ class TrainingStep(ProbeStep):
         self.device = torch.device('cuda', 0)
 
         self.model = Model(ckpt['model'].yaml, ch=3, nc=categories, anchors=hyp.get('anchors')).to(self.device)
+        gs = max(int(self.model.stride.max()), 32)  # type: ignore[union-attr]  # grid size (max stride)
+        self.val_img_size = math.ceil(img_size / gs + VAL_PAD) * gs
         # NOTE: the checkpoint's weights, as `train_det.py` transfers them; `check_amp` compares
         # detections, and a randomly initialised model detects nothing either way
         exclude = ['anchor'] if hyp.get('anchors') else []
@@ -127,7 +134,7 @@ class TrainingStep(ProbeStep):
         self.scaler = torch.amp.GradScaler('cuda', enabled=self.amp)
         self.compute_loss = ComputeLoss(self.model)
 
-    def run(self, batch_size: int) -> str:
+    def train_step(self, batch_size: int) -> str:
         images = torch.rand(batch_size, 3, self.img_size, self.img_size, device=self.device)
         targets = self._targets(batch_size)
 
@@ -142,6 +149,20 @@ class TrainingStep(ProbeStep):
         self.zero_gradients()
         self.ema.update(self.model)
         return f'{self.img_size} px, {"mixed precision" if self.amp else "float32"}'
+
+    @smart_inference_mode()
+    def val_step(self, batch_size: int) -> str:
+        """One validation batch: square images, the largest shape the rectangular loader pads to."""
+        val_batch_size = max(batch_size // 2, 1)
+        model = self.ema.ema
+        if self.amp:
+            model.half()
+        images = torch.rand(val_batch_size, 3, self.val_img_size, self.val_img_size, device=self.device)
+        preds, train_out = model(images.half() if self.amp else images)
+        self.compute_loss(train_out, self._targets(val_batch_size))
+        non_max_suppression(preds, conf_thres=0.001, iou_thres=0.6, multi_label=True)
+        model.float()
+        return f'validation at {val_batch_size}, {self.val_img_size} px'
 
     def zero_gradients(self) -> None:
         """Clear the gradients but keep their memory, so every trial starts from the same state.
