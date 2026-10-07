@@ -33,7 +33,7 @@ The trainer reports two more hyperparameters back to the Learning Loop. They are
 Trainer Docker-Images are published on https://hub.docker.com/r/zauberzeug/yolov5-trainer
 
 Released images can be pulled with `docker pull zauberzeug/yolov5-trainer:A.B.C`, where `A.B.C` is the version of the release.
-`zauberzeug/yolov5-trainer:latest` always points to the newest release; pre-releases do not move it.
+`zauberzeug/yolov5-trainer:latest` always points to the release marked as "Latest" on GitHub, also when a release is marked as latest only later (for example a promoted pre-release).
 
 During development, i.e. when building the container from code it is recommended to use the script `docker.sh` in the folder `trainer` to build/start/interact with the image.
 It is a thin wrapper: what differs about the sub-project is in `docker.conf` next to it, and the rest is `scripts/node-docker.sh`, a copy of which each node repository holds.
