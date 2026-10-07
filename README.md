@@ -13,6 +13,7 @@ Trainer is tested with Nvidia Driver Version: 580.95.05 and CUDA Version: 13.0. 
 We support all native hyperparameters of YOLOv5 (cf. `hyp_det.yaml` for reference).
 In addition, we support the following hyperparameters:
 
+- `resolution`: The input size of the model. It must be a multiple of the model's largest stride (32, or 64 for the P6 `*6` variants) and at least twice that; otherwise the training fails without being started.
 - `epochs`: The number of epochs to train the model.
 - `detect_nms_conf_thres`: The confidence threshold for the NMS during inference and validation (not relevant for training).
 - `detect_nms_iou_thres`: The IoU threshold for the NMS during inference and validation (not used for training).
