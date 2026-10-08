@@ -16,23 +16,19 @@ under AMP, with the loss and NMS of ``val.run``.
 """
 import logging
 import math
-import os
-import sys
 from pathlib import Path
 from typing import cast
 
 import torch
 import yaml
+from learning_loop_node.trainer.batch_size import MIN_TRAIN_STEPS_PER_EPOCH
 from learning_loop_node.trainer.cuda import ProbeStep, free_cuda_memory, limit_cuda_memory, measure_batch_size
 
 from .yolov5.models.yolo import Model
 from .yolov5.utils.downloads import attempt_download
-from .yolov5.utils.general import check_amp, check_img_size, intersect_dicts, non_max_suppression
+from .yolov5.utils.general import check_amp, check_img_size, init_seeds, intersect_dicts, non_max_suppression
 from .yolov5.utils.loss import ComputeLoss
 from .yolov5.utils.torch_utils import ModelEMA, smart_inference_mode, smart_optimizer
-
-YOLOV5_ROOT = Path(__file__).resolve().parent / 'yolov5'
-"""What `train_det.py` puts on `sys.path`, because yolov5 imports its own packages by bare name."""
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +37,11 @@ PROBE = 'batch-size probe'
 MIN_BATCH_SIZE = 2
 """Smallest batch a training may use, because validation halves it."""
 
-TARGETS_PER_IMAGE = 8
-"""Boxes per synthetic image; the loss allocates per target, so this is not free."""
+DEFAULT_MAX_BATCH_SIZE = 128
+"""Upper bound for a training that sets no `max_batch_size`."""
+
+NOMINAL_BATCH_SIZE = 64
+"""The batch `train_det.py` accumulates gradients up to, so a smaller one adds no optimizer steps."""
 
 VAL_PAD = 0.5
 """The padding, in strides, `train_det.py` gives the validation loader's rectangular batches."""
@@ -58,7 +57,7 @@ def calc(training_path: str, model_file: str, *, img_size: int,
     :param training_path: The training folder, holding the `dataset.yaml` and `hyp.yaml` that
         `train_det.py` reads.
     :param img_size: The `resolution` hyperparameter, rounded here as `train_det.py` rounds it.
-    :param max_batch_size: The bound the training asked for; 0 lets the card decide. The caller
+    :param max_batch_size: The bound the training asked for; 0 means :data:`DEFAULT_MAX_BATCH_SIZE`. The caller
         reports the size this returns as `batch_size`.
     :param vram_limit_gb: Gigabytes of the card this training may use; 0 means the whole card.
         The cap set here is also the budget the probe measures against. `train_det.py` is given
@@ -66,7 +65,7 @@ def calc(training_path: str, model_file: str, *, img_size: int,
     :raises InsufficientMemoryError: If not even :data:`MIN_BATCH_SIZE` fits.
     """
     sample_count = _train_sample_count(training_path)
-    os.chdir('/tmp')  # NOTE: attempt_download writes the weights into the working directory
+    targets_per_image = _targets_per_sample(training_path)
 
     with open(f'{training_path}/hyp.yaml') as f:
         hyp = yaml.safe_load(f)
@@ -74,18 +73,17 @@ def calc(training_path: str, model_file: str, *, img_size: int,
         dataset = yaml.safe_load(f)
 
     attempt_download(model_file)  # Download pretrained yolov5 model from ultralytics to .pt
-    try:
-        ckpt = torch.load(model_file, map_location='cpu', weights_only=False)
-    except FileNotFoundError:
-        ckpt = torch.load(f'{training_path}/{model_file}', map_location='cpu', weights_only=False)
+    ckpt = torch.load(model_file, map_location='cpu', weights_only=False)
     img_size = _training_img_size(ckpt['model'], img_size)
 
+    init_seeds(1, deterministic=True)  # NOTE: as train_det.py seeds itself by default, so both use the same kernels
     torch.cuda.init()
     limit_cuda_memory(vram_limit_gb)
     free_cuda_memory()
 
-    batch_size = measure_batch_size(lambda: TrainingStep(ckpt, hyp, dataset.get('nc'), img_size),
-                                    max_batch_size=max_batch_size, sample_count=sample_count,
+    batch_size = measure_batch_size(lambda: TrainingStep(ckpt, hyp, dataset.get('nc'), img_size, targets_per_image),
+                                    max_batch_size=max_batch_size or DEFAULT_MAX_BATCH_SIZE,
+                                    sample_count=max(sample_count, NOMINAL_BATCH_SIZE * MIN_TRAIN_STEPS_PER_EPOCH),
                                     probe=PROBE, minimum=MIN_BATCH_SIZE)
     logger.info('%s: training at %d px with batch size %d', PROBE, img_size, batch_size)
     return batch_size
@@ -98,11 +96,13 @@ class TrainingStep(ProbeStep):
     optimizer state are resident before the first batch, and only the activations scale with it.
 
     :param img_size: Already rounded, see :func:`_training_img_size`.
+    :param targets_per_image: Boxes per synthetic image, see :func:`_targets_per_sample`.
     """
 
-    def __init__(self, ckpt: dict, hyp: dict, categories: int, img_size: int) -> None:
+    def __init__(self, ckpt: dict, hyp: dict, categories: int, img_size: int, targets_per_image: int) -> None:
         self.categories = categories
         self.img_size = img_size
+        self.targets_per_image = targets_per_image
         self.device = torch.device('cuda', 0)
 
         self.model = Model(ckpt['model'].yaml, ch=3, nc=categories, anchors=hyp.get('anchors')).to(self.device)
@@ -114,7 +114,7 @@ class TrainingStep(ProbeStep):
         weights = intersect_dicts(ckpt['model'].float().state_dict(), self.model.state_dict(), exclude=exclude)
         self.model.load_state_dict(weights, strict=False)
         del weights
-        self.amp = _amp_enabled(self.model)  # before the EMA and optimizer: `check_amp` copies the model
+        self.amp = check_amp(self.model)  # before the EMA and optimizer: `check_amp` copies the model
 
         hyp = dict(hyp)
         nl = self.model.model[-1].nl  # detection layers
@@ -148,7 +148,7 @@ class TrainingStep(ProbeStep):
         self.scaler.update()
         self.zero_gradients()
         self.ema.update(self.model)
-        return f'{self.img_size} px, {"mixed precision" if self.amp else "float32"}'
+        return f'{self.img_size} px, {self.targets_per_image} boxes per image, {"mixed precision" if self.amp else "float32"}'
 
     @smart_inference_mode()
     def val_step(self, batch_size: int) -> str:
@@ -181,9 +181,9 @@ class TrainingStep(ProbeStep):
 
     def _targets(self, batch_size: int) -> torch.Tensor:
         """``[image_index, class, cx, cy, w, h]`` per box, normalised, as the dataloader yields."""
-        count = batch_size * TARGETS_PER_IMAGE
+        count = batch_size * self.targets_per_image
         targets = torch.zeros(count, 6, device=self.device)
-        targets[:, 0] = torch.arange(batch_size, device=self.device).repeat_interleave(TARGETS_PER_IMAGE)
+        targets[:, 0] = torch.arange(batch_size, device=self.device).repeat_interleave(self.targets_per_image)
         targets[:, 1] = torch.randint(0, self.categories, (count,), device=self.device)
         targets[:, 2:4] = torch.rand(count, 2, device=self.device) * 0.6 + 0.2  # centres, away from the border
         targets[:, 4:6] = torch.rand(count, 2, device=self.device) * 0.2 + 0.05
@@ -205,17 +205,11 @@ def _train_sample_count(training_path: str) -> int:
     return sum(1 for path in (Path(training_path) / 'train').iterdir() if path.suffix == '.jpg')
 
 
-def _amp_enabled(model: Model) -> bool:
-    """Whether `train_det.py` will train in mixed precision, asked the way it asks.
+def _targets_per_sample(training_path: str) -> int:
+    """The most boxes a training sample can carry: a mosaic of four images as dense as the densest.
 
-    `check_amp` reaches for the yolov5 packages by bare name, hence the `sys.path` entry. A check
-    that cannot run answers no, so the probe measures float32 -- more memory than AMP needs, never
-    less.
+    The loss allocates per target, so a dense dataset needs memory a sparse one does not.
+    `yolov5_format` writes one line per box or point into `train/<id>.txt`.
     """
-    if str(YOLOV5_ROOT) not in sys.path:
-        sys.path.append(str(YOLOV5_ROOT))
-    try:
-        return bool(check_amp(model))
-    except Exception:  # pylint: disable=broad-except
-        logger.exception('%s: could not determine whether AMP is usable; measuring in float32', PROBE)
-        return False
+    label_files = (Path(training_path) / 'train').glob('*.txt')
+    return 4 * max((len(path.read_text().splitlines()) for path in label_files), default=0)

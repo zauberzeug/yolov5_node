@@ -19,7 +19,7 @@ from learning_loop_node.data_classes import (
 from learning_loop_node.detector.postprocess import Prediction, to_detections
 from learning_loop_node.enums import CategoryType
 from learning_loop_node.trainer import trainer_logic
-from learning_loop_node.trainer.batch_size import requested_batch_size
+from learning_loop_node.trainer.batch_size import REQUESTED_BATCH_SIZE, requested_batch_size
 from learning_loop_node.trainer.exceptions import CriticalError, NodeNeedsRestartError
 from learning_loop_node.trainer.executor import Executor
 
@@ -247,14 +247,22 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
         A subprocess rather than a call, because the CUDA context a probe opens lives as long as
         its process: in the node it would stay beside `train_det.py` for the whole training.
+
+        :raises CriticalError: If `max_batch_size` is not a whole number, or the probe reported an error
+            a restart cannot fix, such as not even the smallest batch fitting or a negative `max_batch_size`.
+        :raises NodeNeedsRestartError: If the probe failed without reporting one, e.g. because the GPU is gone.
         """
         result_path = Path(self.training.training_folder) / 'batch_size.json'
         result_path.unlink(missing_ok=True)
+        try:
+            max_batch_size = requested_batch_size(self.training.hyperparameters)
+        except (TypeError, ValueError) as e:
+            raise CriticalError(f'Invalid {REQUESTED_BATCH_SIZE}: {e}') from e
 
         executor = Executor(self.training.training_folder, 'batch_size.log')
         cmd = f'python /app/probe_batch_size.py --training-path {self.training.training_folder} \
             --weights {model} --img {resolution} \
-            --max-batch-size {requested_batch_size(self.training.hyperparameters)} \
+            --max-batch-size {max_batch_size} \
             --vram-limit-gb {self._vram_limit_gb} --output {result_path}'
         await executor.start(cmd)
         try:
@@ -264,10 +272,13 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             await executor.stop_and_wait()
             raise
 
-        if return_code != 0 or not result_path.exists():
+        result = json.loads(result_path.read_text()) if result_path.exists() else {}
+        if 'error' in result:
+            raise CriticalError(f'Batch size calculation failed: {result["error"]}')
+        if return_code != 0 or 'batch_size' not in result:
             logger.error('Error during batch size calculation: %s', executor.get_log())
             raise NodeNeedsRestartError()
-        return int(json.loads(result_path.read_text())['batch_size'])
+        return int(result['batch_size'])
 
     def _save_additional_hyperparameters(self) -> None:
         """Save additional hyperparameters to attributes of self.

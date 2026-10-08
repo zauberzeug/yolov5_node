@@ -14,7 +14,7 @@ We support all native hyperparameters of YOLOv5 (cf. `hyp_det.yaml` for referenc
 In addition, we support the following hyperparameters:
 
 - `epochs`: The number of epochs to train the model.
-- `max_batch_size`: The largest batch size the training may use. It is measured rather than trusted: if it fits it is used as given, and if it does not, the largest power of two below it that does is used instead. `0` (the default) leaves the bound to the card alone, within `VRAM_LIMIT_GB` when that is set. The training never uses fewer than 2 samples per batch, because validation halves the batch, so a `max_batch_size` of 1 is raised to 2. The value that was actually used is reported back as `batch_size` (see below).
+- `max_batch_size`: The largest batch size the training may use. It is measured rather than trusted: if it fits it is used as given, and if it does not, the largest power of two below it that does is used instead. `0` (the default) means 128. The training never uses fewer than 2 samples per batch, because validation halves the batch, so a `max_batch_size` of 1 is raised to 2. The value that was actually used is reported back as `batch_size` (see below).
 - `detect_nms_conf_thres`: The confidence threshold for the NMS during inference and validation (not relevant for training).
 - `detect_nms_iou_thres`: The IoU threshold for the NMS during inference and validation (not used for training).
 

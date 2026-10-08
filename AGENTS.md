@@ -60,10 +60,14 @@ subprocess of its own, `probe_batch_size.py`, started through the `Executor` bef
 leave one beside the training, which then runs against less memory than the probe measured. The
 node reads the result back from `batch_size.json` in the training folder. The step is all this repository
 supplies, as a `ProbeStep` the library's `measure_batch_size` builds through a factory and releases
-itself, so `calc` never holds a reference to it. `measure_batch_size` reads `max_batch_size` as the
-upper bound, measures against it and returns what fits. Two of the bounds it gets are ours:
-`MIN_BATCH_SIZE`, because `train_det.py` validates at `batch_size // 2`, and the `sample_count`
-counted off the `train/` folder, which keeps an epoch enough optimizer steps to mean something.
+itself, so `calc` never holds a reference to it. The node reads `max_batch_size` with the library's
+`requested_batch_size` in `_measure_batch_size` and hands it down the command line, and
+`measure_batch_size` measures against that bound and returns what fits. Three of the bounds are ours:
+`MIN_BATCH_SIZE`, because `train_det.py` validates at `batch_size // 2`; `DEFAULT_MAX_BATCH_SIZE`
+for a training that sets no `max_batch_size`; and the `sample_count` counted off the `train/`
+folder, which keeps an epoch enough optimizer steps to mean something. That count is floored at
+`NOMINAL_BATCH_SIZE` times the library's `MIN_TRAIN_STEPS_PER_EPOCH`, because `train_det.py`
+accumulates gradients up to a batch of 64, so a smaller batch adds no optimizer steps.
 `--vram-limit-gb` narrows the card the probe measures against, through the `limit_cuda_memory`
 call `calc` makes before probing; because the cap does not survive a spawn, the same number is
 handed to `train_det.py` and `pred_det.py`, which call `limit_cuda_memory` themselves.
