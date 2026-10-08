@@ -17,7 +17,7 @@ from learning_loop_node.trainer.downloader import TrainingsDownloader
 from learning_loop_node.trainer.executor import Executor
 from ruamel.yaml import YAML
 
-from .. import model_files, yolov5_format
+from .. import batch_size_calculation, model_files, yolov5_format
 from ..yolov5_format import set_hyperparameters_in_file
 from ..yolov5_trainer import Yolov5TrainerLogic
 
@@ -65,6 +65,31 @@ class TestWithLoop:
         assert 'best.pt' in executor.get_log()
         best = training.training_folder + '/result/weights/best.pt'
         assert os.path.isfile(best)
+
+    @pytest.mark.usefixtures('use_training_dir')
+    async def test_batch_size_probe(self, data_exchanger: DataExchanger, glc: LoopCommunicator):
+        """Test if the node's batch-size probe settles on a size"""
+        trainer = Yolov5TrainerLogic()
+        project_folder = os.getcwd()
+        images_folder = create_image_folder(project_folder)
+        categories, image_data = await download_training_data(images_folder, data_exchanger, glc)
+        trainer._training = Training(
+            id=str(uuid4()),
+            project_folder=project_folder,
+            training_folder=project_folder + '/training',
+            images_folder=images_folder,
+            model_variant='',
+            context=Context(project='pytest_yolo5det', organization='zauberzeug'),
+            categories=categories, hyperparameters={}, training_number=1,
+            training_state=TrainerState.Initialized.value,
+            image_data=image_data,
+        )
+        yolov5_format.create_file_structure(trainer.training)
+        shutil.copy(Path(__file__).resolve().parents[2] / 'hyp_det.yaml', trainer.hyperparameter_path)
+
+        batch_size = await trainer._measure_batch_size(os.path.abspath('model.pt'), 416)
+
+        assert batch_size >= batch_size_calculation.MIN_BATCH_SIZE
 
     @pytest.mark.usefixtures('use_training_dir')
     async def test_parse_progress_from_log(self, data_exchanger: DataExchanger, glc: LoopCommunicator):
