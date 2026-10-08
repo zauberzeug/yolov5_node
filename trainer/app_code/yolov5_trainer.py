@@ -25,8 +25,6 @@ from learning_loop_node.trainer.executor import Executor
 
 from . import model_files, yolov5_format
 
-logger = logging.getLogger(__name__)
-
 
 class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
@@ -186,6 +184,29 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
                 if dir_ not in keep_dirs:
                     shutil.rmtree(os.path.join(root, dir_))
 
+    # ---------------------------------------- OVERWRITTEN PROPERTIES AND METHODS ----------------------------------------
+
+    @property
+    def hyperparameters_for_state_sync(self) -> dict | None:
+        """The hyperparameters, with the `batch_size` `train_det.py` measured once it has."""
+        hyperparameters = super().hyperparameters_for_state_sync
+        if hyperparameters is None:
+            return None
+        result_path = self.training.training_folder_path / 'result/batch_size.json'
+        if not result_path.exists():
+            return hyperparameters
+        return {**hyperparameters, 'batch_size': json.loads(result_path.read_text())['batch_size']}
+
+    def _get_executor_error_from_log(self) -> str | None:
+        """Also recognise the batch-size probe finding that not even the smallest batch fits.
+
+        :raises CriticalError: In that case, which no retry can fix.
+        """
+        lines = self._executor.get_log_by_lines(tail=50) if self._executor else []
+        if any('InsufficientMemoryError' in line for line in lines):
+            raise CriticalError('graphics card is too small for even the smallest batch size')
+        return super()._get_executor_error_from_log()
+
     # ---------------------------------------- ADDITIONAL METHODS ----------------------------------------
 
     async def _start_training_from_model(self, model: str) -> None:
@@ -204,12 +225,11 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
         self._save_additional_hyperparameters()
 
-        batch_size = await self._measure_batch_size(model, int(resolution))
+        max_batch_size = self._requested_batch_size()
 
         trainer_version = os.environ.get('NODE_VERSION') or 'unknown'
-        logging.info('Training with trainer version %s and batch size %d', trainer_version, batch_size)
+        logging.info('Training with trainer version %s', trainer_version)
         self.training.hyperparameters['trainer_version'] = trainer_version
-        self.training.hyperparameters['batch_size'] = batch_size
 
         p_sizes_by_id = ""
         for i, category in enumerate(self.training.categories):
@@ -230,7 +250,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
                 flip_label_pairs += f"{id_i}:{id_j},"
 
         cmd = f'python /app/train_det.py --exist-ok --patience {self.patience} \
-            --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} \
+            --batch-size -1 --max-batch-size {max_batch_size} --img {resolution} --data dataset.yaml --weights {model} \
             --project {self.training.training_folder} --name result --hyp {self.hyperparameter_path} \
             --epochs {self.epochs} --conf-thres {self.detect_nms_conf_thres} --iou-thres {self.detect_nms_iou_thres} \
             --vram-limit-gb {self._vram_limit_gb} \
@@ -242,43 +262,18 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
         await self.executor.start(cmd, env={'WANDB_MODE': 'disabled'})
 
-    async def _measure_batch_size(self, model: str, resolution: int) -> int:
-        """Run `probe_batch_size.py` and return the batch size it settled on.
+    def _requested_batch_size(self) -> int:
+        """The `max_batch_size` the training asked for, which `train_det.py` probes within.
 
-        A subprocess rather than a call, because the CUDA context a probe opens lives as long as
-        its process: in the node it would stay beside `train_det.py` for the whole training.
-
-        :raises CriticalError: If `max_batch_size` is not a whole number, or the probe reported an error
-            a restart cannot fix, such as not even the smallest batch fitting or a negative `max_batch_size`.
-        :raises NodeNeedsRestartError: If the probe failed without reporting one, e.g. because the GPU is gone.
+        :raises CriticalError: If it is not a whole number of at least 0, which no retry can fix.
         """
-        result_path = Path(self.training.training_folder) / 'batch_size.json'
-        result_path.unlink(missing_ok=True)
         try:
             max_batch_size = requested_batch_size(self.training.hyperparameters)
         except (TypeError, ValueError) as e:
             raise CriticalError(f'Invalid {REQUESTED_BATCH_SIZE}: {e}') from e
-
-        executor = Executor(self.training.training_folder, 'batch_size.log')
-        cmd = f'python /app/probe_batch_size.py --training-path {self.training.training_folder} \
-            --weights {model} --img {resolution} \
-            --max-batch-size {max_batch_size} \
-            --vram-limit-gb {self._vram_limit_gb} --output {result_path}'
-        await executor.start(cmd)
-        try:
-            return_code = await executor.wait()
-        except asyncio.CancelledError:
-            logger.warning('Training cancelled during batch size calculation')
-            await executor.stop_and_wait()
-            raise
-
-        result = json.loads(result_path.read_text()) if result_path.exists() else {}
-        if 'error' in result:
-            raise CriticalError(f'Batch size calculation failed: {result["error"]}')
-        if return_code != 0 or 'batch_size' not in result:
-            logger.error('Error during batch size calculation: %s', executor.get_log())
-            raise NodeNeedsRestartError()
-        return int(result['batch_size'])
+        if max_batch_size < 0:
+            raise CriticalError(f'Invalid {REQUESTED_BATCH_SIZE}: {max_batch_size} is negative')
+        return max_batch_size
 
     def _save_additional_hyperparameters(self) -> None:
         """Save additional hyperparameters to attributes of self.

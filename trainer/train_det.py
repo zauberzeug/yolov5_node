@@ -40,6 +40,7 @@ from PIL import Image, ImageDraw, ImageFont
 from torch.optim import lr_scheduler
 from tqdm import tqdm
 
+from app_code import batch_size_calculation  # PATCH (yolov5-node): the batch-size probe behind --batch-size -1
 from app_code.yolov5 import val as validate  # for end-of-epoch mAP
 from app_code.yolov5.models.experimental import attempt_load
 from app_code.yolov5.models.yolo import Model
@@ -263,6 +264,13 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     # Image size
     gs = max(int(model.stride.max()), 32)  # grid size (max stride)
     imgsz = check_img_size(opt.imgsz, gs, floor=gs * 2)  # verify imgsz is gs-multiple
+
+    # PATCH (yolov5-node): -1 probes the batch size on this model, where upstream's autobatch did
+    if batch_size == -1:
+        setup = batch_size_calculation.TrainingSetup(model=model, device=device, amp=amp, hyp=hyp, img_size=imgsz,
+                                                     grid_size=gs, categories=nc, optimizer=opt.optimizer)
+        batch_size = batch_size_calculation.measure(setup, train_path=train_path, max_batch_size=opt.max_batch_size)
+        (save_dir / 'batch_size.json').write_text(json.dumps({'batch_size': batch_size}))
 
     # Optimizer
     nbs = 64  # nominal batch size
@@ -564,6 +572,8 @@ def parse_opt(known=False):
     # PATCH (yolov5-node): the budget the batch size was probed against
     add_vram_limit_argument(parser)
     parser.add_argument('--batch-size', type=int, default=16, help='total batch size for all GPUs, -1 for autobatch')
+    # PATCH (yolov5-node): the bound of the probe behind --batch-size -1
+    parser.add_argument('--max-batch-size', type=int, default=0, help='upper bound for --batch-size -1, 0 for the default')
     parser.add_argument('--imgsz', '--img', '--img-size', type=int, default=640, help='train, val image size (pixels)')
     parser.add_argument('--rect', action='store_true', help='rectangular training')
     parser.add_argument('--resume', nargs='?', const=True, default=False, help='resume most recent training')

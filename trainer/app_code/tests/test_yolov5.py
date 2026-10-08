@@ -68,7 +68,7 @@ class TestWithLoop:
 
     @pytest.mark.usefixtures('use_training_dir')
     async def test_batch_size_probe(self, data_exchanger: DataExchanger, glc: LoopCommunicator):
-        """Test if the node's batch-size probe settles on a size"""
+        """Test if train_det.py measures the batch size and the node reports it"""
         trainer = Yolov5TrainerLogic()
         project_folder = os.getcwd()
         images_folder = create_image_folder(project_folder)
@@ -85,11 +85,18 @@ class TestWithLoop:
             image_data=image_data,
         )
         yolov5_format.create_file_structure(trainer.training)
-        shutil.copy(Path(__file__).resolve().parents[2] / 'hyp_det.yaml', trainer.hyperparameter_path)
 
-        batch_size = await trainer._measure_batch_size(os.path.abspath('model.pt'), 416)
+        executor = Executor(os.getcwd())
+        ROOT = Path(__file__).resolve().parents[2]
+        cmd = f'python {ROOT/"train_det.py"} --project training --name result --batch-size -1 --img 416 --data training/dataset.yaml --weights model.pt --epochs 1'
+        await executor.start(cmd, env={'WANDB_MODE': 'disabled'})
+        while executor.is_running():
+            await asyncio.sleep(1)
 
-        assert batch_size >= batch_size_calculation.MIN_BATCH_SIZE
+        assert '1 epochs completed' in executor.get_log()
+        hyperparameters = trainer.hyperparameters_for_state_sync
+        assert hyperparameters is not None
+        assert hyperparameters['batch_size'] >= batch_size_calculation.MIN_BATCH_SIZE
 
     @pytest.mark.usefixtures('use_training_dir')
     async def test_parse_progress_from_log(self, data_exchanger: DataExchanger, glc: LoopCommunicator):

@@ -50,27 +50,27 @@ debugging, so the library is expected beside this checkout.
 Each `main.py` only builds a `TrainerNode`/`DetectorNode` from the library and hands it one class of
 ours; everything below is our side of that contract.
 
-**The batch size is measured, not configured.** `batch_size_calculation.calc` builds the model
-`train_det.py` would build and runs a step resembling its own — EMA copy, three-group SGD, mixed
-precision on the same `check_amp` verdict, the real `ComputeLoss`, backward, clipping, optimizer
-step — and, as `val_step`, the validation `train_det.py` runs between epochs: the EMA copy at
-`batch_size // 2`, on the padded shape of the rectangular validation loader. It runs in a
-subprocess of its own, `probe_batch_size.py`, started through the `Executor` before
-`train_det.py`: a CUDA context lives as long as its process, so a probe in the node would
-leave one beside the training, which then runs against less memory than the probe measured. The
-node reads the result back from `batch_size.json` in the training folder. The step is all this repository
-supplies, as a `ProbeStep` the library's `measure_batch_size` builds through a factory and releases
-itself, so `calc` never holds a reference to it. The node reads `max_batch_size` with the library's
-`requested_batch_size` in `_measure_batch_size` and hands it down the command line, and
-`measure_batch_size` measures against that bound and returns what fits. Three of the bounds are ours:
-`MIN_BATCH_SIZE`, because `train_det.py` validates at `batch_size // 2`; `DEFAULT_MAX_BATCH_SIZE`
-for a training that sets no `max_batch_size`; and the `sample_count` counted off the `train/`
-folder, which keeps an epoch enough optimizer steps to mean something. That count is floored at
-`NOMINAL_BATCH_SIZE` times the library's `MIN_TRAIN_STEPS_PER_EPOCH`, because `train_det.py`
-accumulates gradients up to a batch of 64, so a smaller batch adds no optimizer steps.
-`--vram-limit-gb` narrows the card the probe measures against, through the `limit_cuda_memory`
-call `calc` makes before probing; because the cap does not survive a spawn, the same number is
-handed to `train_det.py` and `pred_det.py`, which call `limit_cuda_memory` themselves.
+**The batch size is measured, not configured.** The node starts `train_det.py` with
+`--batch-size -1` and, as `--max-batch-size`, the bound it read with the library's
+`requested_batch_size`. Where upstream yolov5 ran its autobatch, right after the model is built and
+before the optimizer, `train_det.py` hands that model to `batch_size_calculation.measure`, so the
+probe runs in the training's own process and CUDA context, under its seeds, its deterministic
+kernels and its `check_amp` verdict. It measures a copy of the model, while the training's own
+waits on the CPU, with a step resembling the training's — EMA copy, three-group optimizer, the
+real `ComputeLoss`, backward, clipping, optimizer step — and, as `val_step`, the validation
+`train_det.py` runs between epochs: the EMA copy at `batch_size // 2`, on the padded shape of the
+rectangular validation loader. The step is all this repository supplies, as a `ProbeStep` the
+library's `measure_batch_size` builds through a factory and releases itself. `train_det.py` writes
+the settled size to `result/batch_size.json`, which the node adds to the hyperparameters it syncs;
+a probe that finds not even the smallest batch fitting ends the training with a `CriticalError`.
+Three of the bounds are ours: `MIN_BATCH_SIZE`, because `train_det.py` validates at
+`batch_size // 2`; `DEFAULT_MAX_BATCH_SIZE` for a training that sets no `max_batch_size`; and the
+`sample_count` counted off the `train/` folder, which keeps an epoch enough optimizer steps to
+mean something. That count is floored at `NOMINAL_BATCH_SIZE` times the library's
+`MIN_TRAIN_STEPS_PER_EPOCH`, because `train_det.py` accumulates gradients up to a batch of 64, so a
+smaller batch adds no optimizer steps. `--vram-limit-gb` narrows the card the probe measures
+against, through the `limit_cuda_memory` call `train_det.py` makes at its start; because the cap
+does not survive a spawn, the node hands the same number to `train_det.py` and `pred_det.py`.
 
 **The trainer never trains in-process.** `Yolov5TrainerLogic` (`trainer/app_code/yolov5_trainer.py`)
 implements the library's abstract `TrainerLogic` hooks and shells out through the library's
