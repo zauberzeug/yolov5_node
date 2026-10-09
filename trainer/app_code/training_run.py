@@ -16,13 +16,20 @@ from .batch_size_calculation import InvalidResolutionError
 BATCH_SIZE_FILE = 'batch_size.json'
 FAILURE_FILE = 'failure.json'
 
+
+class NoGpuError(CriticalError):
+    pass
+
+
 _KINDS: dict[type[Exception], str] = {
     InvalidResolutionError: 'invalid_resolution',
     InsufficientMemoryError: 'insufficient_memory',
+    NoGpuError: 'no_gpu',
 }
 _ERRORS: dict[str, Callable[[str], CriticalError]] = {
     'invalid_resolution': InvalidResolutionError,
     'insufficient_memory': lambda _: CriticalError('graphics card is too small for even the smallest batch size'),
+    'no_gpu': NoGpuError,
 }
 
 
@@ -63,6 +70,7 @@ class TrainingRun:
 
         :raises InvalidResolutionError: If the resolution does not suit the model's largest stride.
         :raises CriticalError: If not even the smallest batch fits on the graphics card.
+        :raises NoGpuError: If `train_det.py` found no graphics card to train on.
         """
         failure = _read_json(self.result_dir / FAILURE_FILE)
         if failure is not None:

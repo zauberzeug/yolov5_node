@@ -15,7 +15,7 @@ In addition, we support the following hyperparameters:
 
 - `resolution`: The input size of the model. It must be a multiple of the model's largest stride (32, or 64 for the P6 `*6` variants) and at least twice that; otherwise the training fails before its first epoch.
 - `epochs`: The number of epochs to train the model.
-- `max_batch_size`: The largest batch size the training may use. It is measured rather than trusted: if it fits it is used as given, and if it does not, the largest power of two below it that does is used instead. `0` (the default) means 128. The training never uses fewer than 2 samples per batch, because validation halves the batch, so a `max_batch_size` of 1 is raised to 2. The value that was actually used is reported back as `batch_size` (see below).
+- `max_batch_size`: The largest batch size the training may use. It is measured rather than trusted: if it fits it is used as given, and if it does not, the largest power of two below it that does is used instead. `0` (the default) means 128. The training set bounds it as well: by an eighth of the training images, but never below 64. A training of fewer than 1 024 images therefore uses at most 64, and a `max_batch_size` above that bound is not tried as given. The training never uses fewer than 2 samples per batch, because validation halves the batch, so a `max_batch_size` of 1 is raised to 2. The value that was actually used is reported back as `batch_size` (see below).
 - `detect_nms_conf_thres`: The confidence threshold for the NMS during inference and validation (not relevant for training).
 - `detect_nms_iou_thres`: The IoU threshold for the NMS during inference and validation (not used for training).
 

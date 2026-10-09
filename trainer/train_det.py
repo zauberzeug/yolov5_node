@@ -37,7 +37,7 @@ from PIL import Image, ImageDraw, ImageFont
 from torch.optim import lr_scheduler
 from tqdm import tqdm
 
-from app_code import batch_size_calculation, training_run
+from app_code import batch_size_calculation, training_recipe, training_run
 from app_code.yolov5 import val as validate  # for end-of-epoch mAP
 from app_code.yolov5.models.experimental import attempt_load
 from app_code.yolov5.models.yolo import Model
@@ -270,7 +270,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         training_run.report_batch_size(save_dir, batch_size)
 
     # Optimizer
-    nbs = 64  # nominal batch size
+    nbs = training_recipe.NOMINAL_BATCH_SIZE  # nominal batch size
     accumulate = max(round(nbs / batch_size), 1)  # accumulate loss before optimizing
     hyp['weight_decay'] *= batch_size * accumulate / nbs  # scale weight_decay
     optimizer = smart_optimizer(model, opt.optimizer, hyp['lr0'], hyp['momentum'], hyp['weight_decay'])
@@ -339,7 +339,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                    rect=True,
                                    rank=-1,
                                    workers=workers * 2,
-                                   pad=0.5,
+                                   pad=training_recipe.VAL_PAD,
                                    prefix=colorstr('val: '),
                                    point_sizes_by_id=point_sizes_by_id)[0]
 
@@ -352,9 +352,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
     # Model attributes
     nl = de_parallel(model).model[-1].nl  # number of detection layers (to scale hyps)
-    hyp['box'] *= 3 / nl  # scale to layers
-    hyp['cls'] *= nc / 80 * 3 / nl  # scale to classes and layers
-    hyp['obj'] *= (imgsz / 640) ** 2 * 3 / nl  # scale to image size and layers
+    training_recipe.scale_loss_weights(hyp, layers=nl, categories=nc, img_size=imgsz)
     hyp['label_smoothing'] = opt.label_smoothing
     model.nc = nc  # attach number of classes to model
     model.hyp = hyp  # attach hyperparameters to model
@@ -771,10 +769,12 @@ def run(**kwargs):
 
 if __name__ == "__main__":
     print('START: YOLOv5 - train det', flush=True)
-    torch.cuda.init()
-    torch.cuda.empty_cache()
     opt = parse_opt()
     with training_run.reporting(Path(opt.project) / opt.name):
+        if not torch.cuda.is_available():
+            raise training_run.NoGpuError('no graphics card available; the trainer does not train on the CPU')
+        torch.cuda.init()
+        torch.cuda.empty_cache()
         main(opt)
     torch.cuda.empty_cache()
     print('END: YOLOv5 - train det', flush=True)

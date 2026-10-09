@@ -64,7 +64,8 @@ library's `measure_batch_size` builds through a factory and releases itself. `tr
 the settled size through `training_run`, and the node adds it to the hyperparameters it syncs;
 a probe that finds not even the smallest batch fitting ends the training with a `CriticalError`.
 So does a `--img` the model's largest stride does not divide: `train_det.py` rejects it through
-`check_resolution` just before the probe, where upstream would round it. `train_det.py` records both
+`check_resolution` just before the probe, where upstream would round it. So does a missing graphics
+card, as `NoGpuError`: the trainer does not fall back to the CPU. `train_det.py` records these
 errors in its result folder through `training_run.reporting`, and the node raises them again from
 there in `_get_executor_error_from_log`. The node, which has no model, checks
 `resolution` against `MIN_STRIDE` before it starts `train_det.py`, which already catches anything
@@ -73,7 +74,9 @@ that suits no model. Three of the bounds are ours: `MIN_BATCH_SIZE`, because `tr
 `sample_count` counted off the `train/` folder, which keeps an epoch enough optimizer steps to
 mean something. That count is floored at `NOMINAL_BATCH_SIZE` times the library's
 `MIN_TRAIN_STEPS_PER_EPOCH`, because `train_det.py` accumulates gradients up to a batch of 64, so a
-smaller batch adds no optimizer steps. `--vram-limit-gb` narrows the card the probe measures
+smaller batch adds no optimizer steps. What the probe has to mirror of the training — that
+nominal batch, the validation padding, the loss-weight scaling — lives in `training_recipe`, and
+`train_det.py` reads it from there too. `--vram-limit-gb` narrows the card the probe measures
 against, through the `limit_cuda_memory` call `train_det.py` makes at its start; because the cap
 does not survive a spawn, the node hands the same number to `train_det.py` and `pred_det.py`.
 

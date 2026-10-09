@@ -35,6 +35,15 @@ def test_insufficient_memory_ends_the_training(tmp_path: Path):
         training_run.TrainingRun(tmp_path).raise_failure()
 
 
+def test_missing_gpu_ends_the_training(tmp_path: Path):
+    with pytest.raises(training_run.NoGpuError):
+        with training_run.reporting(tmp_path):
+            raise training_run.NoGpuError('no graphics card available')
+
+    with pytest.raises(training_run.NoGpuError, match='no graphics card available'):
+        training_run.TrainingRun(tmp_path).raise_failure()
+
+
 def test_other_errors_are_left_to_the_log(tmp_path: Path):
     with pytest.raises(ValueError):
         with training_run.reporting(tmp_path):

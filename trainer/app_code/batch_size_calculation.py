@@ -20,6 +20,7 @@ from learning_loop_node.trainer.batch_size import MIN_TRAIN_STEPS_PER_EPOCH
 from learning_loop_node.trainer.cuda import ProbeStep, measure_batch_size
 from learning_loop_node.trainer.exceptions import CriticalError
 
+from .training_recipe import NOMINAL_BATCH_SIZE, VAL_PAD, scale_loss_weights
 from .yolov5.models.yolo import Model
 from .yolov5.utils.general import non_max_suppression
 from .yolov5.utils.loss import ComputeLoss
@@ -34,12 +35,6 @@ MIN_BATCH_SIZE = 2
 
 DEFAULT_MAX_BATCH_SIZE = 128
 """Upper bound for a training that sets no `max_batch_size`."""
-
-NOMINAL_BATCH_SIZE = 64
-"""The batch `train_det.py` accumulates gradients up to."""
-
-VAL_PAD = 0.5
-"""The padding, in strides, `train_det.py` gives the validation loader's rectangular batches."""
 
 MIN_STRIDE = 32
 """The smallest grid size `train_det.py` uses, whatever the model."""
@@ -109,10 +104,7 @@ class TrainingStep(ProbeStep):
         self.targets_per_image = targets_per_image
 
         hyp = dict(setup.hyp)
-        nl = setup.model.model[-1].nl  # detection layers
-        hyp['box'] *= 3 / nl
-        hyp['cls'] *= setup.categories / 80 * 3 / nl
-        hyp['obj'] *= (setup.img_size / 640) ** 2 * 3 / nl
+        scale_loss_weights(hyp, layers=setup.model.model[-1].nl, categories=setup.categories, img_size=setup.img_size)
 
         self.model = deepcopy(setup.model).to(self.device)
         self.model.hyp = hyp

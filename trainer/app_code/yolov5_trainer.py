@@ -199,6 +199,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
         :raises InvalidResolutionError: If the resolution does not suit the model's largest stride.
         :raises CriticalError: If not even the smallest batch fits on the graphics card.
+        :raises NoGpuError: If there is no graphics card to train on.
         """
         self._run.raise_failure()
         return super()._get_executor_error_from_log()
