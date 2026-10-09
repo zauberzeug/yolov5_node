@@ -104,7 +104,8 @@ asyncio_default_test_loop_scope = "session"
 # NOTE: changing default location of pytest_cache because the uvicorn file watcher somehow triggered too many reloads
 cache_dir = "/tmp/.pytest_cache"
 testpaths = [
-    "app_code/tests"
+    "app_code/tests",
+    "tests",
 ]
 filterwarnings = [
     "ignore:distutils Version classes are deprecated:DeprecationWarning:thop.profile",
