@@ -60,12 +60,13 @@ waits on the CPU, with a step resembling the training's — EMA copy, three-grou
 real `ComputeLoss`, backward, clipping, optimizer step — and, as `val_step`, the validation
 `train_det.py` runs between epochs: the EMA copy at `batch_size // 2`, on the padded shape of the
 rectangular validation loader. The step is all this repository supplies, as a `ProbeStep` the
-library's `measure_batch_size` builds through a factory and releases itself. `train_det.py` writes
-the settled size to `result/batch_size.json`, which the node adds to the hyperparameters it syncs;
+library's `measure_batch_size` builds through a factory and releases itself. `train_det.py` reports
+the settled size through `training_run`, and the node adds it to the hyperparameters it syncs;
 a probe that finds not even the smallest batch fitting ends the training with a `CriticalError`.
 So does a `--img` the model's largest stride does not divide: `train_det.py` rejects it through
-`check_resolution` just before the probe, where upstream would round it, and the node reads both
-errors out of the log in `_get_executor_error_from_log`. The node, which has no model, checks
+`check_resolution` just before the probe, where upstream would round it. `train_det.py` records both
+errors in its result folder through `training_run.reporting`, and the node raises them again from
+there in `_get_executor_error_from_log`. The node, which has no model, checks
 `resolution` against `MIN_STRIDE` before it starts `train_det.py`, which already catches anything
 that suits no model. Three of the bounds are ours: `MIN_BATCH_SIZE`, because `train_det.py` validates at
 `batch_size // 2`; `DEFAULT_MAX_BATCH_SIZE` for a training that sets no `max_batch_size`; and the

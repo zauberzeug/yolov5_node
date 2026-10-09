@@ -37,7 +37,7 @@ from PIL import Image, ImageDraw, ImageFont
 from torch.optim import lr_scheduler
 from tqdm import tqdm
 
-from app_code import batch_size_calculation
+from app_code import batch_size_calculation, training_run
 from app_code.yolov5 import val as validate  # for end-of-epoch mAP
 from app_code.yolov5.models.experimental import attempt_load
 from app_code.yolov5.models.yolo import Model
@@ -267,7 +267,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         setup = batch_size_calculation.TrainingSetup(model=model, device=device, amp=amp, hyp=hyp, img_size=imgsz,
                                                      grid_size=gs, categories=nc, optimizer=opt.optimizer)
         batch_size = batch_size_calculation.measure(setup, train_path=train_path, max_batch_size=opt.max_batch_size)
-        (save_dir / 'batch_size.json').write_text(json.dumps({'batch_size': batch_size}))
+        training_run.report_batch_size(save_dir, batch_size)
 
     # Optimizer
     nbs = 64  # nominal batch size
@@ -776,7 +776,8 @@ if __name__ == "__main__":
     torch.cuda.init()
     torch.cuda.empty_cache()
     opt = parse_opt()
-    main(opt)
+    with training_run.reporting(Path(opt.project) / opt.name):
+        main(opt)
     torch.cuda.empty_cache()
     print('END: YOLOv5 - train det', flush=True)
 

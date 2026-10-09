@@ -23,7 +23,7 @@ from learning_loop_node.trainer.batch_size import REQUESTED_BATCH_SIZE, requeste
 from learning_loop_node.trainer.exceptions import CriticalError, NodeNeedsRestartError
 from learning_loop_node.trainer.executor import Executor
 
-from . import batch_size_calculation, model_files, yolov5_format
+from . import batch_size_calculation, model_files, training_run, yolov5_format
 
 
 class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
@@ -190,25 +190,17 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     def hyperparameters_for_state_sync(self) -> dict | None:
         """The hyperparameters, with the `batch_size` `train_det.py` measured once it has."""
         hyperparameters = super().hyperparameters_for_state_sync
-        if hyperparameters is None:
-            return None
-        result_path = self.training.training_folder_path / 'result/batch_size.json'
-        if not result_path.exists():
+        if hyperparameters is None or (batch_size := self._run.batch_size) is None:
             return hyperparameters
-        return {**hyperparameters, 'batch_size': json.loads(result_path.read_text())['batch_size']}
+        return {**hyperparameters, 'batch_size': batch_size}
 
     def _get_executor_error_from_log(self) -> str | None:
-        """Also recognise the errors from `train_det.py` that no retry can fix.
+        """Also raise the failures `train_det.py` recorded, which no retry can fix.
 
         :raises InvalidResolutionError: If the resolution does not suit the model's largest stride.
-        :raises CriticalError: If the batch-size probe finds that not even the smallest batch fits.
+        :raises CriticalError: If not even the smallest batch fits on the graphics card.
         """
-        lines = self._executor.get_log_by_lines(tail=50) if self._executor else []
-        for line in lines:
-            if 'InvalidResolutionError: ' in line:
-                raise batch_size_calculation.InvalidResolutionError(line.split('InvalidResolutionError: ', 1)[1].strip())
-        if any('InsufficientMemoryError' in line for line in lines):
-            raise CriticalError('graphics card is too small for even the smallest batch size')
+        self._run.raise_failure()
         return super()._get_executor_error_from_log()
 
     # ---------------------------------------- ADDITIONAL METHODS ----------------------------------------
@@ -265,7 +257,12 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         if flip_label_pairs:
             cmd += f' --flip_label_pairs {flip_label_pairs[:-1]}'
 
+        self._run.clear_failure()
         await self.executor.start(cmd, env={'WANDB_MODE': 'disabled'})
+
+    @property
+    def _run(self) -> training_run.TrainingRun:
+        return training_run.TrainingRun(self.training.training_folder_path / 'result')
 
     def _requested_batch_size(self) -> int:
         """The `max_batch_size` the training asked for, which `train_det.py` probes within.
