@@ -18,8 +18,9 @@ This will automatically trigger a pipeline action that builds and publishes dock
 
 ## Vendored Upstream Code
 
-[detector/tensorrtx](detector/tensorrtx) is a copy of [wang-xinyu/tensorrtx](https://github.com/wang-xinyu/tensorrtx) (trt10 branch).
-Avoid changing it, so that upstream patches can still be merged.
+[detector/tensorrtx](detector/tensorrtx) is a copy of [wang-xinyu/tensorrtx](https://github.com/wang-xinyu/tensorrtx) (trt10 branch),
+[trainer/app_code/yolov5](trainer/app_code/yolov5) a copy of [ultralytics/yolov5](https://github.com/ultralytics/yolov5).
+Avoid changing them, so that upstream patches can still be merged.
 
 If a change is unavoidable, mark it with a `PATCH (yolov5-node)` comment at the place it applies, so that `grep -rn "PATCH (yolov5-node)"` lists every deviation.
 

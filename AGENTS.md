@@ -21,7 +21,7 @@ itself and never reach the node.
 Sub-projects:
 
 - `trainer/` — the training node. Runs on GPU in an NVIDIA PyTorch image; `app_code/` holds the
-  trainer logic, `app_code/yolov5/` the upstream code, `app_code/tests/` the suite.
+  trainer logic, `app_code/yolov5/` **vendored upstream code**, `app_code/tests/` the suite.
 - `detector/` — the TensorRT detector. `detector/tensorrtx/` is **vendored upstream code**; see the
   CONTRIBUTING section before changing anything in it.
 - `detector_cpu/` — the CPU detector, a second implementation of the same detector contract on top
@@ -142,10 +142,12 @@ cd trainer && uv run --no-sync ruff check .
   `max_batch_size` bound, because the node saves `training.hyperparameters` with the training and
   a training resumed after a restart reads them back; it would otherwise take its first run's
   measurement as its bound. (The loop itself never hands reported values to a later training.)
-- **Keep upstream mergeable.** Changes in `detector/tensorrtx` (and in the vendored yolov5 code)
-  must carry a `PATCH (yolov5-node)` comment stating what deviates, so `grep -rn "PATCH (yolov5-node)"`
-  lists every deviation. Only `detector/tensorrtx` follows this today; the trainer's copy of yolov5
-  carries older unmarked deviations (the point-detection support in `train_det.py` and
-  `app_code/yolov5/utils/dataloaders.py`), so do not read a clean grep there as "unmodified".
+- **Keep upstream mergeable.** Changes in the vendored code, `detector/tensorrtx` and
+  `trainer/app_code/yolov5`, must carry a `PATCH (yolov5-node)` comment stating what deviates, so
+  `grep -rn "PATCH (yolov5-node)"` lists every deviation. Only `detector/tensorrtx` follows this
+  today; `trainer/app_code/yolov5` carries older unmarked deviations (the point-detection support in
+  `utils/dataloaders.py`), so do not read a clean grep there as "unmodified". `trainer/train_det.py`
+  and `trainer/pred_det.py` are not vendored: they started as upstream's `train.py` and `detect.py`
+  but are our own entry scripts now, so changes there carry no marker.
 - Each sub-project pins its own `learning_loop_node` version; the image tag `A.B.C-nlvX.Y.Z`
   encodes the node version and the library version it was built against.

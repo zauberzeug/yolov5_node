@@ -32,15 +32,12 @@ import numpy as np
 import torch
 import torch.nn as nn
 import yaml
-from learning_loop_node.trainer.cuda import (  # PATCH (yolov5-node): the node's VRAM budget
-    add_vram_limit_argument,
-    limit_cuda_memory,
-)
+from learning_loop_node.trainer.cuda import add_vram_limit_argument, limit_cuda_memory
 from PIL import Image, ImageDraw, ImageFont
 from torch.optim import lr_scheduler
 from tqdm import tqdm
 
-from app_code import batch_size_calculation  # PATCH (yolov5-node): the batch-size probe behind --batch-size -1
+from app_code import batch_size_calculation
 from app_code.yolov5 import val as validate  # for end-of-epoch mAP
 from app_code.yolov5.models.experimental import attempt_load
 from app_code.yolov5.models.yolo import Model
@@ -263,10 +260,9 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
     # Image size
     gs = max(int(model.stride.max()), 32)  # grid size (max stride)
-    batch_size_calculation.check_resolution(opt.imgsz, gs)  # PATCH (yolov5-node): reject an --img check_img_size would round
+    batch_size_calculation.check_resolution(opt.imgsz, gs)  # reject an --img check_img_size would round
     imgsz = check_img_size(opt.imgsz, gs, floor=gs * 2)  # verify imgsz is gs-multiple
 
-    # PATCH (yolov5-node): -1 probes the batch size on this model, where upstream's autobatch did
     if batch_size == -1:
         setup = batch_size_calculation.TrainingSetup(model=model, device=device, amp=amp, hyp=hyp, img_size=imgsz,
                                                      grid_size=gs, categories=nc, optimizer=opt.optimizer)
@@ -570,10 +566,8 @@ def parse_opt(known=False):
     parser.add_argument('--hyp', type=str, default=ROOT / 'data/hyps/hyp.scratch-low.yaml', help='hyperparameters path')
     parser.add_argument('--epochs', type=int, default=300)
     parser.add_argument('--clear', action='store_true', help='clear epochs before starting training')
-    # PATCH (yolov5-node): the budget the batch size was probed against
     add_vram_limit_argument(parser)
     parser.add_argument('--batch-size', type=int, default=16, help='total batch size for all GPUs, -1 for autobatch')
-    # PATCH (yolov5-node): the bound of the probe behind --batch-size -1
     parser.add_argument('--max-batch-size', type=int, default=0, help='upper bound for --batch-size -1, 0 for the default')
     parser.add_argument('--imgsz', '--img', '--img-size', type=int, default=640, help='train, val image size (pixels)')
     parser.add_argument('--rect', action='store_true', help='rectangular training')
@@ -623,7 +617,7 @@ def parse_opt(known=False):
 
 
 def main(opt, callbacks=Callbacks()):
-    # PATCH (yolov5-node): apply the node's VRAM cap, which does not survive a spawn.
+    # Apply the node's VRAM cap, which does not survive a spawn.
     # Before the resume branch below, which replaces `opt`.
     limit_cuda_memory(opt.vram_limit_gb)
 
