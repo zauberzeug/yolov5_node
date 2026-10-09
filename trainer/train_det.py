@@ -617,9 +617,7 @@ def parse_opt(known=False):
 
 
 def main(opt, callbacks=Callbacks()):
-    # Apply the node's VRAM cap, which does not survive a spawn.
-    # Before the resume branch below, which replaces `opt`.
-    limit_cuda_memory(opt.vram_limit_gb)
+    limit_cuda_memory(opt.vram_limit_gb)  # before the resume branch replaces `opt`
 
     # Checks
     print_args(vars(opt))

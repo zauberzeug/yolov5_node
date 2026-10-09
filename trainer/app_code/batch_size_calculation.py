@@ -1,11 +1,9 @@
-"""Choosing the training batch size by probing, rather than by estimating one.
+"""Choosing the training batch size by probing.
 
 `train_det.py` calls :func:`measure` when it is given ``--batch-size -1``, on the model it has just
-built and before it builds anything that depends on the batch size. The probe therefore runs in
-the training's own process and CUDA context, under its seeds and deterministic kernels, with its
-AMP verdict and on its model with the weights it transferred. What it adds is a step resembling the
-one the training runs: EMA copy, three-group optimizer, the real ``ComputeLoss``, backward,
-clipping, optimizer step.
+built and before it builds anything that depends on the batch size. The probe runs a step
+resembling the one the training runs: EMA copy, three-group optimizer, the real ``ComputeLoss``,
+backward, clipping, optimizer step.
 
 Validation is measured as well, as ``train_det.py`` runs it between epochs: the EMA copy at
 ``batch_size // 2``, on the padded rectangular shape of the validation loader, in half precision
@@ -32,19 +30,19 @@ logger = logging.getLogger(__name__)
 PROBE = 'batch-size probe'
 
 MIN_BATCH_SIZE = 2
-"""Smallest batch a training may use, because validation halves it."""
+"""Smallest batch a training may use; validation runs at half of it."""
 
 DEFAULT_MAX_BATCH_SIZE = 128
 """Upper bound for a training that sets no `max_batch_size`."""
 
 NOMINAL_BATCH_SIZE = 64
-"""The batch `train_det.py` accumulates gradients up to, so a smaller one adds no optimizer steps."""
+"""The batch `train_det.py` accumulates gradients up to."""
 
 VAL_PAD = 0.5
 """The padding, in strides, `train_det.py` gives the validation loader's rectangular batches."""
 
 MIN_STRIDE = 32
-"""The smallest grid size `train_det.py` uses, whatever the model: a resolution that does not suit it suits no model."""
+"""The smallest grid size `train_det.py` uses, whatever the model."""
 
 
 class InvalidResolutionError(CriticalError):
@@ -98,11 +96,10 @@ class TrainingStep(ProbeStep):
     Built once by `measure_batch_size` and run at several batch sizes: model copy, EMA copy and
     optimizer state are resident before the first batch, and only the activations scale with it.
     The training's own model waits on the CPU meanwhile; :meth:`release` puts it back.
-
-    :param targets_per_image: Boxes per synthetic image, see :func:`_targets_per_sample`.
     """
 
     def __init__(self, setup: TrainingSetup, targets_per_image: int) -> None:
+        """:param targets_per_image: Boxes per synthetic image, see :func:`_targets_per_sample`."""
         self.training_model = setup.model.cpu()
         self.device = setup.device
         self.amp = setup.amp
@@ -158,11 +155,7 @@ class TrainingStep(ProbeStep):
         return f'validation at {val_batch_size}, {self.val_img_size} px'
 
     def zero_gradients(self) -> None:
-        """Clear the gradients but keep their memory, so every trial starts from the same state.
-
-        `train_det.py` accumulates over ``round(64 / batch_size)`` steps, so from its second step
-        on every forward runs with the gradients resident.
-        """
+        """Clear the gradients but keep their memory, so every trial starts from the same state."""
         self.optimizer.zero_grad(set_to_none=False)
 
     def on_out_of_memory(self) -> None:
@@ -195,7 +188,6 @@ def _train_sample_count(train_path: str) -> int:
 def _targets_per_sample(train_path: str) -> int:
     """The most boxes a training sample can carry: a mosaic of four images as dense as the densest.
 
-    The loss allocates per target, so a dense dataset needs memory a sparse one does not.
     `yolov5_format` writes one line per box or point into `train/<id>.txt`.
     """
     return 4 * max((len(path.read_text().splitlines()) for path in Path(train_path).glob('*.txt')), default=0)

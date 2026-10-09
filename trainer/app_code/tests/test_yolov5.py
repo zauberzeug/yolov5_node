@@ -200,13 +200,13 @@ class TestWithDetection:
 
     @pytest.mark.parametrize('stride, resolution', [
         (32, 600), (32, 32), (32, '640'), (32, True), (32, None), (64, 608), (64, 64)])
-    def test_invalid_resolution_is_rejected(self, stride: int, resolution):
+    def test_invalid_resolution_is_rejected(self, stride: int, resolution: object):
         with pytest.raises(batch_size_calculation.InvalidResolutionError, match='invalid resolution'):
             batch_size_calculation.check_resolution(resolution, stride)
 
     @pytest.mark.parametrize('resolution', [600, '640', True, None])
     @pytest.mark.usefixtures('use_training_dir')
-    async def test_invalid_resolution_fails_the_training_instead_of_restarting(self, resolution):
+    async def test_invalid_resolution_fails_the_training_instead_of_restarting(self, resolution: object):
         """Test if the node rejects what suits no model before it starts train_det.py"""
         trainer = Yolov5TrainerLogic()
         trainer._training = Training(

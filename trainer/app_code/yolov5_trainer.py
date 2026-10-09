@@ -31,7 +31,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     def __init__(self, vram_limit_gb: float = 0) -> None:
         super().__init__(model_format='yolov5_pytorch')
 
-        self._vram_limit_gb = vram_limit_gb  # handed to the subprocesses; the cap does not survive a spawn
+        self._vram_limit_gb = vram_limit_gb
 
         logging.info('------ STARTING YOLOV5 TRAINER LOGIC ------')
         self.latest_epoch = 0
