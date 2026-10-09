@@ -61,3 +61,14 @@ def test_a_cleared_failure_is_not_raised_again(tmp_path: Path):
     run.clear_failure()
 
     run.raise_failure()
+
+
+def test_each_epoch_adds_a_row_under_one_header(tmp_path: Path):
+    training_run.report_epoch(tmp_path, 0, {'train/box_loss': 0.123456789, 'metrics/mAP_0.5': 0.5})
+    training_run.report_epoch(tmp_path, 1, {'train/box_loss': 0.1, 'metrics/mAP_0.5': 0.6})
+
+    assert (tmp_path / training_run.RESULTS_FILE).read_text().splitlines() == [
+        'epoch,train/box_loss,metrics/mAP_0.5',
+        '0,0.12346,0.5',
+        '1,0.1,0.6',
+    ]

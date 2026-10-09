@@ -1,9 +1,11 @@
-"""What `train_det.py` leaves in its result folder for the trainer node, and for its own resume, to read.
+"""What `train_det.py` leaves in its result folder for the trainer node, and for its own resume, to read,
+and for people to inspect.
 
-`train_det.py` writes through :func:`report_batch_size` and :func:`reporting`; the node reads
-through :class:`TrainingRun`, and so does a resumed `train_det.py` for the batch size the
+`train_det.py` writes through :func:`report_batch_size`, :func:`report_epoch` and :func:`reporting`; the node
+reads through :class:`TrainingRun`, and so does a resumed `train_det.py` for the batch size the
 interrupted run measured. The file names and their format stay inside this module.
 """
+import csv
 import json
 import os
 from collections.abc import Callable, Iterator
@@ -16,6 +18,7 @@ from .batch_size_calculation import InvalidResolutionError
 
 BATCH_SIZE_FILE = 'batch_size.json'
 FAILURE_FILE = 'failure.json'
+RESULTS_FILE = 'results.csv'
 
 
 class NoGpuError(CriticalError):
@@ -36,6 +39,17 @@ _ERRORS: dict[str, Callable[[str], CriticalError]] = {
 
 def report_batch_size(result_dir: Path, batch_size: int) -> None:
     _write_json(result_dir / BATCH_SIZE_FILE, {'batch_size': batch_size})
+
+
+def report_epoch(result_dir: Path, epoch: int, metrics: dict[str, float]) -> None:
+    """Append an epoch's losses, metrics and learning rates to the results table."""
+    path = result_dir / RESULTS_FILE
+    is_new = not path.exists()
+    with path.open('a', newline='') as f:
+        writer = csv.writer(f)
+        if is_new:
+            writer.writerow(['epoch', *metrics])
+        writer.writerow([epoch, *(f'{value:.5g}' for value in metrics.values())])
 
 
 @contextmanager

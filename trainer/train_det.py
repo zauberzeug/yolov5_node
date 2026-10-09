@@ -512,6 +512,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             best_fitness = fi
         log_vals = list(mloss) + list(results) + lr
         callbacks.run('on_fit_epoch_end', log_vals, epoch, best_fitness, fi)
+        training_run.report_epoch(save_dir, epoch, {key: float(value) for key, value in zip(loggers.keys, log_vals)})
 
         # Save model
         if (not nosave) or (final_epoch and not evolve):  # if save
