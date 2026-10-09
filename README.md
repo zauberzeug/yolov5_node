@@ -54,7 +54,7 @@ When using the script it is required to set up a .env file in the trainer folder
 ## Several trainers on one GPU
 
 Every trainer `docker.sh` starts on a machine mounts `$HOME/training_slot` and takes the lock file in it (`TRAINING_SLOT_LOCK`, see the node library's README) for the duration of a training.
-The other trainers on the machine — a second container of this image, or a trainer from another node repository that mounts the same directory — report `busy` to the loop in the meantime instead of `idle`, so all of them can stay up without ever training at once.
+The other trainers on the machine — a second container of this image, or a trainer from another node repository that mounts the same directory — report `blocked` to the loop in the meantime instead of `idle`, so all of them can stay up without ever training at once.
 The kernel drops the lock with the container, so a crash frees it by itself.
 Set `TRAINING_SLOT_DIR` in `.env` to use another directory, or to the empty string for a trainer that has its GPU to itself.
 
