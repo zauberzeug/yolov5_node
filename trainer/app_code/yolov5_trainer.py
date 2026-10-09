@@ -19,16 +19,19 @@ from learning_loop_node.data_classes import (
 from learning_loop_node.detector.postprocess import Prediction, to_detections
 from learning_loop_node.enums import CategoryType
 from learning_loop_node.trainer import trainer_logic
+from learning_loop_node.trainer.batch_size import REQUESTED_BATCH_SIZE, requested_batch_size
 from learning_loop_node.trainer.exceptions import CriticalError, NodeNeedsRestartError
 from learning_loop_node.trainer.executor import Executor
 
-from . import batch_size_calculation, model_files, yolov5_format
+from . import batch_size_calculation, model_files, training_run, yolov5_format
 
 
 class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
-    def __init__(self) -> None:
+    def __init__(self, vram_limit_gb: float = 0) -> None:
         super().__init__(model_format='yolov5_pytorch')
+
+        self._vram_limit_gb = vram_limit_gb
 
         logging.info('------ STARTING YOLOV5 TRAINER LOGIC ------')
         self.latest_epoch = 0
@@ -153,6 +156,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
         cmd = f'python /app/pred_det.py --weights {model_folder}/model.pt --source {images_folder}'
         cmd += f' --img-size {img_size} --conf-thres {self.detect_nms_conf_thres} --iou-thres {self.detect_nms_iou_thres}'
+        cmd += f' --vram-limit-gb {self._vram_limit_gb}'
 
         await executor.start(cmd)
         if await executor.wait() != 0:
@@ -180,6 +184,26 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
                 if dir_ not in keep_dirs:
                     shutil.rmtree(os.path.join(root, dir_))
 
+    # ---------------------------------------- OVERWRITTEN PROPERTIES AND METHODS ----------------------------------------
+
+    @property
+    def hyperparameters_for_state_sync(self) -> dict | None:
+        """The hyperparameters, with the `batch_size` `train_det.py` measured once it has."""
+        hyperparameters = super().hyperparameters_for_state_sync
+        if hyperparameters is None or (batch_size := self._training_run.batch_size) is None:
+            return hyperparameters
+        return {**hyperparameters, 'batch_size': batch_size}
+
+    def _get_executor_error_from_log(self) -> str | None:
+        """Also raise the failures `train_det.py` recorded, which no retry can fix.
+
+        :raises InvalidResolutionError: If the resolution does not suit the model's largest stride.
+        :raises CriticalError: If not even the smallest batch fits on the graphics card.
+        :raises NoGpuError: If there is no graphics card to train on.
+        """
+        self._training_run.raise_failure()
+        return super()._get_executor_error_from_log()
+
     # ---------------------------------------- ADDITIONAL METHODS ----------------------------------------
 
     async def _start_training_from_model(self, model: str) -> None:
@@ -195,22 +219,15 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
     async def _start(self, model: str, additional_parameters: str = ''):
         resolution = self.training.hyperparameters.get('resolution')
+        batch_size_calculation.check_resolution(resolution, batch_size_calculation.MIN_STRIDE)
 
         self._save_additional_hyperparameters()
 
-        try:
-            batch_size = await batch_size_calculation.calc(self.training.training_folder, model, self.hyperparameter_path,
-                                                           f'{self.training.training_folder}/dataset.yaml', resolution)
-        except batch_size_calculation.InvalidResolutionError:
-            raise
-        except Exception as e:
-            logging.exception('Error during batch size calculation:')
-            raise NodeNeedsRestartError() from e
+        max_batch_size = self._requested_batch_size()
 
         trainer_version = os.environ.get('NODE_VERSION') or 'unknown'
-        logging.info('Training with trainer version %s and batch size %d', trainer_version, batch_size)
+        logging.info('Training with trainer version %s', trainer_version)
         self.training.hyperparameters['trainer_version'] = trainer_version
-        self.training.hyperparameters['batch_size'] = batch_size
 
         p_sizes_by_id = ""
         for i, category in enumerate(self.training.categories):
@@ -231,16 +248,35 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
                 flip_label_pairs += f"{id_i}:{id_j},"
 
         cmd = f'python /app/train_det.py --exist-ok --patience {self.patience} \
-            --batch-size {batch_size} --img {resolution} --data dataset.yaml --weights {model} \
+            --batch-size -1 --max-batch-size {max_batch_size} --img {resolution} --data dataset.yaml --weights {model} \
             --project {self.training.training_folder} --name result --hyp {self.hyperparameter_path} \
             --epochs {self.epochs} --conf-thres {self.detect_nms_conf_thres} --iou-thres {self.detect_nms_iou_thres} \
+            --vram-limit-gb {self._vram_limit_gb} \
             {additional_parameters}'
         if p_sizes_by_id:
             cmd += f' --point_sizes_by_id {p_sizes_by_id[:-1]}'
         if flip_label_pairs:
             cmd += f' --flip_label_pairs {flip_label_pairs[:-1]}'
 
+        self._training_run.clear_failure()
         await self.executor.start(cmd, env={'WANDB_MODE': 'disabled'})
+
+    @property
+    def _training_run(self) -> training_run.TrainingRun:
+        return training_run.TrainingRun(self.training.training_folder_path / 'result')
+
+    def _requested_batch_size(self) -> int:
+        """The `max_batch_size` the training asked for, which `train_det.py` probes within.
+
+        :raises CriticalError: If it is not a whole number of at least 0, which no retry can fix.
+        """
+        try:
+            max_batch_size = requested_batch_size(self.training.hyperparameters)
+        except (TypeError, ValueError) as e:
+            raise CriticalError(f'Invalid {REQUESTED_BATCH_SIZE}: {e}') from e
+        if max_batch_size < 0:
+            raise CriticalError(f'Invalid {REQUESTED_BATCH_SIZE}: {max_batch_size} is negative')
+        return max_batch_size
 
     def _save_additional_hyperparameters(self) -> None:
         """Save additional hyperparameters to attributes of self.

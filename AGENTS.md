@@ -21,7 +21,7 @@ itself and never reach the node.
 Sub-projects:
 
 - `trainer/` — the training node. Runs on GPU in an NVIDIA PyTorch image; `app_code/` holds the
-  trainer logic, `app_code/yolov5/` the upstream code, `app_code/tests/` the suite.
+  trainer logic, `app_code/yolov5/` **vendored upstream code**, `app_code/tests/` the suite.
 - `detector/` — the TensorRT detector. `detector/tensorrtx/` is **vendored upstream code**; see the
   CONTRIBUTING section before changing anything in it.
 - `detector_cpu/` — the CPU detector, a second implementation of the same detector contract on top
@@ -49,6 +49,36 @@ debugging, so the library is expected beside this checkout.
 
 Each `main.py` only builds a `TrainerNode`/`DetectorNode` from the library and hands it one class of
 ours; everything below is our side of that contract.
+
+**The batch size is measured, not configured.** The node starts `train_det.py` with
+`--batch-size -1` and, as `--max-batch-size`, the bound it read with the library's
+`requested_batch_size`. Where upstream yolov5 ran its autobatch, right after the model is built and
+before the optimizer, `train_det.py` hands that model to `batch_size_calculation.measure`, so the
+probe runs in the training's own process and CUDA context, under its seeds, its deterministic
+kernels and its `check_amp` verdict. It measures a copy of the model, while the training's own
+waits on the CPU, with a step resembling the training's — EMA copy, three-group optimizer, the
+real `ComputeLoss`, backward, clipping, optimizer step — and, as `val_step`, the validation
+`train_det.py` runs between epochs: the EMA copy at `batch_size // 2`, on the padded shape of the
+rectangular validation loader. The step is all this repository supplies, as a `ProbeStep` the
+library's `measure_batch_size` builds through a factory and releases itself. `train_det.py` reports
+the settled size through `training_run`, and the node adds it to the hyperparameters it syncs;
+a probe that finds not even the smallest batch fitting ends the training with a `CriticalError`.
+So does a `--img` the model's largest stride does not divide: `train_det.py` rejects it through
+`check_resolution` just before the probe, where upstream would round it. So does a missing graphics
+card, as `NoGpuError`: the trainer does not fall back to the CPU. `train_det.py` records these
+errors in its result folder through `training_run.reporting`, and the node raises them again from
+there in `_get_executor_error_from_log`. The node, which has no model, checks
+`resolution` against `MIN_STRIDE` before it starts `train_det.py`, which already catches anything
+that suits no model. Three of the bounds are ours: `MIN_BATCH_SIZE`, because `train_det.py` validates at
+`batch_size // 2`; `DEFAULT_MAX_BATCH_SIZE` for a training that sets no `max_batch_size`; and the
+`sample_count` counted off the `train/` folder, which keeps an epoch enough optimizer steps to
+mean something. That count is floored at `NOMINAL_BATCH_SIZE` times the library's
+`MIN_TRAIN_STEPS_PER_EPOCH`, because `train_det.py` accumulates gradients up to a batch of 64, so a
+smaller batch adds no optimizer steps. What the probe has to mirror of the training — that
+nominal batch, the validation padding, the loss-weight scaling — lives in `training_recipe`, and
+`train_det.py` reads it from there too. `--vram-limit-gb` narrows the card the probe measures
+against, through the `limit_cuda_memory` call `train_det.py` makes at its start; because the cap
+does not survive a spawn, the node hands the same number to `train_det.py` and `pred_det.py`.
 
 **The trainer never trains in-process.** `Yolov5TrainerLogic` (`trainer/app_code/yolov5_trainer.py`)
 implements the library's abstract `TrainerLogic` hooks and shells out through the library's
@@ -111,11 +141,17 @@ cd trainer && uv run --no-sync ruff check .
 
 - **Hyperparameters are a cheap way to report a value to the loop.** Anything a trainer writes to
   `training.hyperparameters` lands on the model and shows up in its hyperparameter view — no new
-  plumbing in the loop needed. `batch_size` and `trainer_version` already use this.
-- **Keep upstream mergeable.** Changes in `detector/tensorrtx` (and in the vendored yolov5 code)
-  must carry a `PATCH (yolov5-node)` comment stating what deviates, so `grep -rn "PATCH (yolov5-node)"`
-  lists every deviation. Only `detector/tensorrtx` follows this today; the trainer's copy of yolov5
-  carries older unmarked deviations (the point-detection support in `train_det.py` and
-  `app_code/yolov5/utils/dataloaders.py`), so do not read a clean grep there as "unmodified".
+  plumbing in the loop needed. `batch_size` and `trainer_version` already use this. Keep such an
+  output apart from any input: the settled size goes to `batch_size`, never back into the
+  `max_batch_size` bound, because the node saves `training.hyperparameters` with the training and
+  a training resumed after a restart reads them back; it would otherwise take its first run's
+  measurement as its bound. (The loop itself never hands reported values to a later training.)
+- **Keep upstream mergeable.** Changes in the vendored code, `detector/tensorrtx` and
+  `trainer/app_code/yolov5`, must carry a `PATCH (yolov5-node)` comment stating what deviates, so
+  `grep -rn "PATCH (yolov5-node)"` lists every deviation. Only `detector/tensorrtx` follows this
+  today; `trainer/app_code/yolov5` carries older unmarked deviations (the point-detection support in
+  `utils/dataloaders.py`), so do not read a clean grep there as "unmodified". `trainer/train_det.py`
+  and `trainer/pred_det.py` are not vendored: they started as upstream's `train.py` and `detect.py`
+  but are our own entry scripts now, so changes there carry no marker.
 - Each sub-project pins its own `learning_loop_node` version; the image tag `A.B.C-nlvX.Y.Z`
   encodes the node version and the library version it was built against.

@@ -10,3 +10,5 @@ detector/livesync.sh
 trainer/.mypy_cache
 trainer/runs
 trainer/app_code/yolov5/runs
+
+.claude/worktrees/
