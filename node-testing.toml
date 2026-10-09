@@ -1,0 +1,45 @@
+# How node-testing (github.com/zauberzeug/node-testing) tests this node end to end: it trains on a
+# Loop, hands the model to every detector build below and checks what they answer. Start it from
+# this directory; the keys are documented in node-testing's README.
+name = "yolov5"
+architecture = "yolov5"
+model_variant = "n"
+# The trainer uploads yolov5_pytorch and yolov5_wts; each build below loads one of them.
+model_format = "yolov5_pytorch"
+needs_gpu = true
+finish_timeout = 3600
+learning_fscore_floor = 0.9
+
+[trainer]
+# {version} is NODE_VERSION. `latest` follows the newest release only from the first one after
+# 7 Oct 2026; before that it is a 12 GB image from 2024.
+image = "zauberzeug/yolov5-trainer:{version}"
+build = "trainer"
+
+# `-cloud` is what docker.sh picks off Jetson; -jetson is left out, nothing here runs on arm64.
+[[detectors]]
+name = "trt"
+image = "zauberzeug/yolov5-detector:{version}-cloud"
+model_format = "yolov5_wts"
+build = "detector"
+model_timeout = 1800
+# Optimization level 0 instead of the shipped 4: a fast engine build, with other kernel tactics
+# than a customer's.
+round_trip_environment = { BUILDER_OPTIMIZATION_LEVEL = "0" }
+
+[[detectors]]
+name = "cpu"
+image = "zauberzeug/yolov5-detector:{version}-cloud-cpu"
+model_format = "yolov5_pytorch"
+build = "detector_cpu"
+
+# The minimum that makes this trainer hand over a model at all. It only writes epoch<N>.pt -- the
+# file it publishes -- once validation found a true positive, and train_det.py warms up for at
+# least 100 optimizer steps; with the whole set in one batch an epoch is one step, so 100 epochs
+# or fewer never publish a model. lr0 0.01 (upstream's from-scratch value, against the node's
+# finetune 0.0032) makes 150 epochs enough: fscore 0.991 / 0.994 / 0.993 in three runs on n9,
+# 28 Sep 2026, ~4 min each; at 0.0032 it took 300. No `--quick` for the same reason.
+[hyperparameters]
+epochs = 150
+resolution = 320
+lr0 = 0.01
