@@ -46,9 +46,17 @@ When using the script it is required to set up a .env file in the trainer folder
 | CONTAINER_NAME              | Name of the docker container, not of the node in the loop | String    | yolov5_trainer | Yes                |
 | HOST_PORT                   | Port on this machine mapped to the container         | Integer        | 7443    | Yes                          |
 | LINKLL                      | Link the node library into the container?            | TRUE/FALSE     | FALSE   | Yes                          |
+| TRAINING_SLOT_DIR           | Host directory the trainers on this machine share their GPU lock through; empty disables it | Path | $HOME/training_slot | Yes |
 | UVICORN_RELOAD              | Enable hot-reload                                    | TRUE/FALSE/0/1 | FALSE   | No                           |
 | RESTART_AFTER_TRAINING      | Auto-restart after training                          | TRUE/FALSE/0/1 | FALSE   | No                           |
 | KEEP_OLD_TRAININGS          | Do not remove old trainings, when starting a new one | TRUE/FALSE/0/1 | FALSE   | No                           |
+
+## Several trainers on one GPU
+
+Every trainer `docker.sh` starts on a machine mounts `$HOME/training_slot` and takes the lock file in it (`TRAINING_SLOT_LOCK`, see the node library's README) for the duration of a training.
+The other trainers on the machine — a second container of this image, or a trainer from another node repository that mounts the same directory — report `busy` to the loop in the meantime instead of `idle`, so all of them can stay up without ever training at once.
+The kernel drops the lock with the container, so a crash frees it by itself.
+Set `TRAINING_SLOT_DIR` in `.env` to use another directory, or to the empty string for a trainer that has its GPU to itself.
 
 # Detector Node
 

@@ -7,9 +7,9 @@
 # file. The conf declares what differs about that sub-project; everything here is what does not.
 #
 # Required in docker.conf:  IMAGE_REPO, CONTAINER_NAME
-# Optional:                 IMAGE_TAG_SUFFIX, TEST_LATEST_TAG, DATA_VOLUME, HOST_PORT,
-#                           CONTAINER_PORT, BUILD_CONTEXT, DOCKERFILE, GPU, IPC_HOST, ENV_FILE,
-#                           EXTRA_RUN_ARGS, EXTRA_BUILD_ARGS, LINKLL_SITE_PACKAGES
+# Optional:                 IMAGE_TAG_SUFFIX, TEST_LATEST_TAG, DATA_VOLUME, TRAINING_SLOT_DIR,
+#                           HOST_PORT, CONTAINER_PORT, BUILD_CONTEXT, DOCKERFILE, GPU, IPC_HOST,
+#                           ENV_FILE, EXTRA_RUN_ARGS, EXTRA_BUILD_ARGS, LINKLL_SITE_PACKAGES
 #                           and a select_image function for host-dependent image choices
 #
 # NOTE the conf is sourced before this file, so it cannot reference SEMANTIC_VERSION or
@@ -81,6 +81,12 @@ fi
 
 run_args="-it"
 [ -n "${DATA_VOLUME:-}" ] && run_args+=" -v $DATA_VOLUME:/data"
+# Every trainer on the host mounts the same directory, so the lock file inside it is one lock
+# for the one GPU they share -- whichever repository their images come from.
+if [ -n "${TRAINING_SLOT_DIR:-}" ]; then
+    mkdir -p "$TRAINING_SLOT_DIR"
+    run_args+=" -v $TRAINING_SLOT_DIR:/slot --env TRAINING_SLOT_LOCK=/slot/training.lock"
+fi
 run_args+=" -h ${HOSTNAME}_DEV"
 # NOTE not `--env-file .env`: docker's env-file reader passes the raw line through -- it strips
 # no quotes and expands nothing, so PASSWORD='secret' would reach the container with its quotes
