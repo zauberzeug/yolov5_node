@@ -221,7 +221,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         await self._start(model, additional_params)
 
     async def _start(self, model: str, additional_parameters: str = ''):
-        resolution = self.training.hyperparameters['resolution']
+        resolution = self.training.hyperparameters.get('resolution')
 
         self._save_additional_hyperparameters()
 

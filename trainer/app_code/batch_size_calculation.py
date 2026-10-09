@@ -20,6 +20,7 @@ from pathlib import Path
 import torch
 from learning_loop_node.trainer.batch_size import MIN_TRAIN_STEPS_PER_EPOCH
 from learning_loop_node.trainer.cuda import ProbeStep, measure_batch_size
+from learning_loop_node.trainer.exceptions import CriticalError
 
 from .yolov5.models.yolo import Model
 from .yolov5.utils.general import non_max_suppression
@@ -41,6 +42,18 @@ NOMINAL_BATCH_SIZE = 64
 
 VAL_PAD = 0.5
 """The padding, in strides, `train_det.py` gives the validation loader's rectangular batches."""
+
+
+class InvalidResolutionError(CriticalError):
+    pass
+
+
+def check_resolution(img_size: object, model: Model) -> None:
+    """The input size must be a multiple of the model's largest stride and at least twice that stride."""
+    stride = max(int(model.stride.max()), 32)
+    if not isinstance(img_size, int) or isinstance(img_size, bool) or img_size < 2 * stride or img_size % stride:
+        raise InvalidResolutionError(
+            f'invalid resolution {img_size!r}: must be a multiple of {stride} and at least {2 * stride}')
 
 
 @dataclass(kw_only=True, slots=True)

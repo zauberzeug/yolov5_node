@@ -2,15 +2,40 @@ name: docker-deploy
 
 on:
   release:
-    types: [published]
+    types: [published, released, edited]
 
 env:
   VERSION: ${{ github.event.release.tag_name }}
 
 jobs:
+  is-latest:
+    runs-on: [self-hosted, cpu, X64]
+    outputs:
+      result: ${{ steps.check.outputs.result }}
+    steps:
+      - name: Check whether this is GitHub's latest release
+        id: check
+        uses: actions/github-script@v8
+        with:
+          result-encoding: string
+          script: |
+            try {
+              const { data } = await github.rest.repos.getLatestRelease(context.repo)
+              return String(data.tag_name === context.payload.release.tag_name)
+            } catch (error) {
+              if (error.status === 404) return 'false'
+              throw error
+            }
+
   multi-arch:
-    runs-on: self-hosted
+    needs: is-latest
+    if: github.event.action == 'published'
+    runs-on: [self-hosted, cpu, X64]
+    env:
+      LATEST: ${{ needs.is-latest.outputs.result }}
     strategy:
+      fail-fast: false
+      max-parallel: 1
       matrix:
         include:
           - context: trainer/
@@ -18,36 +43,43 @@ jobs:
             image: zauberzeug/yolov5-trainer
             tag_suffix: ""
             build_args: ""
-          - context: .
-            dockerfile: detector_cpu/Dockerfile
-            image: zauberzeug/yolov5-detector
-            tag_suffix: "-cloud-cpu"
-            build_args: ""
           - context: detector/
             dockerfile: detector/Dockerfile
             image: zauberzeug/yolov5-detector
             tag_suffix: "-cloud"
             build_args: "--build-arg BASE_IMAGE=nvcr.io/nvidia/tensorrt:26.05-py3 --build-arg INSTALL_OPENCV=true"
+          - context: .
+            dockerfile: detector_cpu/Dockerfile
+            image: zauberzeug/yolov5-detector
+            tag_suffix: "-cloud-cpu"
+            build_args: ""
     steps:
       - uses: actions/checkout@v4
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
       - name: Log in to Docker Hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
       - name: Build and push
         run: |
+          tags=(-t ${{ matrix.image }}:${VERSION#v}${{ matrix.tag_suffix }})
+          if [ "$LATEST" = true ]; then
+            tags+=(-t ${{ matrix.image }}:latest${{ matrix.tag_suffix }})
+          fi
           docker buildx build ${{ matrix.context }} \
+            --builder node-release \
             --platform linux/amd64,linux/arm64 \
             -f ${{ matrix.dockerfile }} \
             ${{ matrix.build_args }} \
             --build-arg VERSION=${VERSION#v} \
-            -t ${{ matrix.image }}:${VERSION#v}${{ matrix.tag_suffix }} \
+            "${tags[@]}" \
             --push
 
   detector-jetson:
+    needs: is-latest
+    if: github.event.action == 'published'
     runs-on: [self-hosted, arm64]
+    env:
+      LATEST: ${{ needs.is-latest.outputs.result }}
     steps:
       - uses: actions/checkout@v4
       - name: Log in to Docker Hub
@@ -61,3 +93,30 @@ jobs:
             --build-arg VERSION=${VERSION#v} \
             -t zauberzeug/yolov5-detector:${VERSION#v}-jetson
           docker push zauberzeug/yolov5-detector:${VERSION#v}-jetson
+          if [ "$LATEST" = true ]; then
+            docker tag zauberzeug/yolov5-detector:${VERSION#v}-jetson zauberzeug/yolov5-detector:latest-jetson
+            docker push zauberzeug/yolov5-detector:latest-jetson
+          fi
+
+  promote:
+    needs: is-latest
+    if: github.event.action != 'published' && needs.is-latest.outputs.result == 'true'
+    runs-on: [self-hosted, cpu, X64]
+    steps:
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+      - name: Point latest at the already built version
+        run: |
+          while read -r image suffix; do
+            versioned="${image}:${VERSION#v}${suffix}"
+            if docker buildx imagetools inspect "$versioned" > /dev/null 2>&1; then
+              docker buildx imagetools create -t "${image}:latest${suffix}" "$versioned"
+            else
+              echo "$versioned is not pushed (yet), leaving ${image}:latest${suffix} as it is"
+            fi
+          done <<'EOF'
+          zauberzeug/yolov5-trainer
+          zauberzeug/yolov5-detector -cloud
+          zauberzeug/yolov5-detector -cloud-cpu
+          zauberzeug/yolov5-detector -jetson
+          EOF

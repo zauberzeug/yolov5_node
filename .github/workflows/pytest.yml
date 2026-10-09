@@ -10,9 +10,6 @@ jobs:
       - name: checkout | cleanup
         run: |
           docker stop yolov5_trainer_node_github_action || echo "Nothing to do. No container running."
-      - name: pre-connect to nvidia container
-        run: |
-          docker run -d -it --rm nvcr.io/nvidia/pytorch:25.01-py3 echo "I have to be startet to authenticate against nvcr.io"
       - name: build
         run: |
           cd trainer

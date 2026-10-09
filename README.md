@@ -13,6 +13,7 @@ Trainer is tested with Nvidia Driver Version: 580.95.05 and CUDA Version: 13.0. 
 We support all native hyperparameters of YOLOv5 (cf. `hyp_det.yaml` for reference).
 In addition, we support the following hyperparameters:
 
+- `resolution`: The input size of the model. It must be a multiple of the model's largest stride (32, or 64 for the P6 `*6` variants) and at least twice that; otherwise the training fails without being started.
 - `epochs`: The number of epochs to train the model.
 - `max_batch_size`: The largest batch size the training may use. It is measured rather than trusted: if it fits it is used as given, and if it does not, the largest power of two below it that does is used instead. `0` (the default) means 128. The training never uses fewer than 2 samples per batch, because validation halves the batch, so a `max_batch_size` of 1 is raised to 2. The value that was actually used is reported back as `batch_size` (see below).
 - `detect_nms_conf_thres`: The confidence threshold for the NMS during inference and validation (not relevant for training).
@@ -33,7 +34,8 @@ The trainer reports these hyperparameters back to the Learning Loop:
 
 Trainer Docker-Images are published on https://hub.docker.com/r/zauberzeug/yolov5-trainer
 
-New images can be pulled with `docker pull zauberzeug/yolov5-trainer:A.B.C-nlvX.Y.Z`, where `A.B.C` is the version of the trainer node and `X.Y.Z` is the version of the learning loop node library.
+Released images can be pulled with `docker pull zauberzeug/yolov5-trainer:A.B.C`, where `A.B.C` is the version of the release.
+`zauberzeug/yolov5-trainer:latest` always points to the release marked as "Latest" on GitHub, also when a release is marked as latest only later (for example a promoted pre-release).
 
 During development, i.e. when building the container from code it is recommended to use the script `docker.sh` in the folder `trainer` to build/start/interact with the image.
 It is a thin wrapper: what differs about the sub-project is in `docker.conf` next to it, and the rest is `scripts/node-docker.sh`, a copy of which each node repository holds.
@@ -86,15 +88,15 @@ Local builds can be run with `./docker.sh run` (or `./docker.sh r`).
 
 ### Cloud-Detector (For Linux computers with Nvidia GPU)
 
-Images can be pulled with `docker pull zauberzeug/yolov5-detector:A.B.C-nlvX.Y.Z-cloud`, where `A.B.C` is the version of the detector node and `X.Y.Z` is the version of the learning loop node library.
+Images can be pulled with `docker pull zauberzeug/yolov5-detector:A.B.C-cloud`, where `A.B.C` is the version of the release; `latest-cloud` points to the newest release.
 
 ### Cloud-CPU-Detector (For Linux computers without Nvidia GPU)
 
-Images can be pulled with `docker pull zauberzeug/yolov5-detector:A.B.C-nlvX.Y.Z-cloud-cpu`, where `A.B.C` is the version of the detector node and `X.Y.Z` is the version of the learning loop node library.
+Images can be pulled with `docker pull zauberzeug/yolov5-detector:A.B.C-cloud-cpu`, where `A.B.C` is the version of the release; `latest-cloud-cpu` points to the newest release.
 
 ### L4T-Detector
 
-Images can be pulled with `docker pull zauberzeug/yolov5-detector:A.B.C-nlvX.Y.Z-L.4.T`, where `A.B.C` is the version of the detector node, `X.Y.Z` is the version of the node-lib used and `L.4.T` is the L4T version.
+Images can be pulled with `docker pull zauberzeug/yolov5-detector:A.B.C-jetson`, where `A.B.C` is the version of the release; `latest-jetson` points to the newest release.
 
 ## Get Detections
 

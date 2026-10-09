@@ -18,6 +18,7 @@ from learning_loop_node.trainer.executor import Executor
 from ruamel.yaml import YAML
 
 from .. import batch_size_calculation, model_files, yolov5_format
+from ..yolov5.models.yolo import Model
 from ..yolov5_format import set_hyperparameters_in_file
 from ..yolov5_trainer import Yolov5TrainerLogic
 
@@ -25,6 +26,9 @@ from ..yolov5_trainer import Yolov5TrainerLogic
 
 logging.basicConfig(level=logging.DEBUG)
 yaml = YAML()
+
+MODELS_DIR = Path(__file__).resolve().parents[1] / 'yolov5' / 'models'
+TEST_DATA_DIR = Path(__file__).resolve().parent / 'test_data'
 
 project_configuration = {
     'project_name': 'pytest_yolo5det', 'box_categories': 2, 'point_categories': 2, 'inbox': 4, 'annotate': 0, 'review': 0,
@@ -162,6 +166,35 @@ class TestWithDetection:
 
         assert '0 0.500000 0.600000 0.200000 0.200000' in lines[0]
         assert '1 0.600000 0.700000 0.300000 0.300000' in lines[1]
+
+    @pytest.mark.parametrize('config, resolution', [
+        ('yolov5n.yaml', 640), ('yolov5n.yaml', 64), ('yolov5n.yaml', 608),
+        ('hub/yolov5n6.yaml', 1280), ('hub/yolov5n6.yaml', 128)])
+    def test_valid_resolution_is_accepted(self, config: str, resolution: int):
+        batch_size_calculation.check_resolution(resolution, Model(MODELS_DIR / config))
+
+    @pytest.mark.parametrize('config, resolution', [
+        ('yolov5n.yaml', 600), ('yolov5n.yaml', 32), ('yolov5n.yaml', '640'), ('yolov5n.yaml', True),
+        ('yolov5n.yaml', None), ('hub/yolov5n6.yaml', 608), ('hub/yolov5n6.yaml', 64)])
+    def test_invalid_resolution_is_rejected(self, config: str, resolution):
+        with pytest.raises(batch_size_calculation.InvalidResolutionError, match='invalid resolution'):
+            batch_size_calculation.check_resolution(resolution, Model(MODELS_DIR / config))
+
+    @pytest.mark.usefixtures('use_training_dir')
+    async def test_invalid_resolution_fails_the_training_instead_of_restarting(self):
+        trainer = Yolov5TrainerLogic()
+        trainer._training = Training(
+            id='someid', context=Context(organization='o', project='p'),
+            project_folder=os.getcwd(), images_folder=os.getcwd(), training_folder=os.getcwd(), image_data=[],
+            categories=[Category(name='class_a', id='uuid_of_class_a', type='box')],
+            hyperparameters={'resolution': 600}, model_variant='', training_number=1,
+            training_state=TrainerState.Initialized.value)
+        shutil.copy(TEST_DATA_DIR / 'hyp.yaml', trainer.hyperparameter_path)
+        with open('dataset.yaml', 'w') as f:
+            f.write('nc: 1\n')
+
+        with pytest.raises(batch_size_calculation.InvalidResolutionError):
+            await trainer._start(os.path.abspath('model.pt'))
 
     @pytest.mark.usefixtures('use_training_dir')
     async def test_new_model_discovery(self):
