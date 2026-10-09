@@ -13,6 +13,18 @@ from .yolov5.models.yolo import Model
 from .yolov5.utils.downloads import attempt_download
 
 
+class InvalidResolutionError(CriticalError):
+    pass
+
+
+def check_resolution(img_size: object, model: Model) -> None:
+    """The input size must be a multiple of the model's largest stride and at least twice that stride."""
+    stride = max(int(model.stride.max()), 32)
+    if not isinstance(img_size, int) or isinstance(img_size, bool) or img_size < 2 * stride or img_size % stride:
+        raise InvalidResolutionError(
+            f'invalid resolution {img_size!r}: must be a multiple of {stride} and at least {2 * stride}')
+
+
 async def calc(training_path: str, model_file: str, hyp_path: str, dataset_path: str, img_size: int,
                init_clear_cuda: bool = True) -> int:
 
@@ -39,7 +51,9 @@ async def calc(training_path: str, model_file: str, hyp_path: str, dataset_path:
     except FileNotFoundError:
         ckpt = torch.load(f'{training_path}/{model_file}', map_location=device, weights_only=False)
 
-    model = Model(ckpt['model'].yaml, ch=3, nc=dataset.get('nc'), anchors=hyp.get('anchors')).to(device)  # create
+    model = Model(ckpt['model'].yaml, ch=3, nc=dataset.get('nc'), anchors=hyp.get('anchors'))
+    check_resolution(img_size, model)
+    model = model.to(device)
 
     best_batch_size = None
     for batch_size in [128, 96, 64, 48, 32, 24, 16, 12, 8, 6, 4, 2, 1]:

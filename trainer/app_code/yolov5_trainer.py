@@ -194,13 +194,15 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         await self._start(model, additional_params)
 
     async def _start(self, model: str, additional_parameters: str = ''):
-        resolution = self.training.hyperparameters['resolution']
+        resolution = self.training.hyperparameters.get('resolution')
 
         self._save_additional_hyperparameters()
 
         try:
             batch_size = await batch_size_calculation.calc(self.training.training_folder, model, self.hyperparameter_path,
                                                            f'{self.training.training_folder}/dataset.yaml', resolution)
+        except batch_size_calculation.InvalidResolutionError:
+            raise
         except Exception as e:
             logging.exception('Error during batch size calculation:')
             raise NodeNeedsRestartError() from e
