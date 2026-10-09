@@ -23,7 +23,7 @@ from learning_loop_node.trainer.batch_size import REQUESTED_BATCH_SIZE, requeste
 from learning_loop_node.trainer.exceptions import CriticalError, NodeNeedsRestartError
 from learning_loop_node.trainer.executor import Executor
 
-from . import model_files, yolov5_format
+from . import batch_size_calculation, model_files, yolov5_format
 
 
 class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
@@ -198,11 +198,15 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         return {**hyperparameters, 'batch_size': json.loads(result_path.read_text())['batch_size']}
 
     def _get_executor_error_from_log(self) -> str | None:
-        """Also recognise the batch-size probe finding that not even the smallest batch fits.
+        """Also recognise the errors from `train_det.py` that no retry can fix.
 
-        :raises CriticalError: In that case, which no retry can fix.
+        :raises InvalidResolutionError: If the resolution does not suit the model's largest stride.
+        :raises CriticalError: If the batch-size probe finds that not even the smallest batch fits.
         """
         lines = self._executor.get_log_by_lines(tail=50) if self._executor else []
+        for line in lines:
+            if 'InvalidResolutionError: ' in line:
+                raise batch_size_calculation.InvalidResolutionError(line.split('InvalidResolutionError: ', 1)[1].strip())
         if any('InsufficientMemoryError' in line for line in lines):
             raise CriticalError('graphics card is too small for even the smallest batch size')
         return super()._get_executor_error_from_log()
@@ -222,6 +226,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
     async def _start(self, model: str, additional_parameters: str = ''):
         resolution = self.training.hyperparameters.get('resolution')
+        batch_size_calculation.check_resolution(resolution, batch_size_calculation.MIN_STRIDE)
 
         self._save_additional_hyperparameters()
 

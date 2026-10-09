@@ -263,6 +263,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
     # Image size
     gs = max(int(model.stride.max()), 32)  # grid size (max stride)
+    batch_size_calculation.check_resolution(opt.imgsz, gs)  # PATCH (yolov5-node): reject an --img check_img_size would round
     imgsz = check_img_size(opt.imgsz, gs, floor=gs * 2)  # verify imgsz is gs-multiple
 
     # PATCH (yolov5-node): -1 probes the batch size on this model, where upstream's autobatch did

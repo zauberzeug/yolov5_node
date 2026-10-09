@@ -13,7 +13,7 @@ Trainer is tested with Nvidia Driver Version: 580.95.05 and CUDA Version: 13.0. 
 We support all native hyperparameters of YOLOv5 (cf. `hyp_det.yaml` for reference).
 In addition, we support the following hyperparameters:
 
-- `resolution`: The input size of the model. It must be a multiple of the model's largest stride (32, or 64 for the P6 `*6` variants) and at least twice that; otherwise the training fails without being started.
+- `resolution`: The input size of the model. It must be a multiple of the model's largest stride (32, or 64 for the P6 `*6` variants) and at least twice that; otherwise the training fails before its first epoch.
 - `epochs`: The number of epochs to train the model.
 - `max_batch_size`: The largest batch size the training may use. It is measured rather than trusted: if it fits it is used as given, and if it does not, the largest power of two below it that does is used instead. `0` (the default) means 128. The training never uses fewer than 2 samples per batch, because validation halves the batch, so a `max_batch_size` of 1 is raised to 2. The value that was actually used is reported back as `batch_size` (see below).
 - `detect_nms_conf_thres`: The confidence threshold for the NMS during inference and validation (not relevant for training).

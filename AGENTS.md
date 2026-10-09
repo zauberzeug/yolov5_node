@@ -63,7 +63,11 @@ rectangular validation loader. The step is all this repository supplies, as a `P
 library's `measure_batch_size` builds through a factory and releases itself. `train_det.py` writes
 the settled size to `result/batch_size.json`, which the node adds to the hyperparameters it syncs;
 a probe that finds not even the smallest batch fitting ends the training with a `CriticalError`.
-Three of the bounds are ours: `MIN_BATCH_SIZE`, because `train_det.py` validates at
+So does a `--img` the model's largest stride does not divide: `train_det.py` rejects it through
+`check_resolution` just before the probe, where upstream would round it, and the node reads both
+errors out of the log in `_get_executor_error_from_log`. The node, which has no model, checks
+`resolution` against `MIN_STRIDE` before it starts `train_det.py`, which already catches anything
+that suits no model. Three of the bounds are ours: `MIN_BATCH_SIZE`, because `train_det.py` validates at
 `batch_size // 2`; `DEFAULT_MAX_BATCH_SIZE` for a training that sets no `max_batch_size`; and the
 `sample_count` counted off the `train/` folder, which keeps an epoch enough optimizer steps to
 mean something. That count is floored at `NOMINAL_BATCH_SIZE` times the library's

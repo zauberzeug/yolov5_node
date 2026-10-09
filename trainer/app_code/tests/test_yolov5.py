@@ -18,7 +18,6 @@ from learning_loop_node.trainer.executor import Executor
 from ruamel.yaml import YAML
 
 from .. import batch_size_calculation, model_files, yolov5_format
-from ..yolov5.models.yolo import Model
 from ..yolov5_format import set_hyperparameters_in_file
 from ..yolov5_trainer import Yolov5TrainerLogic
 
@@ -26,9 +25,6 @@ from ..yolov5_trainer import Yolov5TrainerLogic
 
 logging.basicConfig(level=logging.DEBUG)
 yaml = YAML()
-
-MODELS_DIR = Path(__file__).resolve().parents[1] / 'yolov5' / 'models'
-TEST_DATA_DIR = Path(__file__).resolve().parent / 'test_data'
 
 project_configuration = {
     'project_name': 'pytest_yolo5det', 'box_categories': 2, 'point_categories': 2, 'inbox': 4, 'annotate': 0, 'review': 0,
@@ -103,6 +99,37 @@ class TestWithLoop:
         assert hyperparameters['batch_size'] >= batch_size_calculation.MIN_BATCH_SIZE
 
     @pytest.mark.usefixtures('use_training_dir')
+    async def test_invalid_resolution_ends_the_training(self, data_exchanger: DataExchanger, glc: LoopCommunicator):
+        """Test if train_det.py rejects a resolution the model's stride does not divide and the node reports it"""
+        trainer = Yolov5TrainerLogic()
+        project_folder = os.getcwd()
+        images_folder = create_image_folder(project_folder)
+        categories, image_data = await download_training_data(images_folder, data_exchanger, glc)
+        trainer._training = Training(
+            id=str(uuid4()),
+            project_folder=project_folder,
+            training_folder=project_folder + '/training',
+            images_folder=images_folder,
+            model_variant='',
+            context=Context(project='pytest_yolo5det', organization='zauberzeug'),
+            categories=categories, hyperparameters={}, training_number=1,
+            training_state=TrainerState.Initialized.value,
+            image_data=image_data,
+        )
+        yolov5_format.create_file_structure(trainer.training)
+
+        trainer._executor = Executor(os.getcwd())
+        ROOT = Path(__file__).resolve().parents[2]
+        cmd = f'python {ROOT/"train_det.py"} --project training --name result --batch-size -1 --img 600 --data training/dataset.yaml --weights model.pt --epochs 1'
+        await trainer.executor.start(cmd, env={'WANDB_MODE': 'disabled'})
+        while trainer.executor.is_running():
+            await asyncio.sleep(1)
+
+        with pytest.raises(batch_size_calculation.InvalidResolutionError,
+                           match='invalid resolution 600: must be a multiple of 32 and at least 64'):
+            trainer._get_executor_error_from_log()
+
+    @pytest.mark.usefixtures('use_training_dir')
     async def test_parse_progress_from_log(self, data_exchanger: DataExchanger, glc: LoopCommunicator):
         """Test if progress is parsed correctly from log"""
         trainer = Yolov5TrainerLogic()
@@ -167,31 +194,27 @@ class TestWithDetection:
         assert '0 0.500000 0.600000 0.200000 0.200000' in lines[0]
         assert '1 0.600000 0.700000 0.300000 0.300000' in lines[1]
 
-    @pytest.mark.parametrize('config, resolution', [
-        ('yolov5n.yaml', 640), ('yolov5n.yaml', 64), ('yolov5n.yaml', 608),
-        ('hub/yolov5n6.yaml', 1280), ('hub/yolov5n6.yaml', 128)])
-    def test_valid_resolution_is_accepted(self, config: str, resolution: int):
-        batch_size_calculation.check_resolution(resolution, Model(MODELS_DIR / config))
+    @pytest.mark.parametrize('stride, resolution', [(32, 640), (32, 64), (32, 608), (64, 1280), (64, 128)])
+    def test_valid_resolution_is_accepted(self, stride: int, resolution: int):
+        batch_size_calculation.check_resolution(resolution, stride)
 
-    @pytest.mark.parametrize('config, resolution', [
-        ('yolov5n.yaml', 600), ('yolov5n.yaml', 32), ('yolov5n.yaml', '640'), ('yolov5n.yaml', True),
-        ('yolov5n.yaml', None), ('hub/yolov5n6.yaml', 608), ('hub/yolov5n6.yaml', 64)])
-    def test_invalid_resolution_is_rejected(self, config: str, resolution):
+    @pytest.mark.parametrize('stride, resolution', [
+        (32, 600), (32, 32), (32, '640'), (32, True), (32, None), (64, 608), (64, 64)])
+    def test_invalid_resolution_is_rejected(self, stride: int, resolution):
         with pytest.raises(batch_size_calculation.InvalidResolutionError, match='invalid resolution'):
-            batch_size_calculation.check_resolution(resolution, Model(MODELS_DIR / config))
+            batch_size_calculation.check_resolution(resolution, stride)
 
+    @pytest.mark.parametrize('resolution', [600, '640', True, None])
     @pytest.mark.usefixtures('use_training_dir')
-    async def test_invalid_resolution_fails_the_training_instead_of_restarting(self):
+    async def test_invalid_resolution_fails_the_training_instead_of_restarting(self, resolution):
+        """Test if the node rejects what suits no model before it starts train_det.py"""
         trainer = Yolov5TrainerLogic()
         trainer._training = Training(
             id='someid', context=Context(organization='o', project='p'),
             project_folder=os.getcwd(), images_folder=os.getcwd(), training_folder=os.getcwd(), image_data=[],
             categories=[Category(name='class_a', id='uuid_of_class_a', type='box')],
-            hyperparameters={'resolution': 600}, model_variant='', training_number=1,
+            hyperparameters={'resolution': resolution}, model_variant='', training_number=1,
             training_state=TrainerState.Initialized.value)
-        shutil.copy(TEST_DATA_DIR / 'hyp.yaml', trainer.hyperparameter_path)
-        with open('dataset.yaml', 'w') as f:
-            f.write('nc: 1\n')
 
         with pytest.raises(batch_size_calculation.InvalidResolutionError):
             await trainer._start(os.path.abspath('model.pt'))
