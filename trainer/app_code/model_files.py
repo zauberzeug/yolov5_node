@@ -8,7 +8,6 @@ def get_all_weightfiles(training_path: Path) -> list[Path]:
 
 
 def resume_checkpoint(training_path: Path) -> Path | None:
-    """The checkpoint an interrupted training continues from; older trainings only have the published one."""
     weights = training_path / 'result/weights'
     for path in (weights / 'last.pt', weights / 'published/latest.pt'):
         if path.exists():
