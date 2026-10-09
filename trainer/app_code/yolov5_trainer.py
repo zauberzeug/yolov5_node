@@ -190,7 +190,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     def hyperparameters_for_state_sync(self) -> dict | None:
         """The hyperparameters, with the `batch_size` `train_det.py` measured once it has."""
         hyperparameters = super().hyperparameters_for_state_sync
-        if hyperparameters is None or (batch_size := self._run.batch_size) is None:
+        if hyperparameters is None or (batch_size := self._training_run.batch_size) is None:
             return hyperparameters
         return {**hyperparameters, 'batch_size': batch_size}
 
@@ -201,7 +201,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         :raises CriticalError: If not even the smallest batch fits on the graphics card.
         :raises NoGpuError: If there is no graphics card to train on.
         """
-        self._run.raise_failure()
+        self._training_run.raise_failure()
         return super()._get_executor_error_from_log()
 
     # ---------------------------------------- ADDITIONAL METHODS ----------------------------------------
@@ -258,11 +258,11 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         if flip_label_pairs:
             cmd += f' --flip_label_pairs {flip_label_pairs[:-1]}'
 
-        self._run.clear_failure()
+        self._training_run.clear_failure()
         await self.executor.start(cmd, env={'WANDB_MODE': 'disabled'})
 
     @property
-    def _run(self) -> training_run.TrainingRun:
+    def _training_run(self) -> training_run.TrainingRun:
         return training_run.TrainingRun(self.training.training_folder_path / 'result')
 
     def _requested_batch_size(self) -> int:
