@@ -198,10 +198,16 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
     async def _clear_training_data(self, training_folder: str) -> None:
         keep_files = ['hyp.yaml', 'dataset.yaml', 'best.pt']
-        keep_dirs = ['result', 'weights']
+        # keep_dirs = ['result', 'weights']
+        keep_dirs = ['result', 'weights', 'examples']
+        # keep the training logs (results.csv, plots, batch and example images); only drop dataset and extra weights
+        result_path = Path(training_folder, 'result').resolve()
+        keep_log_dirs = [result_path, result_path / 'examples']
         for root, dirs, files in os.walk(training_folder, topdown=False):
             for file in files:
-                if file not in keep_files and not file.endswith('.log'):
+                # if file not in keep_files and not file.endswith('.log'):
+                if file not in keep_files and not file.endswith('.log') \
+                        and not (Path(root).resolve() in keep_log_dirs and not file.endswith('.pt')):
                     os.remove(os.path.join(root, file))
             for dir_ in dirs:
                 if dir_ not in keep_dirs:
