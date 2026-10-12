@@ -92,11 +92,10 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         checkpoint = model_files.resume_checkpoint(self.training.training_folder_path)
         assert checkpoint is not None
         self._save_additional_hyperparameters()
-        with (self.training.training_folder_path / 'result/opt.yaml').open() as handle:
-            options = yaml.safe_load(handle)
-        self.training.hyperparameters['batch_size'] = options['batch_size']
         self.training.hyperparameters['trainer_version'] = os.environ.get('NODE_VERSION') or 'unknown'
-        await self.executor.start(f'python /app/train_det.py --resume {shlex.quote(str(checkpoint))}',
+        self._training_run.clear_failure()
+        await self.executor.start(f'python /app/train_det.py --resume {shlex.quote(str(checkpoint))} \
+            --project {self.training.training_folder} --name result --vram-limit-gb {self._vram_limit_gb}',
                                   env={'WANDB_MODE': 'disabled'})
 
     def _get_new_best_training_state(self) -> TrainingStateData | None:
