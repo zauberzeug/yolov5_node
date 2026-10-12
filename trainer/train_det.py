@@ -648,6 +648,8 @@ def main(opt, callbacks=Callbacks()):
         opt = argparse.Namespace(**d)  # replace
         opt.cfg, opt.weights, opt.resume = '', str(last), True  # reinstate
         opt.clear = False  # PATCH (yolov5-node): --clear belongs only to a fresh training.
+        if opt.batch_size == -1:  # PATCH (yolov5-node): keep the batch size the interrupted run measured.
+            opt.batch_size = training_run.TrainingRun(Path(opt.save_dir)).batch_size or -1
         if is_url(opt_data):
             opt.data = check_file(opt_data)  # avoid HUB resume auth timeout
     else:

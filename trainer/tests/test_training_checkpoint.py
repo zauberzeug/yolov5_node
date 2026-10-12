@@ -9,6 +9,7 @@ import pytest
 import torch
 
 import train_det
+from app_code import training_run
 from app_code.model_files import resume_checkpoint
 from app_code.training_checkpoint import (
     atomic_save,
@@ -148,25 +149,46 @@ def test_resume_prefers_last_checkpoint_over_published_model(tmp_path: Path) -> 
     assert resume_checkpoint(tmp_path) == weights / 'last.pt'
 
 
-def test_node_uses_last_checkpoint_without_batch_probe(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_main_resumes_with_the_measured_batch_size(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    weights = tmp_path / 'result/weights'
+    weights.mkdir(parents=True)
+    checkpoint = weights / 'last.pt'
+    checkpoint.touch()
+    monkeypatch.setattr('sys.argv', ['train_det.py'])
+    options = train_det.parse_opt()
+    options.batch_size = -1
+    options.save_dir = str(weights.parent)
+    train_det.yaml_save(str(weights.parent / 'opt.yaml'), vars(options))
+    training_run.report_batch_size(weights.parent, 16)
+    options.resume = str(checkpoint)
+    train = MagicMock()
+    monkeypatch.setattr(train_det, 'train', train)
+    monkeypatch.setattr(train_det, 'select_device', lambda *_a, **_kw: torch.device('cpu'))
+    monkeypatch.setattr(train_det, 'check_comet_resume', lambda _: False)
+
+    train_det.main(options)
+
+    assert train.call_args.args[1].batch_size == 16
+
+
+def test_node_resumes_from_last_checkpoint_into_the_result_folder(tmp_path: Path) -> None:
     weights = tmp_path / 'result/weights'
     (weights / 'published').mkdir(parents=True)
     (weights / 'last.pt').touch()
     (weights / 'published/latest.pt').touch()
-    (weights.parent / 'opt.yaml').write_text('batch_size: 4\n')
     (tmp_path / 'hyp.yaml').write_text('epochs: 10\n')
     logic = Yolov5TrainerLogic()
     logic._training = SimpleNamespace(training_folder=str(tmp_path), training_folder_path=tmp_path, hyperparameters={})
     logic._executor = MagicMock(start=AsyncMock())
-    probe = AsyncMock(side_effect=AssertionError('must not probe'))
-    monkeypatch.setattr('app_code.yolov5_trainer.batch_size_calculation.calc', probe)
     assert logic._can_resume()
 
     asyncio.run(logic._resume())
 
-    assert logic.executor.start.call_args.args[0] == f'python /app/train_det.py --resume {weights / "last.pt"}'
-    assert logic.training.hyperparameters['batch_size'] == 4
-    probe.assert_not_called()
+    command = logic.executor.start.call_args.args[0].split()
+    assert command[:4] == ['python', '/app/train_det.py', '--resume', str(weights / 'last.pt')]
+    assert command[command.index('--project') + 1] == str(tmp_path)
+    assert command[command.index('--name') + 1] == 'result'
+    assert '--vram-limit-gb' in command
 
 
 def test_finished_after_early_stop_or_last_epoch() -> None:
