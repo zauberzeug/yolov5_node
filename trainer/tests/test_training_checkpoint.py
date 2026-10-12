@@ -160,6 +160,7 @@ def test_main_resumes_with_the_measured_batch_size(tmp_path: Path, monkeypatch: 
     options = train_det.parse_opt()
     options.batch_size = -1
     options.save_dir = str(weights.parent)
+    options.project, options.name = str(tmp_path), 'result'
     train_det.yaml_save(str(weights.parent / 'opt.yaml'), vars(options))
     if measured is not None:
         training_run.report_batch_size(weights.parent, measured)
