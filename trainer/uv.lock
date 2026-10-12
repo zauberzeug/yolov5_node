@@ -1007,7 +1007,7 @@ wheels = [
 
 [[package]]
 name = "learning-loop-node"
-version = "0.23.0"
+version = "0.24.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles" },
@@ -1026,9 +1026,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "uvicorn", extra = ["standard"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d2/31/f86903408d6173ebd837a7236f6ad3ecac796e9f2aa3c91dc11493308b15/learning_loop_node-0.23.0.tar.gz", hash = "sha256:61caa353c922cf52e4b19c16cb0cb7a43bb900d32843d683bfc3d0f3bb3af5c1", size = 74090, upload-time = "2026-09-10T05:27:48.691Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ce/b6/ca45bc014719bacff9cc9c6f6a1bc0af56daec7577f6408e9ea253f96278/learning_loop_node-0.24.0.tar.gz", hash = "sha256:45ce3d9cc07d1a317e9222c1cd5aad942aa7c774c10d3c6003f99a798ace660d", size = 77730, upload-time = "2026-10-07T13:20:19.468Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/71/9c/062b35ed5231add37c4023c5cec989c695f16e0cd34c6beadce45846a438/learning_loop_node-0.23.0-py3-none-any.whl", hash = "sha256:4775f0f11a8932adced9b59731f1852e7d6339d00079cc7a2ff1f67f835bbb71", size = 89629, upload-time = "2026-09-10T05:27:47.538Z" },
+    { url = "https://files.pythonhosted.org/packages/bb/bd/a89f6194fd5b04fa6f448482f8a9b328de001c83680e67b38bcc7f33b294/learning_loop_node-0.24.0-py3-none-any.whl", hash = "sha256:f39e46810d4baa33d2cc4d777fb7f234e3f1a97dcb5be842884e43dd02225b78", size = 93246, upload-time = "2026-10-07T13:20:18.044Z" },
 ]
 
 [[package]]
@@ -2626,15 +2626,6 @@ wheels = [
 ]
 
 [[package]]
-name = "torchinfo"
-version = "1.8.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/53/d9/2b811d1c0812e9ef23e6cf2dbe022becbe6c5ab065e33fd80ee05c0cd996/torchinfo-1.8.0.tar.gz", hash = "sha256:72e94b0e9a3e64dc583a8e5b7940b8938a1ac0f033f795457f27e6f4e7afa2e9", size = 25880, upload-time = "2023-05-14T19:23:26.377Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/72/25/973bd6128381951b23cdcd8a9870c6dcfc5606cb864df8eabd82e529f9c1/torchinfo-1.8.0-py3-none-any.whl", hash = "sha256:2e911c2918603f945c26ff21a3a838d12709223dc4ccf243407bce8b6e897b46", size = 23377, upload-time = "2023-05-14T19:23:24.141Z" },
-]
-
-[[package]]
 name = "torchvision"
 version = "0.28.0+cu130"
 source = { registry = "https://download.pytorch.org/whl/cu130" }
@@ -3051,7 +3042,6 @@ source = { virtual = "." }
 dependencies = [
     { name = "learning-loop-node" },
     { name = "ruamel-yaml" },
-    { name = "torchinfo" },
 ]
 
 [package.dev-dependencies]
@@ -3090,9 +3080,8 @@ yolo = [
 
 [package.metadata]
 requires-dist = [
-    { name = "learning-loop-node", specifier = "==0.23.0" },
+    { name = "learning-loop-node", specifier = "==0.24.0" },
     { name = "ruamel-yaml" },
-    { name = "torchinfo", specifier = ">=1.8.0" },
 ]
 
 [package.metadata.requires-dev]

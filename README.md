@@ -13,7 +13,9 @@ Trainer is tested with Nvidia Driver Version: 580.95.05 and CUDA Version: 13.0. 
 We support all native hyperparameters of YOLOv5 (cf. `hyp_det.yaml` for reference).
 In addition, we support the following hyperparameters:
 
+- `resolution`: The input size of the model. It must be a multiple of the model's largest stride (32, or 64 for the P6 `*6` variants) and at least twice that; otherwise the training fails before its first epoch.
 - `epochs`: The number of epochs to train the model.
+- `max_batch_size`: The largest batch size the training may use. It is measured rather than trusted: if it fits it is used as given, and if it does not, the largest power of two below it that does is used instead. `0` (the default) means 128. The training set bounds it as well: by an eighth of the training images, but never below 64. A training of fewer than 1 024 images therefore uses at most 64, and a `max_batch_size` above that bound is not tried as given. The training never uses fewer than 2 samples per batch, because validation halves the batch, so a `max_batch_size` of 1 is raised to 2. The value that was actually used is reported back as `batch_size` (see below).
 - `detect_nms_conf_thres`: The confidence threshold for the NMS during inference and validation (not relevant for training).
 - `detect_nms_iou_thres`: The IoU threshold for the NMS during inference and validation (not used for training).
 
@@ -23,16 +25,17 @@ Further, we support the following hyperparameters for point detection:
 - `point_sizes_by_id`: A dictionary that maps from point category uuids to the size of the points in the output (fractional size 0-1).
 - `flip_label_pairs`: A list of pairs of point uuids that should be swapped when a horizontal flip is applied during data augmentation.
 
-The trainer reports two more hyperparameters back to the Learning Loop. They are output only and never read as input:
+The trainer reports these hyperparameters back to the Learning Loop:
 
-- `batch_size`: The batch size the training actually ran with, computed from the available GPU memory.
-- `trainer_version`: The version of the trainer node, which the release build bakes into the docker image as `NODE_VERSION`. Locally built images report `unknown`.
+- `batch_size`: The batch size the training actually ran with, which is at most `max_batch_size` when that is set (but never below 2). Output only; never read as input, so a training resumed after a restart of the node measures again instead of taking its first run's result as its bound.
+- `trainer_version`: The version of the trainer node, which the release build bakes into the docker image as `NODE_VERSION`. Locally built images report `unknown`. Output only; never read as input.
 
 ## Images
 
 Trainer Docker-Images are published on https://hub.docker.com/r/zauberzeug/yolov5-trainer
 
-New images can be pulled with `docker pull zauberzeug/yolov5-trainer:A.B.C-nlvX.Y.Z`, where `A.B.C` is the version of the trainer node and `X.Y.Z` is the version of the learning loop node library.
+Released images can be pulled with `docker pull zauberzeug/yolov5-trainer:A.B.C`, where `A.B.C` is the version of the release.
+`zauberzeug/yolov5-trainer:latest` always points to the release marked as "Latest" on GitHub, also when a release is marked as latest only later (for example a promoted pre-release).
 
 During development, i.e. when building the container from code it is recommended to use the script `docker.sh` in the folder `trainer` to build/start/interact with the image.
 It is a thin wrapper: what differs about the sub-project is in `docker.conf` next to it, and the rest is `scripts/node-docker.sh`, a copy of which each node repository holds.
@@ -47,6 +50,7 @@ When using the script it is required to set up a .env file in the trainer folder
 | UVICORN_RELOAD              | Enable hot-reload                                    | TRUE/FALSE/0/1 | FALSE   | No                           |
 | RESTART_AFTER_TRAINING      | Auto-restart after training                          | TRUE/FALSE/0/1 | FALSE   | No                           |
 | KEEP_OLD_TRAININGS          | Do not remove old trainings, when starting a new one | TRUE/FALSE/0/1 | FALSE   | No                           |
+| VRAM_LIMIT_GB               | Gigabytes of GPU memory a training may use. The batch size is probed against this limit instead of the whole card, and `train_det.py` and `pred_det.py` cap themselves to it, so a lower limit yields a smaller batch size rather than an out-of-memory error. Useful to share one GPU between processes. The limit is relative to the card's *total* memory, not to what is currently free | Number | 0 (no limit) | No |
 
 ## Interrupted Training
 
@@ -105,15 +109,15 @@ Local builds can be run with `./docker.sh run` (or `./docker.sh r`).
 
 ### Cloud-Detector (For Linux computers with Nvidia GPU)
 
-Images can be pulled with `docker pull zauberzeug/yolov5-detector:A.B.C-nlvX.Y.Z-cloud`, where `A.B.C` is the version of the detector node and `X.Y.Z` is the version of the learning loop node library.
+Images can be pulled with `docker pull zauberzeug/yolov5-detector:A.B.C-cloud`, where `A.B.C` is the version of the release; `latest-cloud` points to the newest release.
 
 ### Cloud-CPU-Detector (For Linux computers without Nvidia GPU)
 
-Images can be pulled with `docker pull zauberzeug/yolov5-detector:A.B.C-nlvX.Y.Z-cloud-cpu`, where `A.B.C` is the version of the detector node and `X.Y.Z` is the version of the learning loop node library.
+Images can be pulled with `docker pull zauberzeug/yolov5-detector:A.B.C-cloud-cpu`, where `A.B.C` is the version of the release; `latest-cloud-cpu` points to the newest release.
 
 ### L4T-Detector
 
-Images can be pulled with `docker pull zauberzeug/yolov5-detector:A.B.C-nlvX.Y.Z-L.4.T`, where `A.B.C` is the version of the detector node, `X.Y.Z` is the version of the node-lib used and `L.4.T` is the L4T version.
+Images can be pulled with `docker pull zauberzeug/yolov5-detector:A.B.C-jetson`, where `A.B.C` is the version of the release; `latest-jetson` points to the newest release.
 
 ## Get Detections
 
