@@ -43,6 +43,5 @@
     "editor.codeActionsOnSave": {
       "source.organizeImports": "explicit"
     }
-  },
-  "cmake.sourceDirectory": "/Users/jan/Projects/yolov5_node/detector/tensorrtx/yolov5"
+  }
 }
