@@ -16,7 +16,6 @@ Tutorial:   https://github.com/ultralytics/yolov5/wiki/Train-Custom-Data
 """
 
 import argparse
-import json
 import math
 import os
 import random
@@ -38,6 +37,15 @@ from torch.optim import lr_scheduler
 from tqdm import tqdm
 
 from app_code import batch_size_calculation, training_recipe, training_run
+from app_code.training_checkpoint import (
+    atomic_save,
+    discard_unfinished_epochs,
+    finished,
+    restore_training_state,
+    resume_fields,
+    resume_state,
+    save_best,
+)
 from app_code.yolov5 import val as validate  # for end-of-epoch mAP
 from app_code.yolov5.models.experimental import attempt_load
 from app_code.yolov5.models.yolo import Model
@@ -65,7 +73,6 @@ from app_code.yolov5.utils.general import (
     one_cycle,
     print_args,
     print_mutation,
-    strip_optimizer,
     yaml_save,
 )
 from app_code.yolov5.utils.loggers import Loggers
@@ -208,7 +215,10 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     # Save run settings
     if not evolve:
         yaml_save(str(save_dir / 'hyp.yaml'), hyp)
-        yaml_save(str(save_dir / 'opt.yaml'), vars(opt))
+        # PATCH (yolov5-node): resume options remain readable during a restart.
+        options_path = save_dir / 'opt.tmp.yaml'
+        yaml_save(str(options_path), vars(opt))
+        options_path.replace(save_dir / 'opt.yaml')
 
     loggers = Loggers(save_dir, weights, opt, hyp, LOGGER)  # loggers instance
 
@@ -239,6 +249,12 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         weights = attempt_download(weights)  # download if not found locally
         # load checkpoint to CPU to avoid CUDA memory leak
         ckpt = torch.load(weights, map_location='cpu', weights_only=False)
+        # PATCH (yolov5-node): resume after the last completed epoch, or only publish when none is left.
+        if resume:
+            discard_unfinished_epochs(w, ckpt['epoch'])
+        if resume and finished(ckpt, epochs):
+            LOGGER.info('Training checkpoint already completed; continuing with model publication.')
+            return (0.0,) * 7
         model = Model(cfg or ckpt['model'].yaml, ch=3, nc=nc, anchors=hyp.get('anchors')).to(device)  # create
         exclude = ['anchor'] if (cfg or hyp.get('anchors')) and not resume else []  # exclude keys
         csd = ckpt['model'].float().state_dict()  # checkpoint state_dict as FP32
@@ -288,11 +304,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     # Resume
     best_fitness, start_epoch = 0.0, 0
     if pretrained:
-        # Optimizer
-        # if ckpt['optimizer'] is not None:
-        #     optimizer.load_state_dict(ckpt['optimizer'])
-        #     best_fitness = ckpt['best_fitness']
-
         # EMA
         if ema and ckpt.get('ema'):
             ema.ema.load_state_dict(ckpt['ema'].float().state_dict())
@@ -304,6 +315,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         start_epoch = ckpt['epoch'] + 1
         if resume:
             best_fitness, start_epoch, epochs = smart_resume(ckpt, optimizer, ema, weights, epochs, resume)
+            state = resume_state(ckpt)  # PATCH (yolov5-node): what the restore below needs after `del ckpt`
         del ckpt, csd
 
     # Trainloader
@@ -370,6 +382,9 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     scheduler.last_epoch = start_epoch - 1  # do not move
     scaler = torch.cuda.amp.GradScaler(enabled=amp)
     stopper, stop = EarlyStopping(patience=opt.patience), False
+    # PATCH (yolov5-node): retain the schedule, AMP scale and early-stopping history across restarts.
+    if resume:
+        last_opt_step = restore_training_state(state, scheduler, scaler, stopper, start_epoch * nb - 1)
     compute_loss = ComputeLoss(model)  # init loss class
     callbacks.run('on_train_start')
     LOGGER.info(f'Image sizes {imgsz} train, {imgsz} val\n'
@@ -492,6 +507,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 'ema': deepcopy(ema.ema).half(),
                 'updates': ema.updates,
                 'optimizer': optimizer.state_dict(),
+                **resume_fields(scheduler, scaler, stopper, last_opt_step, stop),  # PATCH (yolov5-node): runtime state for resume
                 'opt': vars(opt),
                 'git': 'remote',
                 'date': datetime.now().isoformat()}
@@ -508,15 +524,12 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     visu.save(examples / f'example_{epoch}_{idx}.png')
 
             # Save last, best and delete
-            torch.save(ckpt, last)
+            # PATCH (yolov5-node): best keeps only the EMA weights; readers only see fully written checkpoints.
             if best_fitness == fi:
-                torch.save(ckpt, best)
-                if confusion_matrices:
-                    with open(w / f'epoch{epoch}.json', 'w+') as f:
-                        json.dump(confusion_matrices, f)
-                    torch.save(ckpt, w / f'epoch{epoch}.pt')
+                save_best(ckpt, w, confusion_matrices)
             if (epoch > 0) and (opt.save_period > 0) and (epoch % opt.save_period == 0):
-                torch.save(ckpt, w / f'epoch{epoch}.pt')
+                atomic_save(ckpt, w / f'epoch{epoch}.pt')
+            atomic_save(ckpt, last)
             del ckpt
             callbacks.run('on_model_save', last, epoch, final_epoch, best_fitness, fi)
 
@@ -529,7 +542,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     LOGGER.info(f'\n{epoch - start_epoch + 1} epochs completed in {(time.time() - t0) / 3600:.3f} hours.')
     for f in last, best:
         if f.exists():
-            strip_optimizer(f)  # strip optimizers
+            # PATCH (yolov5-node): checkpoints retain their resume state after the final epoch.
             if f is best:
                 LOGGER.info(f'\nValidating {f}...')
                 results, _, _, _ = validate.run(
@@ -627,6 +640,7 @@ def main(opt, callbacks=Callbacks()):
         last = Path(check_file(opt.resume) if isinstance(opt.resume, str) else get_latest_run())
         opt_yaml = last.parent.parent / 'opt.yaml'  # train options yaml
         opt_data = opt.data  # original dataset
+        result_dir = Path(opt.project) / opt.name  # PATCH (yolov5-node): the folder the node passed.
         if opt_yaml.is_file():
             with open(opt_yaml, errors='ignore') as f:
                 d = yaml.safe_load(f)
@@ -634,6 +648,9 @@ def main(opt, callbacks=Callbacks()):
             d = torch.load(last, map_location='cpu', weights_only=False)['opt']
         opt = argparse.Namespace(**d)  # replace
         opt.cfg, opt.weights, opt.resume = '', str(last), True  # reinstate
+        opt.clear = False  # PATCH (yolov5-node): --clear belongs only to a fresh training.
+        if opt.batch_size == -1:  # PATCH (yolov5-node): keep the batch size the interrupted run measured.
+            opt.batch_size = training_run.TrainingRun(result_dir).batch_size or -1
         if is_url(opt_data):
             opt.data = check_file(opt_data)  # avoid HUB resume auth timeout
     else:

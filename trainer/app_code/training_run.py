@@ -1,7 +1,8 @@
-"""What `train_det.py` leaves in its result folder for the trainer node to read.
+"""What `train_det.py` leaves in its result folder for the trainer node, and for its own resume, to read.
 
 `train_det.py` writes through :func:`report_batch_size` and :func:`reporting`; the node reads
-through :class:`TrainingRun`. The file names and their format stay inside this module.
+through :class:`TrainingRun`, and so does a resumed `train_det.py` for the batch size the
+interrupted run measured. The file names and their format stay inside this module.
 """
 import json
 import os
