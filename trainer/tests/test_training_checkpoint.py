@@ -149,7 +149,9 @@ def test_resume_prefers_last_checkpoint_over_published_model(tmp_path: Path) -> 
     assert resume_checkpoint(tmp_path) == weights / 'last.pt'
 
 
-def test_main_resumes_with_the_measured_batch_size(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize(('measured', 'expected'), [(16, 16), (None, -1)])
+def test_main_resumes_with_the_measured_batch_size(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                   measured: int | None, expected: int) -> None:
     weights = tmp_path / 'result/weights'
     weights.mkdir(parents=True)
     checkpoint = weights / 'last.pt'
@@ -159,7 +161,8 @@ def test_main_resumes_with_the_measured_batch_size(tmp_path: Path, monkeypatch: 
     options.batch_size = -1
     options.save_dir = str(weights.parent)
     train_det.yaml_save(str(weights.parent / 'opt.yaml'), vars(options))
-    training_run.report_batch_size(weights.parent, 16)
+    if measured is not None:
+        training_run.report_batch_size(weights.parent, measured)
     options.resume = str(checkpoint)
     train = MagicMock()
     monkeypatch.setattr(train_det, 'train', train)
@@ -168,7 +171,7 @@ def test_main_resumes_with_the_measured_batch_size(tmp_path: Path, monkeypatch: 
 
     train_det.main(options)
 
-    assert train.call_args.args[1].batch_size == 16
+    assert train.call_args.args[1].batch_size == expected
 
 
 def test_node_resumes_from_last_checkpoint_into_the_result_folder(tmp_path: Path) -> None:
