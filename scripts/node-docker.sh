@@ -84,7 +84,7 @@ run_args="-it"
 # Every trainer on the host mounts the same directory, so the lock file inside it is one lock
 # for the one GPU they share -- whichever repository their images come from.
 if [ -n "${TRAINING_SLOT_DIR:-}" ]; then
-    mkdir -p "$TRAINING_SLOT_DIR"
+    mkdir -p -m 1777 "$TRAINING_SLOT_DIR"
     run_args+=" -v $TRAINING_SLOT_DIR:/slot --env TRAINING_SLOT_LOCK=/slot/training.lock"
 fi
 run_args+=" -h ${HOSTNAME}_DEV"
