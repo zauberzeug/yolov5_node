@@ -8,8 +8,7 @@ requires-python = ">=3.12"
 
 dependencies = [
     "ruamel.yaml",
-    "learning_loop_node==0.23.0",
-    "torchinfo>=1.8.0",
+    "learning_loop_node==0.24.0",
 ]
 
 [dependency-groups]
@@ -104,7 +103,8 @@ asyncio_default_test_loop_scope = "session"
 # NOTE: changing default location of pytest_cache because the uvicorn file watcher somehow triggered too many reloads
 cache_dir = "/tmp/.pytest_cache"
 testpaths = [
-    "app_code/tests"
+    "app_code/tests",
+    "tests",
 ]
 filterwarnings = [
     "ignore:distutils Version classes are deprecated:DeprecationWarning:thop.profile",

@@ -341,7 +341,7 @@ name = "exceptiongroup"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/50/79/66800aadf48771f6b62f7eb014e352e5d06856655206165d775e675a02c9/exceptiongroup-1.3.1.tar.gz", hash = "sha256:8b412432c6055b0b7d14c310000ae93352ed6754f70fa8f7c34141f91c4e3219", size = 30371, upload-time = "2025-11-21T23:01:54.787Z" }
 wheels = [
@@ -534,7 +534,7 @@ wheels = [
 
 [[package]]
 name = "learning-loop-node"
-version = "0.23.0"
+version = "0.24.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles" },
@@ -554,9 +554,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "uvicorn", extra = ["standard"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d2/31/f86903408d6173ebd837a7236f6ad3ecac796e9f2aa3c91dc11493308b15/learning_loop_node-0.23.0.tar.gz", hash = "sha256:61caa353c922cf52e4b19c16cb0cb7a43bb900d32843d683bfc3d0f3bb3af5c1", size = 74090, upload-time = "2026-09-10T05:27:48.691Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ce/b6/ca45bc014719bacff9cc9c6f6a1bc0af56daec7577f6408e9ea253f96278/learning_loop_node-0.24.0.tar.gz", hash = "sha256:45ce3d9cc07d1a317e9222c1cd5aad942aa7c774c10d3c6003f99a798ace660d", size = 77730, upload-time = "2026-10-07T13:20:19.468Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/71/9c/062b35ed5231add37c4023c5cec989c695f16e0cd34c6beadce45846a438/learning_loop_node-0.23.0-py3-none-any.whl", hash = "sha256:4775f0f11a8932adced9b59731f1852e7d6339d00079cc7a2ff1f67f835bbb71", size = 89629, upload-time = "2026-09-10T05:27:47.538Z" },
+    { url = "https://files.pythonhosted.org/packages/bb/bd/a89f6194fd5b04fa6f448482f8a9b328de001c83680e67b38bcc7f33b294/learning_loop_node-0.24.0-py3-none-any.whl", hash = "sha256:f39e46810d4baa33d2cc4d777fb7f234e3f1a97dcb5be842884e43dd02225b78", size = 93246, upload-time = "2026-10-07T13:20:18.044Z" },
 ]
 
 [[package]]
@@ -1711,7 +1711,7 @@ requires-dist = [
     { name = "async-timeout" },
     { name = "attrs" },
     { name = "idna-ssl" },
-    { name = "learning-loop-node", specifier = "==0.23.0" },
+    { name = "learning-loop-node", specifier = "==0.24.0" },
     { name = "multidict" },
     { name = "numpy" },
     { name = "pillow" },
