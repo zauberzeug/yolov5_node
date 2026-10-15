@@ -36,7 +36,7 @@ lr0 = 0.01
 
 # Real photos of faces and hands, at mixed sizes and aspect ratios.
 [[datasets]]
-name = "testing/facedetection_copy"
+name = "testing/facedetection"
 fscore_floor = 0.5
 max_f1_drop = 0.03
 
