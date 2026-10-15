@@ -1,29 +1,23 @@
-# How node-testing (github.com/zauberzeug/node-testing) tests this node end to end: it trains on a
-# Loop, hands the model to every detector build below and checks what they answer. Start it from
-# this directory; the keys are documented in node-testing's README.
+# How node-testing (github.com/zauberzeug/node-testing) tests this node; its README documents the keys.
 name = "yolov5"
 architecture = "yolov5"
 model_variant = "n"
-# The trainer uploads yolov5_pytorch and yolov5_wts; each build below loads one of them.
 model_format = "yolov5_pytorch"
 needs_gpu = true
 finish_timeout = 3600
 
 [trainer]
-# {version} is NODE_VERSION. `latest` follows the newest release only from the first one after
-# 7 Oct 2026; before that it is a 12 GB image from 2024.
 image = "zauberzeug/yolov5-trainer:{version}"
 build = "trainer"
 
-# `-cloud` is what docker.sh picks off Jetson; -jetson is left out, nothing here runs on arm64.
+# `-cloud`: the build docker.sh picks off Jetson.
 [[detectors]]
 name = "trt"
 image = "zauberzeug/yolov5-detector:{version}-cloud"
 model_format = "yolov5_wts"
 build = "detector"
 model_timeout = 1800
-# Optimization level 0 instead of the shipped 4: a fast engine build, with other kernel tactics
-# than a customer's.
+# Level 0 instead of the shipped 4, for a fast engine build.
 round_trip_environment = { BUILDER_OPTIMIZATION_LEVEL = "0" }
 
 [[detectors]]
@@ -32,25 +26,15 @@ image = "zauberzeug/yolov5-detector:{version}-cloud-cpu"
 model_format = "yolov5_pytorch"
 build = "detector_cpu"
 
-# Under every training; a dataset below sets what differs. 150 epochs is the minimum that makes this
-# trainer hand over a model at all on a small set. It only writes epoch<N>.pt -- the file it
-# publishes -- once validation found a true positive, and train_det.py warms up for at least 100
-# optimizer steps; with the whole set in one batch an epoch is one step, so 100 epochs or fewer
-# never publish a model. lr0 0.01 (upstream's from-scratch value, against the node's finetune
-# 0.0032) makes 150 epochs enough: fscore 0.991 / 0.994 / 0.993 in three runs on n9, 28 Sep 2026,
-# ~4 min each; at 0.0032 it took 300. No `--quick` for the same reason.
+# The trainer publishes no model before 100 warmup steps, and on a small set an epoch is one step:
+# 150 epochs is the minimum, and lr0 0.01 instead of the node's 0.0032 is what makes them enough.
+# No --quick for the same reason.
 [hyperparameters]
 epochs = 150
 resolution = 320
 lr0 = 0.01
 
-# Every run trains on each dataset below, one after the other: both took 21:55 on n9 with 1.0.11
-# (15 Oct 2026), all checks passed.
-#
-# facedetection_copy: 258 photos of faces and hands (203 train, 55 test), at 640 px. The Loop's
-# fscore was 0.69 (n9, 13 Oct 2026, one run), so the floor leaves room for a weaker training and
-# still fails one that learned nothing. The builds' test F1 was no lower than the trainer's: 0.710
-# against 0.714 (trt) and 0.719 (cpu).
+# Real photos of faces and hands, at mixed sizes and aspect ratios.
 [[datasets]]
 name = "testing/facedetection_copy"
 fscore_floor = 0.5
@@ -59,10 +43,7 @@ max_f1_drop = 0.03
 [datasets.hyperparameters]
 resolution = 640
 
-# small_set: drawn triangles, red or blue (96 train, 6 test) -- the one dataset where an RGB/BGR swap
-# flips every box. 1.0.11 trained it in 51 s to fscore 1.000 and passed every check on all 6 test
-# images, in two runs on n9 (13 Oct 2026). One of the 15 test boxes is worth ~0.07 F1, so the
-# allowed drop lets one go.
+# Red and blue triangles: an RGB/BGR swap flips every box. One of the 15 test boxes is worth ~0.07 F1.
 [[datasets]]
 name = "testing/small_set"
 fscore_floor = 0.9
