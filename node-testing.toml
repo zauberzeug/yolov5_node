@@ -8,7 +8,6 @@ model_variant = "n"
 model_format = "yolov5_pytorch"
 needs_gpu = true
 finish_timeout = 3600
-learning_fscore_floor = 0.9
 
 [trainer]
 # {version} is NODE_VERSION. `latest` follows the newest release only from the first one after
@@ -33,13 +32,38 @@ image = "zauberzeug/yolov5-detector:{version}-cloud-cpu"
 model_format = "yolov5_pytorch"
 build = "detector_cpu"
 
-# The minimum that makes this trainer hand over a model at all. It only writes epoch<N>.pt -- the
-# file it publishes -- once validation found a true positive, and train_det.py warms up for at
-# least 100 optimizer steps; with the whole set in one batch an epoch is one step, so 100 epochs
-# or fewer never publish a model. lr0 0.01 (upstream's from-scratch value, against the node's
-# finetune 0.0032) makes 150 epochs enough: fscore 0.991 / 0.994 / 0.993 in three runs on n9,
-# 28 Sep 2026, ~4 min each; at 0.0032 it took 300. No `--quick` for the same reason.
+# Under every training; a dataset below sets what differs. 150 epochs is the minimum that makes this
+# trainer hand over a model at all on a small set. It only writes epoch<N>.pt -- the file it
+# publishes -- once validation found a true positive, and train_det.py warms up for at least 100
+# optimizer steps; with the whole set in one batch an epoch is one step, so 100 epochs or fewer
+# never publish a model. lr0 0.01 (upstream's from-scratch value, against the node's finetune
+# 0.0032) makes 150 epochs enough: fscore 0.991 / 0.994 / 0.993 in three runs on n9, 28 Sep 2026,
+# ~4 min each; at 0.0032 it took 300. No `--quick` for the same reason.
 [hyperparameters]
 epochs = 150
 resolution = 320
 lr0 = 0.01
+
+# Every run trains on each dataset below, one after the other: both took 21:55 on n9 with 1.0.11
+# (15 Oct 2026), all checks passed.
+#
+# facedetection_copy: 258 photos of faces and hands (203 train, 55 test), at 640 px. The Loop's
+# fscore was 0.69 (n9, 13 Oct 2026, one run), so the floor leaves room for a weaker training and
+# still fails one that learned nothing. The builds' test F1 was no lower than the trainer's: 0.710
+# against 0.714 (trt) and 0.719 (cpu).
+[[datasets]]
+name = "testing/facedetection_copy"
+fscore_floor = 0.5
+max_f1_drop = 0.03
+
+[datasets.hyperparameters]
+resolution = 640
+
+# small_set: drawn triangles, red or blue (96 train, 6 test) -- the one dataset where an RGB/BGR swap
+# flips every box. 1.0.11 trained it in 51 s to fscore 1.000 and passed every check on all 6 test
+# images, in two runs on n9 (13 Oct 2026). One of the 15 test boxes is worth ~0.07 F1, so the
+# allowed drop lets one go.
+[[datasets]]
+name = "testing/small_set"
+fscore_floor = 0.9
+max_f1_drop = 0.1
