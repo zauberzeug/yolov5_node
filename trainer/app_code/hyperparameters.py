@@ -43,8 +43,9 @@ HYPERPARAMETERS = [
                    notes='Epochs without improvement before the training stops early'),
     Hyperparameter(name=REQUESTED_BATCH_SIZE, type='int', default=0, minimum=0,
                    notes='Upper bound for the measured batch size, 0 means 128'),
-    _probability('fliplr', 'Probability of a horizontal flip', expert=False),
-    _probability('flipud', 'Probability of a vertical flip', expert=False),
+    # on or off rather than a probability, see yolov5_format.FLIP_PROBABILITY; the template keeps 0.0 for off
+    Hyperparameter(name='fliplr', type='bool', default=False, notes='Flip half of the images horizontally'),
+    Hyperparameter(name='flipud', type='bool', default=False, notes='Flip half of the images vertically'),
     _probability('detect_nms_conf_thres', 'Minimum confidence of a detection', expert=False),
     _probability('detect_nms_iou_thres', 'IoU above which the weaker of two detections is dropped', expert=False),
     _from_template('lr0', notes='Initial learning rate', minimum=0),
