@@ -34,3 +34,9 @@ def test_a_flip_that_is_on_flips_half_of_the_images(tmp_path):
     assert written['fliplr'] == FLIP_PROBABILITY
     assert written['flipud'] == 0.0
     assert hyperparameters == {'fliplr': True, 'flipud': False}, 'the training keeps the declared form'
+
+def test_every_hyperparameter_has_a_note():
+    """The loop shows the note as the description under each hyperparameter."""
+    for hyperparameter in HYPERPARAMETERS:
+        assert hyperparameter.notes, f'{hyperparameter.name} has no note'
+        assert hyperparameter.notes[0].isupper(), f'the note of {hyperparameter.name} starts lowercase'
