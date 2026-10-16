@@ -12,7 +12,7 @@ Trainer is tested with Nvidia Driver Version: 580.95.05 and CUDA Version: 13.0. 
 
 We support all native hyperparameters of YOLOv5 (cf. `hyp_det.yaml` for reference).
 The trainer declares every hyperparameter it accepts in [`hyperparameters.py`](trainer/app_code/hyperparameters.py) — type, default, range and a short note — and reports that declaration to the Learning Loop, which offers it in the project's training configuration and in the enqueue dialog.
-The defaults of everything in `hyp_det.yaml` are taken from that file; its native YOLOv5 knobs are declared as expert hyperparameters, which the loop shows behind an expansion.
+The defaults of everything in `hyp_det.yaml` are taken from that file. Only `resolution`, `epochs`, `patience`, `max_batch_size`, `lr0`, `fliplr` and `flipud` are standard hyperparameters; all others, the native YOLOv5 knobs included, are declared as expert ones, which the loop shows only on request or when a project sets them.
 The loop sends only what a project sets, and the declared defaults fill in the rest before the training starts.
 In addition, we support the following hyperparameters:
 

@@ -47,9 +47,9 @@ HYPERPARAMETERS = [
     # on or off rather than a probability, see yolov5_format.FLIP_PROBABILITY; the template keeps 0.0 for off
     Hyperparameter(name='fliplr', type='bool', default=False, notes='Flip half of the images horizontally'),
     Hyperparameter(name='flipud', type='bool', default=False, notes='Flip half of the images vertically'),
-    _probability('detect_nms_conf_thres', 'Minimum confidence of a detection', expert=False),
-    _probability('detect_nms_iou_thres', 'IoU above which the weaker of two detections is dropped', expert=False),
-    _from_template('lr0', notes='Initial learning rate', minimum=0),
+    _probability('detect_nms_conf_thres', 'Minimum confidence of a detection'),
+    _probability('detect_nms_iou_thres', 'IoU above which the weaker of two detections is dropped'),
+    _from_template('lr0', notes='Initial learning rate', minimum=0, expert=False),
     _from_template('lrf', notes='Final learning rate, as a fraction of lr0', minimum=0),
     _from_template('momentum', notes='SGD momentum, Adam beta1', minimum=0, maximum=1),
     _from_template('weight_decay', notes='Weight decay of the optimizer', minimum=0),
