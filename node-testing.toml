@@ -8,14 +8,14 @@ finish_timeout = 3600
 
 [trainer]
 image = "zauberzeug/yolov5-trainer:{version}"
-build = "trainer"
+build = { dockerfile = "trainer/Dockerfile", context = "trainer" }
 
-# `-cloud`: the build docker.sh picks off Jetson.
+# `-cloud`: the release's build for everything but Jetson.
 [[detectors]]
 name = "trt"
 image = "zauberzeug/yolov5-detector:{version}-cloud"
 model_format = "yolov5_wts"
-build = "detector"
+build = { dockerfile = "detector/Dockerfile", context = "detector" }
 model_timeout = 1800
 # Level 0 instead of the shipped 4, for a fast engine build.
 round_trip_environment = { BUILDER_OPTIMIZATION_LEVEL = "0" }
