@@ -7,6 +7,7 @@ import shlex
 import shutil
 from dataclasses import asdict
 from pathlib import Path
+from typing import Any
 
 import cv2  # type: ignore # pylint: disable=import-error
 import yaml  # type: ignore
@@ -121,9 +122,24 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
         weightfile = training_state_data.meta_information['weightfile']
         shutil.move(weightfile, pub_path / 'latest.pt')
+        metadata = model_files.metadata_for_weightfile(Path(weightfile))
+        if metadata.exists():
+            shutil.move(metadata, self._published_metadata_path)
+        else:
+            self._published_metadata_path.unlink(missing_ok=True)
 
         model_files.delete_json_for_weightfile(Path(weightfile))
         model_files.delete_older_epochs(Path(self.training.training_folder), Path(weightfile))
+
+    def _get_model_metadata(self) -> dict[str, Any]:
+        """The metadata `train_det.py` chose for the published model, e.g. the `conf_threshold` picked on `val/`."""
+        if not self._published_metadata_path.exists():
+            return {}
+        return json.loads(self._published_metadata_path.read_text())
+
+    @property
+    def _published_metadata_path(self) -> Path:
+        return self.training.training_folder_path / 'result/weights/published/latest.model.json'
 
     async def _get_latest_model_files(self) -> dict[str, list[str]]:
         weightfile = (self.training.training_folder_path / "result/weights/published/latest.pt").absolute()

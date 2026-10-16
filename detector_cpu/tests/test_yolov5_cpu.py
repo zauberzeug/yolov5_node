@@ -7,7 +7,7 @@ from fastapi.encoders import jsonable_encoder
 from learning_loop_node.data_classes import Category, ModelInformation
 from learning_loop_node.enums import CategoryType
 
-from ..yolov5_detector import Yolov5Detector
+from ..yolov5_detector import DEFAULT_CONF_THRESHOLD, Yolov5Detector, Yolov5DetectorParams
 
 # pylint: disable=protected-access
 
@@ -84,3 +84,18 @@ def test_evaluate_returns_serializable_point_detections():
     assert type(point.confidence) is float
     assert point.category_name == 'Rechts'
     jsonable_encoder(asdict(metadata))  # must not raise
+
+
+def _model_info(conf_threshold: float | None) -> ModelInformation:
+    return ModelInformation(id='m', host='', organization='', project='', version='1.0', conf_threshold=conf_threshold)
+
+
+def test_conf_threshold_configured_on_the_detector_wins():
+    params = Yolov5DetectorParams(iou_threshold=0.45, conf_threshold=0.3)
+    assert params.conf_threshold_for(_model_info(0.6)) == 0.3
+
+
+def test_conf_threshold_falls_back_to_the_models_then_the_default():
+    params = Yolov5DetectorParams(iou_threshold=0.45, conf_threshold=None)
+    assert params.conf_threshold_for(_model_info(0.6)) == 0.6
+    assert params.conf_threshold_for(_model_info(None)) == DEFAULT_CONF_THRESHOLD
