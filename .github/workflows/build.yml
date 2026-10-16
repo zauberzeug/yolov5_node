@@ -13,8 +13,6 @@ jobs:
         run: |
           docker build detector/ \
             -f detector/Dockerfile \
-            --build-arg BASE_IMAGE=nvcr.io/nvidia/tensorrt:26.05-py3 \
-            --build-arg INSTALL_OPENCV=true \
             -t $IMAGE
       - name: compile tensorrtx
         # cmake flags mirror _build_module_lib in detector/yolov5_detector.py
