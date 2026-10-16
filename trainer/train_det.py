@@ -236,7 +236,9 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     cuda = device.type != 'cpu'
     init_seeds(opt.seed + 1, deterministic=True)
     data_dict = check_dataset(data)
-    train_path, val_path = data_dict['train'], data_dict['val']
+    train_path, val_path, test_path = data_dict['train'], data_dict['val'], data_dict.get('test', data_dict['val'])
+    # with a separate validation set the test set only reports the counts of a new best model, never selects one
+    separate_testset = val_path != test_path
     nc = 1 if single_cls else int(data_dict['nc'])  # number of classes
     names = {0: 'item'} if single_cls and len(data_dict['names']) != 1 else data_dict['names']  # class names
     is_coco = isinstance(val_path, str) and val_path.endswith('coco/val2017.txt')  # COCO dataset
@@ -354,6 +356,19 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                    pad=training_recipe.VAL_PAD,
                                    prefix=colorstr('val: '),
                                    point_sizes_by_id=point_sizes_by_id)[0]
+    if separate_testset:
+        test_loader = create_dataloader(test_path,
+                                        imgsz,
+                                        batch_size // 2,
+                                        gs,
+                                        single_cls,
+                                        hyp=hyp,
+                                        rect=True,
+                                        rank=-1,
+                                        workers=workers * 2,
+                                        pad=training_recipe.VAL_PAD,
+                                        prefix=colorstr('test: '),
+                                        point_sizes_by_id=point_sizes_by_id)[0]
 
     if not resume:
         if not opt.noautoanchor:
@@ -476,19 +491,19 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         ema.update_attr(model, include=['yaml', 'nc', 'hyp', 'names', 'stride', 'class_weights'])
         final_epoch = (epoch + 1 == epochs) or stopper.possible_stop
         if not noval or final_epoch:  # Calculate mAP
-            results, confusion_matrices, maps, _ = validate.run(data_dict,
-                                                                batch_size=batch_size // 2,
-                                                                imgsz=imgsz,
-                                                                conf_thres=opt.conf_thres,
-                                                                iou_thres=opt.iou_thres,
-                                                                half=amp,
-                                                                model=ema.ema,
-                                                                single_cls=single_cls,
-                                                                dataloader=val_loader,
-                                                                save_dir=save_dir,
-                                                                plots=False,
-                                                                callbacks=callbacks,
-                                                                compute_loss=compute_loss)
+            results, confusion_matrices, maps, _, val_conf = validate.run(data_dict,
+                                                                          batch_size=batch_size // 2,
+                                                                          imgsz=imgsz,
+                                                                          conf_thres=opt.conf_thres,
+                                                                          iou_thres=opt.iou_thres,
+                                                                          half=amp,
+                                                                          model=ema.ema,
+                                                                          single_cls=single_cls,
+                                                                          dataloader=val_loader,
+                                                                          save_dir=save_dir,
+                                                                          plots=False,
+                                                                          callbacks=callbacks,
+                                                                          compute_loss=compute_loss)
 
         # Update best mAP
         fi = fitness(np.array(results).reshape(1, -1))  # weighted combination of [P, R, mAP@.5, mAP@.5-.95]
@@ -526,7 +541,27 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             # Save last, best and delete
             # PATCH (yolov5-node): best keeps only the EMA weights; readers only see fully written checkpoints.
             if best_fitness == fi:
-                save_best(ckpt, w, confusion_matrices)
+                model_metadata = None
+                zero_counts = {name: {'tp': 0, 'fp': 0, 'fn': 0} for name in names.values()}
+                if separate_testset and fi == 0:  # nothing found on the validation set yet, so report zeros
+                    confusion_matrices = zero_counts
+                elif separate_testset:  # report at the confidence where the mean F1 peaked on the validation set
+                    _, confusion_matrices, _, _, _ = validate.run(data_dict,
+                                                                  batch_size=batch_size // 2,
+                                                                  imgsz=imgsz,
+                                                                  conf_thres=opt.conf_thres,
+                                                                  iou_thres=opt.iou_thres,
+                                                                  half=amp,
+                                                                  model=ema.ema,
+                                                                  single_cls=single_cls,
+                                                                  dataloader=test_loader,
+                                                                  save_dir=save_dir,
+                                                                  plots=False,
+                                                                  callbacks=callbacks,
+                                                                  report_conf=val_conf)
+                    confusion_matrices = confusion_matrices or zero_counts  # nothing found on test, still publish
+                    model_metadata = {'conf_threshold': float(val_conf)}  # detectors filter at it
+                save_best(ckpt, w, confusion_matrices, model_metadata)
             if (epoch > 0) and (opt.save_period > 0) and (epoch % opt.save_period == 0):
                 atomic_save(ckpt, w / f'epoch{epoch}.pt')
             atomic_save(ckpt, last)
@@ -545,7 +580,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             # PATCH (yolov5-node): checkpoints retain their resume state after the final epoch.
             if f is best:
                 LOGGER.info(f'\nValidating {f}...')
-                results, _, _, _ = validate.run(
+                results, _, _, _, _ = validate.run(
                     data_dict,
                     batch_size=batch_size // 2,
                     imgsz=imgsz,

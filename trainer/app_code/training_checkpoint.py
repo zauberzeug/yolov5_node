@@ -5,12 +5,14 @@ from typing import Any
 
 import torch
 
-from .model_files import delete_newer_epochs
+from .model_files import delete_newer_epochs, metadata_for_weightfile
 
 
-def save_best(checkpoint: dict[str, Any], folder: Path, confusion_matrices: dict[str, Any]) -> None:
+def save_best(checkpoint: dict[str, Any], folder: Path, confusion_matrices: dict[str, Any],
+              model_metadata: dict[str, Any] | None = None) -> None:
     """Save the EMA weights as `best.pt` and, with metrics, as the `epoch<n>.pt` the node publishes.
 
+    `model_metadata` is saved next to `epoch<n>.pt` for the node to add to the uploaded model.json.
     Must run before `last.pt` of the same epoch is written.
     """
     best = folder / 'best.pt'
@@ -22,6 +24,11 @@ def save_best(checkpoint: dict[str, Any], folder: Path, confusion_matrices: dict
         metrics = path.with_suffix('.json.tmp')
         metrics.write_text(json.dumps(confusion_matrices))
         metrics.replace(path.with_suffix('.json'))
+        if model_metadata:
+            metadata = metadata_for_weightfile(path)
+            temporary = metadata.with_suffix('.tmp')
+            temporary.write_text(json.dumps(model_metadata))
+            temporary.replace(metadata)
         _atomic_link(best, path)
 
 

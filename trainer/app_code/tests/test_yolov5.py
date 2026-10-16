@@ -194,6 +194,53 @@ class TestWithDetection:
         assert '0 0.500000 0.600000 0.200000 0.200000' in lines[0]
         assert '1 0.600000 0.700000 0.300000 0.300000' in lines[1]
 
+    @staticmethod
+    def _training_with_sets(train_count: int, val_count: int) -> Training:
+        image_data = [TestWithDetection._image(f'train_{i}', 'train') for i in range(train_count)] + \
+            [TestWithDetection._image(f'val_{i}', 'val') for i in range(val_count)] + \
+            [TestWithDetection._image('test_1', 'test')]
+        return Training(
+            id='someid', context=Context(organization='o', project='p'),
+            project_folder='./', images_folder='./', training_folder='./',
+            image_data=image_data, categories=[], hyperparameters={},
+            model_variant='', training_number=1,
+            training_state=TrainerState.Initialized.value)
+
+    @staticmethod
+    def _image(image_id: str, image_set: str) -> dict:
+        return {'set': image_set, 'id': image_id, 'width': 100, 'height': 100,
+                'box_annotations': [], 'point_annotations': []}
+
+    @staticmethod
+    def _ids(folder: str) -> set[str]:
+        return {path.stem for path in Path(folder).glob('*.txt')}
+
+    @pytest.mark.usefixtures('use_training_dir')
+    async def test_create_file_structure_selects_on_test_set_without_val_images(self):
+        yolov5_format.create_file_structure(self._training_with_sets(train_count=3, val_count=0))
+
+        assert self._ids('./train') == {'train_0', 'train_1', 'train_2'}
+        assert not Path('./val').exists()
+        with open('./dataset.yaml') as f:
+            dataset = yaml.load(f)
+        assert dataset['val'] == dataset['test']
+
+    @pytest.mark.usefixtures('use_training_dir')
+    async def test_create_file_structure_selects_on_the_val_images(self):
+        yolov5_format.create_file_structure(self._training_with_sets(train_count=3, val_count=2))
+
+        assert self._ids('./train') == {'train_0', 'train_1', 'train_2'}
+        assert self._ids('./val') == {'val_0', 'val_1'}
+        assert self._ids('./test') == {'test_1'}
+        with open('./dataset.yaml') as f:
+            dataset = yaml.load(f)
+        assert dataset['val'].endswith('/val') and dataset['test'].endswith('/test')
+
+        yolov5_format.create_file_structure(self._training_with_sets(train_count=3, val_count=0))
+        with open('./dataset.yaml') as f:
+            dataset = yaml.load(f)
+        assert dataset['val'] == dataset['test']  # a val folder of an earlier run is ignored
+
     @pytest.mark.parametrize('stride, resolution', [(32, 640), (32, 64), (32, 608), (64, 1280), (64, 128)])
     def test_valid_resolution_is_accepted(self, stride: int, resolution: int):
         batch_size_calculation.check_resolution(resolution, stride)

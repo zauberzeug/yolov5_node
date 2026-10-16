@@ -89,11 +89,25 @@ CUDA messages, `_get_new_best_training_state` picks up the newest weight file th
 `model_files.py`. Changing what `train_det.py` prints or where it writes breaks those parsers.
 
 **Category order is the wire format.** `yolov5_format.create_file_structure` converts the loop's
-`image_data` into the layout yolov5 expects — `train/` and `test/` folders of image symlinks with one
-`class x y w h` text file per image — encoding each category uuid as its *index* in
+`image_data` into the layout yolov5 expects — `train/` and `test/` folders (plus `val/` if the
+training has `val` images) of image symlinks with one `class x y w h` text file per image — encoding each category uuid as its *index* in
 `training.categories`. Every conversion back (`_parse_file`, the confusion matrix in
 `_get_new_best_training_state`, the `--point_sizes_by_id`/`--flip_label_pairs` arguments) depends on
 that same ordering.
+
+**Models are selected on the `val` images if the training has any.** Without them `dataset.yaml`
+points `val` at `test/`, as upstream would, so the best model, early stopping and the confidence the
+reported counts are read at are all chosen on the test set. With them (`Training.val_images()`),
+`create_file_structure` writes a `val/` folder: `train_det.py` validates on it every epoch and only for
+a new best model evaluates `test/` at the confidence where the mean F1 peaked on `val/`; those test
+counts are the confusion matrix the loop gets. The node never splits anything itself:
+learning_loop_node's `validation_set` either keeps a `val` set the loop sent or, with the
+`separate_testset` hyperparameter, moves a hash-chosen tenth of the train images to `val` right after
+the download. `train_det.py` takes the mode from `dataset.yaml` alone (`val` differing from `test`).
+The picked confidence travels with the checkpoint as `epoch<n>.model.json` →
+`published/latest.model.json` into the uploaded `model.json` (`conf_threshold`, via
+`_get_model_metadata`), where the detectors pick it up unless `CONF_THRESHOLD` is set. While the
+validation fitness is still 0 the test set is skipped and zeros are reported.
 
 **Point detection rides on boxes.** A point annotation is written as a box of `point_size` and turned
 back into a point by category type. The point hyperparameters are not handed to yolov5 as

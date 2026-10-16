@@ -43,7 +43,16 @@ def delete_newer_epochs(weights_folder: Path, epoch: int) -> None:
 
 
 def delete_json_for_weightfile(weightfile: Path) -> None:
+    """Remove the metrics and the model metadata saved next to a weight file."""
     _try_remove(weightfile.with_suffix('.json'))
+    metadata = metadata_for_weightfile(weightfile)
+    if metadata.exists():
+        _try_remove(metadata)
+
+
+def metadata_for_weightfile(weightfile: Path) -> Path:
+    """The model metadata (e.g. `conf_threshold`) `train_det.py` saves next to a weight file, if it chose any."""
+    return weightfile.with_suffix('.model.json')
 
 
 def _weightfiles_in(weights_folder: Path) -> list[Path]:
