@@ -13,6 +13,7 @@ import yaml  # type: ignore
 from fastapi.encoders import jsonable_encoder
 from learning_loop_node.data_classes import (
     Detections,
+    Hyperparameter,
     ModelInformation,
     PretrainedModel,
     TrainingStateData,
@@ -25,6 +26,7 @@ from learning_loop_node.trainer.exceptions import CriticalError, NodeNeedsRestar
 from learning_loop_node.trainer.executor import Executor
 
 from . import batch_size_calculation, model_files, training_run, yolov5_format
+from .hyperparameters import HYPERPARAMETERS, TEMPLATE_PATH
 
 
 class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
@@ -36,7 +38,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
         logging.info('------ STARTING YOLOV5 TRAINER LOGIC ------')
         self.latest_epoch = 0
-        self.patience = 300
+        self.patience = 300  # overwritten by the training's hyperparameters
         self.inference_batch_size = 100  # yolo processes images one by one
 
         # Following will be overwritten by hyp.yaml
@@ -72,6 +74,10 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
                 PretrainedModel(name='m6', label='YOLO v5 1280 medium', description=''),
                 PretrainedModel(name='l6', label='YOLO v5 1280 large', description=''),
                 PretrainedModel(name='x6', label='YOLO v5 1280 extra large', description='')]
+
+    @property
+    def provided_hyperparameters(self) -> list[Hyperparameter]:
+        return HYPERPARAMETERS
 
     @property
     def hyperparameter_path(self) -> str:
@@ -217,9 +223,8 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         yolov5_format.create_file_structure(self.training)
         additional_params = ' --clear'
 
-        base_hyp_path = Path(__file__).resolve().parents[1] / ('hyp_det.yaml')
-        assert (base_hyp_path).exists(), f'Hyperparameter file not found at "{base_hyp_path}"'
-        shutil.copy(base_hyp_path, self.hyperparameter_path)
+        assert TEMPLATE_PATH.exists(), f'Hyperparameter file not found at "{TEMPLATE_PATH}"'
+        shutil.copy(TEMPLATE_PATH, self.hyperparameter_path)
         yolov5_format.set_hyperparameters_in_file(self.hyperparameter_path, self.hyperparameters)
 
         await self._start(model, additional_params)
@@ -301,6 +306,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             hyp = dict(yaml.safe_load(f))  # load hyps dict
 
         self.epochs = int(hyp.get('epochs', self.epochs))
+        self.patience = int(self.training.hyperparameters.get('patience', self.patience))
         self.detect_nms_conf_thres = float(hyp.get('detect_nms_conf_thres', self.detect_nms_conf_thres))
         self.detect_nms_iou_thres = float(hyp.get('detect_nms_iou_thres', self.detect_nms_iou_thres))
 

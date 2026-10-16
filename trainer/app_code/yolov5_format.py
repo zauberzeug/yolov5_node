@@ -144,11 +144,12 @@ def convert_type(value, reference: Any):
 
     if isinstance(reference, (LiteralScalarString, str)):
         return str(value)
+    # bool before int: a bool is an int, and a yaml flag would otherwise be written as 0 or 1
+    if isinstance(reference, (ScalarBoolean, bool)):
+        return bool(value)
     if isinstance(reference, (ScalarFloat, float)):
         return float(value)
     if isinstance(reference, (ScalarInt, int)):
         return int(value)
-    if isinstance(reference, (ScalarBoolean, bool)):
-        return bool(value)
 
     raise CriticalError(f'Unknown type: {type(reference)}')
