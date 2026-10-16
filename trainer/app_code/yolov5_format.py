@@ -111,6 +111,10 @@ def create_file_structure(training: Training) -> None:
     logging.info('Prepared file structure with %d training images and %d test images', num_train_imgs, num_test_imgs)
 
 
+FLIP_PROBABILITY = 0.5
+"""How often a flip is applied when it is on: half of the images, so flipped and original views are equally likely."""
+
+
 def set_hyperparameters_in_file(yaml_path: str, hyperparameter: dict[str, Any]) -> None:
     """Override the hyperparameters in the yaml file used by the yolov5 trainer with the ones from the hyperparameter dict (coming from the loop configuration).
     The yaml file is modified in place."""
@@ -118,6 +122,10 @@ def set_hyperparameters_in_file(yaml_path: str, hyperparameter: dict[str, Any]) 
     with open(yaml_path) as f:
         content = yaml.load(f)
 
+    hyperparameter = dict(hyperparameter)  # the training keeps the declared form, the yaml gets probabilities
+    for flip in ('fliplr', 'flipud'):
+        if isinstance(hyperparameter.get(flip), bool):
+            hyperparameter[flip] = FLIP_PROBABILITY if hyperparameter[flip] else 0.0
     if 'flip_rl' in hyperparameter:
         hyperparameter['fliplr'] = 0.5 if hyperparameter['flip_rl'] else 0.0
     if 'flip_lr' in hyperparameter:
@@ -144,11 +152,12 @@ def convert_type(value, reference: Any):
 
     if isinstance(reference, (LiteralScalarString, str)):
         return str(value)
+    # bool before int: a bool is an int, and a yaml flag would otherwise be written as 0 or 1
+    if isinstance(reference, (ScalarBoolean, bool)):
+        return bool(value)
     if isinstance(reference, (ScalarFloat, float)):
         return float(value)
     if isinstance(reference, (ScalarInt, int)):
         return int(value)
-    if isinstance(reference, (ScalarBoolean, bool)):
-        return bool(value)
 
     raise CriticalError(f'Unknown type: {type(reference)}')
