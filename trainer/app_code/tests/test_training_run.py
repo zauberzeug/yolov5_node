@@ -72,3 +72,31 @@ def test_each_epoch_adds_a_row_under_one_header(tmp_path: Path):
         '0,0.12346,0.5',
         '1,0.1,0.6',
     ]
+
+
+def test_a_resumed_run_replaces_the_epochs_it_repeats(tmp_path: Path):
+    for epoch in range(4):
+        training_run.report_epoch(tmp_path, epoch, {'metrics/mAP_0.5': epoch / 10})
+
+    training_run.report_epoch(tmp_path, 2, {'metrics/mAP_0.5': 0.9})
+
+    assert (tmp_path / training_run.RESULTS_FILE).read_text().splitlines() == [
+        'epoch,metrics/mAP_0.5',
+        '0,0',
+        '1,0.1',
+        '2,0.9',
+    ]
+
+
+def test_rows_are_matched_by_epoch_not_by_position(tmp_path: Path):
+    for epoch in (1, 2, 5, 6):
+        training_run.report_epoch(tmp_path, epoch, {'metrics/mAP_0.5': 0.5})
+
+    training_run.report_epoch(tmp_path, 3, {'metrics/mAP_0.5': 0.7})
+
+    assert (tmp_path / training_run.RESULTS_FILE).read_text().splitlines() == [
+        'epoch,metrics/mAP_0.5',
+        '1,0.5',
+        '2,0.5',
+        '3,0.7',
+    ]

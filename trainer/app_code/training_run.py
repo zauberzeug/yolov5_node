@@ -42,14 +42,22 @@ def report_batch_size(result_dir: Path, batch_size: int) -> None:
 
 
 def report_epoch(result_dir: Path, epoch: int, metrics: dict[str, float]) -> None:
-    """Append an epoch's losses, metrics and learning rates to the results table."""
+    """Add an epoch's losses, metrics and learning rates to the results table.
+
+    A resumed run repeats epochs the interrupted one already reported; their rows, and any later ones, are replaced.
+    """
     path = result_dir / RESULTS_FILE
-    is_new = not path.exists()
-    with path.open('a', newline='') as f:
-        writer = csv.writer(f)
-        if is_new:
-            writer.writerow(['epoch', *metrics])
-        writer.writerow([epoch, *(f'{value:.5g}' for value in metrics.values())])
+    try:
+        with path.open(newline='') as f:
+            header, *rows = list(csv.reader(f))
+    except (FileNotFoundError, ValueError):
+        header, rows = ['epoch', *metrics], []
+    rows = [row for row in rows if int(row[0]) < epoch]
+    rows.append([str(epoch), *(f'{value:.5g}' for value in metrics.values())])
+    temporary = path.with_name(f'.{path.name}.tmp')
+    with temporary.open('w', newline='') as f:
+        csv.writer(f).writerows([header, *rows])
+    os.replace(temporary, path)
 
 
 @contextmanager
