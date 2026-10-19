@@ -63,6 +63,14 @@ def test_best_saves_the_model_metadata_next_to_the_published_epoch(tmp_path: Pat
     assert not (tmp_path / 'epoch5.model.json').exists()
 
 
+def test_best_carries_its_model_metadata_for_the_final_evaluation(tmp_path: Path) -> None:
+    save_best(full_checkpoint(4), tmp_path, {'cat': {'tp': 2}}, {'conf_threshold': 0.4})
+    assert torch.load(tmp_path / 'best.pt', weights_only=False)['model_metadata'] == {'conf_threshold': 0.4}
+
+    save_best(full_checkpoint(5), tmp_path, {'cat': {'tp': 3}})
+    assert torch.load(tmp_path / 'best.pt', weights_only=False)['model_metadata'] == {}
+
+
 def published_logic(training_folder: Path) -> Yolov5TrainerLogic:
     logic = Yolov5TrainerLogic()
     logic._training = SimpleNamespace(training_folder=str(training_folder), training_folder_path=training_folder,

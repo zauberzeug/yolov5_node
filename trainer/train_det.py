@@ -579,7 +579,12 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         if f.exists():
             # PATCH (yolov5-node): checkpoints retain their resume state after the final epoch.
             if f is best:
-                LOGGER.info(f'\nValidating {f}...')
+                # with a separate validation set the final evaluation reports on the test set,
+                # at the confidence picked for the best model; evolution keeps selecting on the validation set.
+                use_testset = separate_testset and not evolve
+                LOGGER.info(f"\n{'Testing' if use_testset else 'Validating'} {f}...")
+                model_metadata = torch.load(f, map_location='cpu', weights_only=False).get('model_metadata', {})
+                report_conf = model_metadata.get('conf_threshold') if use_testset else None
                 results, _, _, _, _ = validate.run(
                     data_dict,
                     batch_size=batch_size // 2,
@@ -588,13 +593,14 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     iou_thres=opt.iou_thres,
                     model=attempt_load(f, device).half(),
                     single_cls=single_cls,
-                    dataloader=val_loader,
+                    dataloader=test_loader if use_testset else val_loader,
                     save_dir=save_dir,
                     save_json=is_coco,
                     verbose=True,
                     plots=plots,
                     callbacks=callbacks,
-                    compute_loss=compute_loss)  # val best model with plots
+                    compute_loss=compute_loss,
+                    report_conf=report_conf)  # val best model with plots
                 if is_coco:
                     callbacks.run('on_fit_epoch_end', list(mloss) + list(results) + lr, epoch, best_fitness, fi)
 
