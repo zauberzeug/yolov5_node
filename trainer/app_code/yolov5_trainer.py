@@ -196,6 +196,14 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         # NOTE: parse function is blocking by IO operations, so we need to run it in a separate thread (default executor is ThreadPoolExecutor)
         return await asyncio.get_event_loop().run_in_executor(None, self._parse, labels_path, images_folder, model_information)
 
+    def _files_to_archive(self, training_folder: Path) -> list[Path]:
+        # results.csv, opt.yaml, plots and batch images, examples and the training log; never the dataset or weights
+        result = training_folder / 'result'
+        files = [f for f in result.glob('*') if f.is_file() and f.suffix != '.pt'] if result.is_dir() else []
+        extras = [result / 'examples', training_folder / 'hyp.yaml', training_folder / 'dataset.yaml',
+                  training_folder / 'last_training.log']
+        return files + [f for f in extras if f.exists()]
+
     async def _clear_training_data(self, training_folder: str) -> None:
         keep_files = ['hyp.yaml', 'dataset.yaml', 'best.pt']
         keep_dirs = ['result', 'weights', 'examples']

@@ -421,6 +421,20 @@ class TestWithDetection:
         assert len(files) == 2  # Note: Do not delete last_training.log and best.pt
 
 
+def test_files_to_archive_are_the_results_without_dataset_or_weights(tmp_path: Path):
+    for name in ['result/results.csv', 'result/opt.yaml', 'result/results.png', 'result/examples/a.jpg',
+                 'result/weights/best.pt', 'result/last.pt', 'hyp.yaml', 'dataset.yaml', 'last_training.log',
+                 'train/images/a.jpg', 'train/labels/a.txt']:
+        (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / name).write_text('0')
+
+    files = Yolov5TrainerLogic()._files_to_archive(tmp_path)  # pylint: disable=protected-access
+
+    assert sorted(str(f.relative_to(tmp_path)) for f in files) == [
+        'dataset.yaml', 'hyp.yaml', 'last_training.log', 'result/examples',
+        'result/opt.yaml', 'result/results.csv', 'result/results.png']
+
+
 def test_update_hyperparameter():
     """The hyperparameter file should be updated with the given hyperparameter"""
     def assert_yaml_content(yaml_path, **kwargs):
