@@ -49,6 +49,7 @@ When using the script it is required to set up a .env file in the trainer folder
 | HOST_PORT                   | Port on this machine mapped to the container         | Integer        | 7443    | Yes                          |
 | LINKLL                      | Link the node library into the container?            | TRUE/FALSE     | FALSE   | Yes                          |
 | TRAINING_SLOT_DIR           | Host directory the trainers on this machine share their GPU lock through; empty disables it | Path | /var/tmp/training_slot | Yes |
+| TRAINING_ARCHIVE_HOST_DIR   | Host directory the results of each training are copied to; empty disables it | Path | /var/tmp/training_archive | Yes |
 | UVICORN_RELOAD              | Enable hot-reload                                    | TRUE/FALSE/0/1 | FALSE   | No                           |
 | RESTART_AFTER_TRAINING      | Auto-restart after training                          | TRUE/FALSE/0/1 | FALSE   | No                           |
 | KEEP_OLD_TRAININGS          | Do not remove old trainings, when starting a new one | TRUE/FALSE/0/1 | FALSE   | No                           |
@@ -81,6 +82,15 @@ Every trainer `docker.sh` starts on a machine mounts `/var/tmp/training_slot` �
 The other trainers on the machine — a second container of this image, or a trainer from another node repository that mounts the same directory — report `blocked` to the loop in the meantime instead of `idle`, so all of them can stay up without ever training at once.
 The kernel drops the lock with the container, so a crash frees it by itself.
 Set `TRAINING_SLOT_DIR` in `.env` to use another directory, or to the empty string for a trainer that has its GPU to itself.
+
+## Archived training results
+
+The training folder in the data volume is deleted when the next training of the same project starts.
+To keep the results longer, `docker.sh` mounts `/var/tmp/training_archive` and the trainer copies each training's results there when it ends, is stopped or fails (`TRAINING_ARCHIVE_DIR`, see the node library's README) — not when it is aborted.
+They land in `<node name>/<organization>/<project>/<training number>_<start time>`: everything in `result/` but the weights (`results.csv`, `opt.yaml`, plots, batch images), `result/examples/`, `hyp.yaml`, `dataset.yaml` and `last_training.log` — never the dataset.
+`docker.sh` creates the directory readable only by the user who first starts a trainer; the container runs as root, so another container can read the results for everyone.
+Below `/var/tmp` the system deletes results nobody has looked at for about 30 days.
+Set `TRAINING_ARCHIVE_HOST_DIR` in `.env` to use another directory, or to the empty string to keep no archive.
 
 # Detector Node
 

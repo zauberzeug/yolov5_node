@@ -8,8 +8,8 @@
 #
 # Required in docker.conf:  IMAGE_REPO, CONTAINER_NAME
 # Optional:                 IMAGE_TAG_SUFFIX, TEST_LATEST_TAG, DATA_VOLUME, TRAINING_SLOT_DIR,
-#                           HOST_PORT, CONTAINER_PORT, BUILD_CONTEXT, DOCKERFILE, GPU, IPC_HOST,
-#                           ENV_FILE, EXTRA_RUN_ARGS, EXTRA_BUILD_ARGS, LINKLL_SITE_PACKAGES
+#                           TRAINING_ARCHIVE_HOST_DIR, HOST_PORT, CONTAINER_PORT, BUILD_CONTEXT,
+#                           DOCKERFILE, GPU, IPC_HOST, ENV_FILE, EXTRA_RUN_ARGS, EXTRA_BUILD_ARGS, LINKLL_SITE_PACKAGES
 #                           and a select_image function for host-dependent image choices
 #
 # NOTE the conf is sourced before this file, so it cannot reference SEMANTIC_VERSION or
@@ -86,6 +86,13 @@ run_args="-it"
 if [ -n "${TRAINING_SLOT_DIR:-}" ]; then
     mkdir -p -m 1777 "$TRAINING_SLOT_DIR"
     run_args+=" -v $TRAINING_SLOT_DIR:/slot --env TRAINING_SLOT_LOCK=/slot/training.lock"
+fi
+# Trainers copy each training's results here. Private to the user who created it (the container's
+# root still writes it); below /var/tmp the system deletes what nobody has looked at for a while.
+# NOTE the host path has a name of its own: every name in .env is forwarded into the container too.
+if [ -n "${TRAINING_ARCHIVE_HOST_DIR:-}" ]; then
+    mkdir -p -m 700 "$TRAINING_ARCHIVE_HOST_DIR"
+    run_args+=" -v $TRAINING_ARCHIVE_HOST_DIR:/archive --env TRAINING_ARCHIVE_DIR=/archive"
 fi
 run_args+=" -h ${HOSTNAME}_DEV"
 # NOTE not `--env-file .env`: docker's env-file reader passes the raw line through -- it strips
