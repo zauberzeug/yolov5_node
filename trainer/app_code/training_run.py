@@ -7,6 +7,7 @@ interrupted run measured. The file names and their format stay inside this modul
 """
 import csv
 import json
+import math
 import os
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -58,6 +59,21 @@ def report_epoch(result_dir: Path, epoch: int, metrics: dict[str, float]) -> Non
     with temporary.open('w', newline='') as f:
         csv.writer(f).writerows([header, *rows])
     os.replace(temporary, path)
+
+
+def class_metrics(names: dict[int, str], counts: dict[str, dict[str, int]]) -> dict[str, float]:
+    """Precision and recall of every class from its tp/fp/fn counts, as columns for :func:`report_epoch`.
+
+    Every class gets both columns, in the order of `names`, so the header stays the same for every epoch;
+    a value without data to compute it from (no counts, or a zero denominator) is NaN.
+    """
+    metrics = {}
+    for name in names.values():
+        class_counts = counts.get(name, {})
+        tp, fp, fn = (class_counts.get(key, 0) for key in ('tp', 'fp', 'fn'))
+        metrics[f'metrics/precision/{name}'] = tp / (tp + fp) if tp + fp else math.nan
+        metrics[f'metrics/recall/{name}'] = tp / (tp + fn) if tp + fn else math.nan
+    return metrics
 
 
 @contextmanager

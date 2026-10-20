@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 
 import pytest
@@ -100,3 +101,23 @@ def test_rows_are_matched_by_epoch_not_by_position(tmp_path: Path):
         '2,0.5',
         '3,0.7',
     ]
+
+
+def test_class_metrics_cover_every_class_in_order(tmp_path: Path):
+    counts = {'weed': {'tp': 3, 'fp': 1, 'fn': 1}, 'crop': {'tp': 0, 'fp': 0, 'fn': 2}}
+
+    metrics = training_run.class_metrics({0: 'weed', 1: 'crop', 2: 'stone'}, counts)
+
+    assert list(metrics) == ['metrics/precision/weed', 'metrics/recall/weed', 'metrics/precision/crop',
+                             'metrics/recall/crop', 'metrics/precision/stone', 'metrics/recall/stone']
+    weed = 3 / (3 + 1)  # tp / (tp + fp) and tp / (tp + fn)
+    assert metrics['metrics/precision/weed'] == weed
+    assert metrics['metrics/recall/weed'] == weed
+    assert math.isnan(metrics['metrics/precision/crop'])  # no predictions
+    assert metrics['metrics/recall/crop'] == 0
+    assert math.isnan(metrics['metrics/precision/stone'])  # no labels in the validation set
+    assert math.isnan(metrics['metrics/recall/stone'])
+
+    training_run.report_epoch(tmp_path, 1, {'metrics/mAP_0.5': 0.5, **metrics})
+
+    assert (tmp_path / training_run.RESULTS_FILE).read_text().splitlines()[1] == '1,0.5,0.75,0.75,nan,0,nan,nan'
