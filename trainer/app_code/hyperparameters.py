@@ -47,6 +47,8 @@ HYPERPARAMETERS = [
     # on or off rather than a probability, see yolov5_format.FLIP_PROBABILITY; the template keeps 0.0 for off
     Hyperparameter(name='fliplr', type='bool', default=False, notes='Flip half of the images horizontally'),
     Hyperparameter(name='flipud', type='bool', default=False, notes='Flip half of the images vertically'),
+    _from_template('flip_label_pairs', expert=False,
+                   notes='Categories swapped by a horizontal flip, as "uuid:uuid,..."'),
     _probability('detect_nms_conf_thres', 'Minimum confidence of a detection, in validation and in detection'),
     _probability('detect_nms_iou_thres',
                  'IoU above which the weaker of two detections is dropped, in validation and in detection'),
@@ -82,6 +84,5 @@ HYPERPARAMETERS = [
     _from_template('point_sizes_by_id',
                    notes='Point size per category as a fraction of the image, "uuid:size,...", used by reset_points; '
                          '0.03 if unset'),
-    _from_template('flip_label_pairs', notes='Categories swapped by a horizontal flip, as "uuid:uuid,..."'),
 ]
 """What this trainer accepts, reported to the loop."""
