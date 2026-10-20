@@ -48,6 +48,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         self.flip_label_uuid_pairs: list[tuple[str, str]] = []
 
         self.additional_hyperparameters_parsed = False
+        self._evaluating = False
 
     # ---------------------------------------- IMPLEMENTED ABSTRACT PROPERTIES ----------------------------------------
 
@@ -239,7 +240,36 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         self._training_run.raise_failure()
         return super()._get_executor_error_from_log()
 
+    async def _train(self) -> None:
+        """Train, then evaluate the best model, also when the training was stopped. An abort cancels both."""
+        await super()._train()
+        await self._final_evaluation()
+
+    async def stop(self) -> None:
+        """Let the final evaluation finish like the upload after it: a stop keeps the model and its evaluation."""
+        if self._evaluating and not self.shutdown_event.is_set():
+            logging.info('Stop during the final evaluation: letting it finish')
+            return
+        await super().stop()
+
     # ---------------------------------------- ADDITIONAL METHODS ----------------------------------------
+
+    async def _final_evaluation(self) -> None:
+        """Run `eval_det.py` on the best model. A failure is logged, never raised: it must not restart the training."""
+        executor = Executor(self.training.training_folder)  # appends to the training's log
+        self._evaluating = True
+        try:
+            await executor.start(f'python /app/eval_det.py --result-dir {self.training.training_folder}/result \
+                --vram-limit-gb {self._vram_limit_gb}', env={'WANDB_MODE': 'disabled'})
+            if (return_code := await executor.wait()) != 0:
+                logging.error('Final evaluation failed with return code %s, see the training log', return_code)
+        except Exception:
+            logging.exception('Final evaluation failed')
+        finally:
+            self._evaluating = False
+            # shield so the evaluation is stopped even when the task is cancelled (e.g. on abort())
+            if executor.is_running():
+                await asyncio.shield(executor.stop_and_wait())
 
     async def _start_training_from_model(self, model: str) -> None:
         yolov5_format.create_file_structure(self.training)
