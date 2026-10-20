@@ -186,7 +186,8 @@ def run(
                                        prefix=colorstr(f'{task}: '))[0]
 
     seen = 0
-    confusion_matrix = ConfusionMatrix(nc=nc)
+    # PATCH (yolov5-node): count at the confidence the per-class counts are reported at, and at IoU 0.5 like them
+    confusion_matrix = ConfusionMatrix(nc=nc, conf=0.25 if report_conf is None else report_conf, iou_thres=0.5)
     names = model.names if hasattr(model, 'names') else model.module.names  # get class names
     if isinstance(names, (list, tuple)):  # old format
         names = dict(enumerate(names))
@@ -307,7 +308,7 @@ def run(
 
     # Plots
     if plots:
-        confusion_matrix.plot(save_dir=save_dir, names=list(names.values()))
+        confusion_matrix.save(save_dir=save_dir, names=list(names.values()))  # PATCH (yolov5-node): instead of plot
         callbacks.run('on_val_end', nt, tp, fp, p, r, f1, ap, ap50, ap_class, confusion_matrix)
 
     # Save JSON

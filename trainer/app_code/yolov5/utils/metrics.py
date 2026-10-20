@@ -3,6 +3,7 @@
 Model validation metrics
 """
 
+import json
 import math
 import warnings
 from pathlib import Path
@@ -181,6 +182,17 @@ class ConfusionMatrix:
             for i, dc in enumerate(detection_classes):
                 if not any(m1 == i):
                     self.matrix[dc, self.nc] += 1  # predicted background
+
+    def save(self, save_dir='', names=()):
+        # PATCH (yolov5-node): keep the raw counts with what they mean, to be evaluated later, instead of a plot
+        names = list(names) if len(names) == self.nc else [str(i) for i in range(self.nc)]
+        content = {
+            'conf': float(self.conf),
+            'iou': float(self.iou_thres),
+            'axes': 'rows: predicted, columns: true; the last row and column are background',
+            'names': [*names, 'background'],
+            'matrix': self.matrix.astype(int).tolist()}
+        (Path(save_dir) / 'confusion_matrix.json').write_text(json.dumps(content))
 
     def tp_fp(self):
         tp = self.matrix.diagonal()  # true positives
