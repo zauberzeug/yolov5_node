@@ -87,7 +87,7 @@ Set `TRAINING_SLOT_DIR` in `.env` to use another directory, or to the empty stri
 
 The training folder in the data volume is deleted when the next training of the same project starts.
 To keep the results longer, `docker.sh` mounts `/var/tmp/training_archive` and the trainer copies each training's results there when it ends, is stopped or fails (`TRAINING_ARCHIVE_DIR`, see the node library's README) — not when it is aborted.
-They land in `<node name>/<organization>/<project>/<training number>_<start time>`: everything in `result/` but the weights and the `.png` plots (`results.csv`, `opt.yaml`, `confusion_matrix_test.json` and `curves_test.json` to draw them again, batch images), all of `result/examples/`, `hyp.yaml`, `dataset.yaml` and `last_training.log` — never the dataset.
+They land in `<node name>/<organization>/<project>/<model version>_<start time>` (e.g. `6.1_…` for the first continuation of training 6): everything in `result/` but the weights and the `.png` plots (`results.csv`, `opt.yaml`, `confusion_matrix_test.json` and `curves_test.json` to draw them again, batch images), all of `result/examples/`, `hyp.yaml`, `dataset.yaml` and `last_training.log` — never the dataset.
 `docker.sh` creates the directory readable only by the user who first starts a trainer; the container runs as root, so another container can read the results for everyone.
 Below `/var/tmp` the system deletes results nobody has looked at for about 30 days.
 Set `TRAINING_ARCHIVE_HOST_DIR` in `.env` to use another directory, or to the empty string to keep no archive.
