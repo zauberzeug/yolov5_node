@@ -188,6 +188,7 @@ def run(
     seen = 0
     # PATCH (yolov5-node): count at the confidence the per-class counts are reported at, and at IoU 0.5 like them
     confusion_matrix = ConfusionMatrix(nc=nc, conf=0.25 if report_conf is None else report_conf, iou_thres=0.5)
+    keep = task == 'test'  # PATCH (yolov5-node): count and save the confusion matrix and curve data on the test set only
     names = model.names if hasattr(model, 'names') else model.module.names  # get class names
     if isinstance(names, (list, tuple)):  # old format
         names = dict(enumerate(names))
@@ -241,7 +242,8 @@ def run(
             if npr == 0:
                 if nl:
                     stats.append((correct, *torch.zeros((2, 0), device=device), labels[:, 0]))
-                    confusion_matrix.process_batch(detections=None, labels=labels[:, 0])  # PATCH (yolov5-node): always
+                    if keep:
+                        confusion_matrix.process_batch(detections=None, labels=labels[:, 0])
                 continue
 
             # Predictions
@@ -256,7 +258,8 @@ def run(
                 scale_boxes(im[si].shape[1:], tbox, shape, shapes[si][1])  # native-space labels
                 labelsn = torch.cat((labels[:, 0:1], tbox), 1)  # native-space labels
                 correct = process_batch(predn, labelsn, iouv)
-                confusion_matrix.process_batch(predn, labelsn)  # PATCH (yolov5-node): always, it is saved below
+                if keep:
+                    confusion_matrix.process_batch(predn, labelsn)
             stats.append((correct, pred[:, 4], pred[:, 5], labels[:, 0]))  # (correct, conf, pcls, tcls)
 
             # Save/log
@@ -279,7 +282,7 @@ def run(
         # PATCH (yolov5-node): plots and curve data named after the set
         tp, fp, p, r, f1, ap, ap_class, reported_conf = ap_per_class(*stats, plot=plots, save_dir=save_dir, names=names,
                                                                      prefix=f'{task}_', report_conf=report_conf,
-                                                                     task=task)
+                                                                     task=task if keep else None)
         ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
         mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
     nt = np.bincount(stats[3].astype(int), minlength=nc)  # number of targets per class
@@ -307,9 +310,11 @@ def run(
         LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {shape}' % t)
 
     # Plots
-    confusion_matrix.save(save_dir=save_dir, names=list(names.values()), task=task)  # PATCH (yolov5-node): raw counts
+    if keep:
+        confusion_matrix.save(save_dir=save_dir, names=list(names.values()), task=task)  # PATCH (yolov5-node): raw counts
     if plots:
-        confusion_matrix.plot(save_dir=save_dir, names=list(names.values()), task=task)
+        if keep:
+            confusion_matrix.plot(save_dir=save_dir, names=list(names.values()), task=task)
         callbacks.run('on_val_end', nt, tp, fp, p, r, f1, ap, ap50, ap_class, confusion_matrix)
 
     # Save JSON

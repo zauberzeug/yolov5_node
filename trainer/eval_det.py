@@ -76,7 +76,7 @@ def evaluate(result_dir: Path) -> None:
                  model=model,
                  single_cls=opt.single_cls,
                  dataloader=dataloader,
-                 task='test' if use_testset else 'val',
+                 task='test',  # without a separate validation set, val is the test set too
                  save_dir=result_dir,
                  verbose=True,
                  plots=not opt.noplots,
