@@ -198,9 +198,10 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         return await asyncio.get_event_loop().run_in_executor(None, self._parse, labels_path, images_folder, model_information)
 
     def _files_to_archive(self, training_folder: Path) -> list[Path]:
-        # results.csv, opt.yaml, plots and batch images, examples and the training log; never the dataset or weights
+        # results.csv, opt.yaml, the confusion matrix and curve data, batch images, examples and the training log;
+        # never the dataset or weights, and no plots (.png), which can be drawn again from the data
         result = training_folder / 'result'
-        files = [f for f in result.glob('*') if f.is_file() and f.suffix != '.pt'] if result.is_dir() else []
+        files = [f for f in result.glob('*') if f.is_file() and f.suffix not in ('.pt', '.png')] if result.is_dir() else []
         extras = [result / 'examples', training_folder / 'hyp.yaml', training_folder / 'dataset.yaml',
                   training_folder / 'last_training.log']
         return files + [f for f in extras if f.exists()]
