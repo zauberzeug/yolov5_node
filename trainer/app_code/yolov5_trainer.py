@@ -36,10 +36,11 @@ EVALUATION_TIMEOUT = 3600
 
 class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
-    def __init__(self, vram_limit_gb: float = 0) -> None:
+    def __init__(self, vram_limit_gb: float = 0, dataloader_workers: int = 8) -> None:
         super().__init__(model_format='yolov5_pytorch')
 
         self._vram_limit_gb = vram_limit_gb
+        self._dataloader_workers = dataloader_workers
 
         logging.info('------ STARTING YOLOV5 TRAINER LOGIC ------')
         self.inference_batch_size = 100  # yolo processes images one by one
@@ -96,7 +97,8 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         self.hyperparameters['trainer_version'] = os.environ.get('NODE_VERSION') or 'unknown'
         self._training_run.clear_failure()
         await self.executor.start(f'python /app/train_det.py --resume {shlex.quote(str(checkpoint))} \
-            --project {self.training.training_folder} --name result --vram-limit-gb {self._vram_limit_gb}',
+            --project {self.training.training_folder} --name result --vram-limit-gb {self._vram_limit_gb} \
+            --workers {self._dataloader_workers}',
                                   env={'WANDB_MODE': 'disabled'})
 
     def _get_new_best_training_state(self) -> TrainingStateData | None:
@@ -306,7 +308,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             --project {self.training.training_folder} --name result --hyp {self.hyperparameter_path} \
             --epochs {hyperparameters["epochs"]} --conf-thres {hyperparameters["detect_nms_conf_thres"]} \
             --iou-thres {hyperparameters["detect_nms_iou_thres"]} \
-            --vram-limit-gb {self._vram_limit_gb} \
+            --vram-limit-gb {self._vram_limit_gb} --workers {self._dataloader_workers} \
             {additional_parameters}'
         if p_sizes_by_id:
             cmd += f' --point_sizes_by_id {p_sizes_by_id}'
