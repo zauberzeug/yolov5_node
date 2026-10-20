@@ -183,16 +183,17 @@ class ConfusionMatrix:
                 if not any(m1 == i):
                     self.matrix[dc, self.nc] += 1  # predicted background
 
-    def save(self, save_dir='', names=()):
-        # PATCH (yolov5-node): keep the raw counts with what they mean, to be evaluated later, instead of a plot
+    def save(self, save_dir='', names=(), task='val'):
+        # PATCH (yolov5-node): keep the raw counts with what they mean, to be evaluated later
         names = list(names) if len(names) == self.nc else [str(i) for i in range(self.nc)]
         content = {
+            'set': task,
             'conf': float(self.conf),
             'iou': float(self.iou_thres),
             'axes': 'rows: predicted, columns: true; the last row and column are background',
             'names': [*names, 'background'],
             'matrix': self.matrix.astype(int).tolist()}
-        (Path(save_dir) / 'confusion_matrix.json').write_text(json.dumps(content))
+        (Path(save_dir) / f'confusion_matrix_{task}.json').write_text(json.dumps(content))
 
     def tp_fp(self):
         tp = self.matrix.diagonal()  # true positives
@@ -201,7 +202,7 @@ class ConfusionMatrix:
         return tp[:-1], fp[:-1]  # remove background class
 
     @TryExcept('WARNING ⚠️ ConfusionMatrix plot failure')
-    def plot(self, normalize=True, save_dir='', names=()):
+    def plot(self, normalize=True, save_dir='', names=(), task='val'):  # PATCH (yolov5-node): task names the file
         import seaborn as sn
 
         array = self.matrix / ((self.matrix.sum(0).reshape(1, -1) + 1E-9) if normalize else 1)  # normalize columns
@@ -228,7 +229,7 @@ class ConfusionMatrix:
         ax.set_ylabel('True')
         ax.set_ylabel('Predicted')
         ax.set_title('Confusion Matrix')
-        fig.savefig(Path(save_dir) / 'confusion_matrix.png', dpi=250)
+        fig.savefig(Path(save_dir) / f'confusion_matrix_{task}.png', dpi=250)
         plt.close(fig)
 
     def print(self):
