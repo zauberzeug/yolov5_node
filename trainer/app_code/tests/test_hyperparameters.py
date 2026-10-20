@@ -1,7 +1,7 @@
 import shutil
 
 import yaml  # type: ignore
-from learning_loop_node.trainer.hyperparameters import resolve
+from learning_loop_node.trainer.hyperparameters import check_declaration, resolve
 
 from ..hyperparameters import _TEMPLATE, HYPERPARAMETERS, TEMPLATE_PATH
 from ..yolov5_format import FLIP_PROBABILITY, set_hyperparameters_in_file
@@ -14,8 +14,9 @@ def test_every_template_key_is_declared_with_the_template_default():
         assert declared[name].default == value, name
 
 
-def test_no_name_is_declared_twice():
-    assert len({h.name for h in HYPERPARAMETERS}) == len(HYPERPARAMETERS)
+def test_the_declaration_passes_the_check_the_node_runs_when_it_starts():
+    """No name twice, no contradiction, every default fits; a failure here would stop the trainer node."""
+    check_declaration(HYPERPARAMETERS)
 
 
 def test_the_declared_defaults_resolve_to_themselves():
