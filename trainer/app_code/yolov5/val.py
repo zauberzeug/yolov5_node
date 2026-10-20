@@ -241,8 +241,7 @@ def run(
             if npr == 0:
                 if nl:
                     stats.append((correct, *torch.zeros((2, 0), device=device), labels[:, 0]))
-                    if plots:
-                        confusion_matrix.process_batch(detections=None, labels=labels[:, 0])
+                    confusion_matrix.process_batch(detections=None, labels=labels[:, 0])  # PATCH (yolov5-node): always
                 continue
 
             # Predictions
@@ -257,8 +256,7 @@ def run(
                 scale_boxes(im[si].shape[1:], tbox, shape, shapes[si][1])  # native-space labels
                 labelsn = torch.cat((labels[:, 0:1], tbox), 1)  # native-space labels
                 correct = process_batch(predn, labelsn, iouv)
-                if plots:
-                    confusion_matrix.process_batch(predn, labelsn)
+                confusion_matrix.process_batch(predn, labelsn)  # PATCH (yolov5-node): always, it is saved below
             stats.append((correct, pred[:, 4], pred[:, 5], labels[:, 0]))  # (correct, conf, pcls, tcls)
 
             # Save/log
@@ -307,8 +305,9 @@ def run(
         LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {shape}' % t)
 
     # Plots
+    confusion_matrix.save(save_dir=save_dir, names=list(names.values()))  # PATCH (yolov5-node): the raw counts
     if plots:
-        confusion_matrix.save(save_dir=save_dir, names=list(names.values()))  # PATCH (yolov5-node): instead of plot
+        confusion_matrix.plot(save_dir=save_dir, names=list(names.values()))
         callbacks.run('on_val_end', nt, tp, fp, p, r, f1, ap, ap50, ap_class, confusion_matrix)
 
     # Save JSON
