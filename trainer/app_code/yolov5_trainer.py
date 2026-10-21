@@ -24,6 +24,7 @@ from learning_loop_node.trainer import trainer_logic
 from learning_loop_node.trainer.batch_size import requested_batch_size
 from learning_loop_node.trainer.exceptions import CriticalError, NodeNeedsRestartError
 from learning_loop_node.trainer.executor import Executor
+from learning_loop_node.trainer.hyperparameters import parse_pairs
 
 from . import batch_size_calculation, model_files, training_run, yolov5_format
 from .hyperparameters import HYPERPARAMETERS, TEMPLATE_PATH
@@ -233,7 +234,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
                 p_sizes_by_id += f"{i}:{point_sizes_by_uuid.get(category.id, 0.03)},"
 
         flip_label_pairs = ""
-        for uuid_i, uuid_j in _parse_items('flip_label_pairs', hyperparameters['flip_label_pairs']):
+        for uuid_i, uuid_j in parse_pairs(hyperparameters['flip_label_pairs']):
             id_i = None
             id_j = None
             for i, category in enumerate(self.training.categories):
@@ -345,29 +346,13 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             print(jsonable_encoder(asdict(detection)))
 
 
-def _parse_items(name: str, text: str) -> list[tuple[str, str]]:
-    """The "key:value" items of the hyperparameter `name`, such as `flip_label_pairs`; empty items are skipped.
-
-    :raises CriticalError: If an item is not a key and a value separated by a single colon.
-    """
-    items = []
-    for item in (i.strip() for i in text.split(',')):
-        if not item:
-            continue
-        key, _, value = (part.strip() for part in item.partition(':'))
-        if not key or not value or ':' in value:
-            raise CriticalError(f'Invalid hyperparameter {name}: "{item}" is not of the form "key:value"')
-        items.append((key, value))
-    return items
-
-
 def _parse_point_sizes(text: str) -> dict[str, float]:
-    """The point size per category uuid from `point_sizes_by_id`.
+    """The point size per category uuid from `point_sizes_by_id`, whose format the node library has checked.
 
-    :raises CriticalError: If an item is malformed or its size is not a positive number.
+    :raises CriticalError: If a size is not a positive number.
     """
     sizes = {}
-    for uuid, size in _parse_items('point_sizes_by_id', text):
+    for uuid, size in parse_pairs(text):
         try:
             sizes[uuid] = float(size)
         except ValueError:

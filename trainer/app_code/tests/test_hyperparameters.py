@@ -7,7 +7,7 @@ from learning_loop_node.trainer.hyperparameters import check_declaration, resolv
 
 from ..hyperparameters import _TEMPLATE, HYPERPARAMETERS, TEMPLATE_PATH
 from ..yolov5_format import FLIP_PROBABILITY, set_hyperparameters_in_file
-from ..yolov5_trainer import _parse_items, _parse_point_sizes
+from ..yolov5_trainer import _parse_point_sizes
 
 
 def test_every_template_key_is_declared_with_the_template_default():
@@ -55,16 +55,15 @@ def test_every_hyperparameter_has_a_note():
         assert hyperparameter.notes[0].isupper(), f'the note of {hyperparameter.name} starts lowercase'
 
 
-def test_the_point_and_flip_items_tolerate_spaces_and_a_trailing_comma():
-    assert _parse_items('flip_label_pairs', ' a:b , c:d,') == [('a', 'b'), ('c', 'd')]
-    assert _parse_items('flip_label_pairs', '') == []
-    assert _parse_point_sizes('a:0.05') == {'a': 0.05}
+@pytest.mark.parametrize('name', ['flip_label_pairs', 'point_sizes_by_id'])
+def test_a_malformed_pair_is_refused_before_the_training_starts(name):
+    with pytest.raises(CriticalError, match=name):
+        resolve(HYPERPARAMETERS, {name: 'a:b:c'})
 
 
-@pytest.mark.parametrize('text', ['a', 'a:b:c', ':b', 'a:'])
-def test_a_malformed_item_ends_the_training_before_it_starts(text):
-    with pytest.raises(CriticalError, match='flip_label_pairs'):
-        _parse_items('flip_label_pairs', text)
+def test_the_point_sizes_tolerate_spaces_and_a_trailing_comma():
+    resolved = resolve(HYPERPARAMETERS, {'point_sizes_by_id': ' a : 0.05 ,'})
+    assert _parse_point_sizes(resolved['point_sizes_by_id']) == {'a': 0.05}
 
 
 @pytest.mark.parametrize('size', ['big', '0', '-0.1', 'nan'])

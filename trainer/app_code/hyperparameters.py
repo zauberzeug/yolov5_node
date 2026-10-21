@@ -35,6 +35,11 @@ def _probability(name: str, notes: str = '', *, expert: bool = True) -> Hyperpar
     return _from_template(name, notes=notes, minimum=0, maximum=1, expert=expert)
 
 
+def _pairs(name: str, notes: str, *, expert: bool = True) -> Hyperparameter:
+    """A ``"key:value,..."`` hyperparameter of ``hyp_det.yaml``, checked by the node library before a training starts."""
+    return Hyperparameter(name=name, type='pairs', default=_TEMPLATE[name], notes=notes, expert=expert)
+
+
 HYPERPARAMETERS = [
     Hyperparameter(name='resolution', type='int', default=832, minimum=2 * MIN_STRIDE,
                    notes="Square input size in pixels, a multiple of the model's largest stride"),
@@ -47,8 +52,7 @@ HYPERPARAMETERS = [
     # on or off rather than a probability, see yolov5_format.FLIP_PROBABILITY; the template keeps 0.0 for off
     Hyperparameter(name='fliplr', type='bool', default=False, notes='Flip half of the images horizontally'),
     Hyperparameter(name='flipud', type='bool', default=False, notes='Flip half of the images vertically'),
-    _from_template('flip_label_pairs', expert=False,
-                   notes='Categories swapped by a horizontal flip, as "uuid:uuid,..."'),
+    _pairs('flip_label_pairs', 'Categories swapped by a horizontal flip, as "uuid:uuid,..."', expert=False),
     _probability('detect_nms_conf_thres', 'Minimum confidence of a detection, in validation and in detection'),
     _probability('detect_nms_iou_thres',
                  'IoU above which the weaker of two detections is dropped, in validation and in detection'),
@@ -81,8 +85,7 @@ HYPERPARAMETERS = [
     _probability('mixup', 'Probability of blending two mosaic images, only applied when mosaic is'),
     _probability('copy_paste', 'Copy-paste of segments; has no effect on box and point labels'),
     _from_template('reset_points', notes='Resize the point labels to point_sizes_by_id'),
-    _from_template('point_sizes_by_id',
-                   notes='Point size per category as a fraction of the image, "uuid:size,...", used by reset_points; '
-                         '0.03 if unset'),
+    _pairs('point_sizes_by_id',
+           'Point size per category as a fraction of the image, "uuid:size,...", used by reset_points; 0.03 if unset'),
 ]
 """What this trainer accepts, reported to the loop."""
