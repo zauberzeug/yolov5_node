@@ -97,8 +97,9 @@ that same ordering.
 
 **Point detection rides on boxes.** A point annotation is written as a box of `point_size` and turned
 back into a point by category type. The point hyperparameters are not handed to yolov5 as
-hyperparameters; `_save_additional_hyperparameters` parses them out of `hyp.yaml` and re-encodes them
-as index-based command line arguments.
+hyperparameters; `_start` parses them from the training's hyperparameters, ending the training with a
+`CriticalError` on a malformed item before `train_det.py` starts, and re-encodes them as index-based
+command line arguments.
 
 **Model handoff between sub-projects.** The trainer publishes `yolov5_pytorch` (`model.pt`) *and*
 `yolov5_wts` (built by `generate_wts.py`); the TensorRT detector declares

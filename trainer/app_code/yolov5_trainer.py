@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import math
 import os
 import re
 import shlex
@@ -220,19 +221,19 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     async def _start(self, model: str, additional_parameters: str = ''):
         hyperparameters = self.training.hyperparameters
         batch_size_calculation.check_resolution(hyperparameters['resolution'], batch_size_calculation.MIN_STRIDE)
+        point_sizes_by_uuid = _parse_point_sizes(hyperparameters['point_sizes_by_id'])
 
         trainer_version = os.environ.get('NODE_VERSION') or 'unknown'
         logging.info('Training with trainer version %s', trainer_version)
         hyperparameters['trainer_version'] = trainer_version
 
-        point_sizes_by_uuid = dict(_parse_items(hyperparameters['point_sizes_by_id']))
         p_sizes_by_id = ""
         for i, category in enumerate(self.training.categories):
             if category.type == CategoryType.Point:
-                p_sizes_by_id += f"{i}:{float(point_sizes_by_uuid.get(category.id, 0.03))},"
+                p_sizes_by_id += f"{i}:{point_sizes_by_uuid.get(category.id, 0.03)},"
 
         flip_label_pairs = ""
-        for uuid_i, uuid_j in _parse_items(hyperparameters['flip_label_pairs']):
+        for uuid_i, uuid_j in _parse_items('flip_label_pairs', hyperparameters['flip_label_pairs']):
             id_i = None
             id_j = None
             for i, category in enumerate(self.training.categories):
@@ -344,10 +345,33 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             print(jsonable_encoder(asdict(detection)))
 
 
-def _parse_items(text: str) -> list[tuple[str, str]]:
-    """The "key:value" items of a hyperparameter such as `flip_label_pairs`, none when it is empty."""
+def _parse_items(name: str, text: str) -> list[tuple[str, str]]:
+    """The "key:value" items of the hyperparameter `name`, such as `flip_label_pairs`; empty items are skipped.
+
+    :raises CriticalError: If an item is not a key and a value separated by a single colon.
+    """
     items = []
-    for item in text.split(',') if text else []:
-        key, value = item.split(':')
+    for item in (i.strip() for i in text.split(',')):
+        if not item:
+            continue
+        key, _, value = (part.strip() for part in item.partition(':'))
+        if not key or not value or ':' in value:
+            raise CriticalError(f'Invalid hyperparameter {name}: "{item}" is not of the form "key:value"')
         items.append((key, value))
     return items
+
+
+def _parse_point_sizes(text: str) -> dict[str, float]:
+    """The point size per category uuid from `point_sizes_by_id`.
+
+    :raises CriticalError: If an item is malformed or its size is not a positive number.
+    """
+    sizes = {}
+    for uuid, size in _parse_items('point_sizes_by_id', text):
+        try:
+            sizes[uuid] = float(size)
+        except ValueError:
+            sizes[uuid] = math.nan
+        if not math.isfinite(sizes[uuid]) or sizes[uuid] <= 0:
+            raise CriticalError(f'Invalid hyperparameter point_sizes_by_id: "{size}" for {uuid} is not a positive number')
+    return sizes
