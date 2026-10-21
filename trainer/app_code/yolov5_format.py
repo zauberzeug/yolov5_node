@@ -126,12 +126,6 @@ def set_hyperparameters_in_file(yaml_path: str, hyperparameter: dict[str, Any]) 
     for flip in ('fliplr', 'flipud'):
         if isinstance(hyperparameter.get(flip), bool):
             hyperparameter[flip] = FLIP_PROBABILITY if hyperparameter[flip] else 0.0
-    if 'flip_rl' in hyperparameter:
-        hyperparameter['fliplr'] = 0.5 if hyperparameter['flip_rl'] else 0.0
-    if 'flip_lr' in hyperparameter:
-        hyperparameter['fliplr'] = 0.5 if hyperparameter['flip_lr'] else 0.0
-    if 'flip_ud' in hyperparameter:
-        hyperparameter['flipud'] = 0.5 if hyperparameter['flip_ud'] else 0.0
 
     for param in content:
         if (hp_value := hyperparameter.get(param)) is not None:
