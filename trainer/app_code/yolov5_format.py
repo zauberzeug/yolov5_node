@@ -7,8 +7,26 @@ from typing import Any
 from learning_loop_node.data_classes import Training
 from learning_loop_node.trainer.exceptions import CriticalError
 from ruamel.yaml import YAML
+from ruamel.yaml.representer import RoundTripRepresenter
+
+
+class _Representer(RoundTripRepresenter):
+    """Writes floats the way PyYAML does, since ``train_det.py`` reads the hyp.yaml with it.
+
+    PyYAML follows YAML 1.1, which reads ``5e-05`` as a string and only ``5.0e-05`` as a number.
+    """
+
+    def represent_float(self, data: float) -> Any:
+        text = repr(data).lower()
+        if '.' not in text and 'e' in text:
+            text = text.replace('e', '.0e', 1)
+        return self.represent_scalar('tag:yaml.org,2002:float', text)
+
+
+_Representer.add_representer(float, _Representer.represent_float)
 
 yaml = YAML()
+yaml.Representer = _Representer
 
 
 def category_lookup_from_training(training: Training) -> dict[str, str]:

@@ -36,6 +36,15 @@ def test_a_flip_that_is_on_flips_half_of_the_images(tmp_path):
     assert written['flipud'] == 0.0
     assert hyperparameters == {'fliplr': True, 'flipud': False}, 'the training keeps the declared form'
 
+
+def test_train_det_reads_a_tiny_float_back_as_a_number(tmp_path):
+    """train_det.py reads hyp.yaml with PyYAML, which takes 5e-05 for a string."""
+    hyp = tmp_path / 'hyp.yaml'
+    shutil.copy(TEMPLATE_PATH, hyp)
+    perspective = 0.00005
+    set_hyperparameters_in_file(str(hyp), resolve(HYPERPARAMETERS, {'perspective': perspective}))
+    assert yaml.safe_load(hyp.read_text())['perspective'] == perspective
+
 def test_every_hyperparameter_has_a_note():
     """The loop shows the note as the description under each hyperparameter."""
     for hyperparameter in HYPERPARAMETERS:
