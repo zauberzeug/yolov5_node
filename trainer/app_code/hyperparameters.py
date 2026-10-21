@@ -22,8 +22,11 @@ with open(TEMPLATE_PATH, encoding='utf-8') as _file:
 
 _TYPES = {bool: 'bool', int: 'int', float: 'float', str: 'str'}
 
+DEFAULT_POINT_SIZE = 0.03
+"""The point size, as a fraction of the image, of a point category ``point_sizes_by_id`` does not name."""
 
-def _from_template(name: str, *, notes: str = '', minimum: float | None = None, maximum: float | None = None,
+
+def _from_template(name: str, *, notes: str, minimum: float | None = None, maximum: float | None = None,
                    expert: bool = True) -> Hyperparameter:
     """A hyperparameter of ``hyp_det.yaml``, its type and default taken from the template."""
     default = _TEMPLATE[name]
@@ -31,8 +34,8 @@ def _from_template(name: str, *, notes: str = '', minimum: float | None = None, 
                           notes=notes, expert=expert)
 
 
-def _probability(name: str, notes: str = '', *, expert: bool = True) -> Hyperparameter:
-    return _from_template(name, notes=notes, minimum=0, maximum=1, expert=expert)
+def _probability(name: str, notes: str) -> Hyperparameter:
+    return _from_template(name, notes=notes, minimum=0, maximum=1)
 
 
 def _pairs(name: str, notes: str, *, expert: bool = True) -> Hyperparameter:
@@ -86,6 +89,7 @@ HYPERPARAMETERS = [
     _probability('copy_paste', 'Copy-paste of segments; has no effect on box and point labels'),
     _from_template('reset_points', notes='Resize the point labels to point_sizes_by_id'),
     _pairs('point_sizes_by_id',
-           'Point size per category as a fraction of the image, "uuid:size,...", used by reset_points; 0.03 if unset'),
+           f'Point size per category as a fraction of the image, "uuid:size,...", used by reset_points; '
+           f'{DEFAULT_POINT_SIZE} if unset'),
 ]
 """What this trainer accepts, reported to the loop."""

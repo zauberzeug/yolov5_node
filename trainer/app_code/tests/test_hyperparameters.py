@@ -48,6 +48,7 @@ def test_train_det_reads_a_tiny_float_back_as_a_number(tmp_path):
     set_hyperparameters_in_file(str(hyp), resolve(HYPERPARAMETERS, {'perspective': perspective}))
     assert yaml.safe_load(hyp.read_text())['perspective'] == perspective
 
+
 def test_every_hyperparameter_has_a_note():
     """The loop shows the note as the description under each hyperparameter."""
     for hyperparameter in HYPERPARAMETERS:
