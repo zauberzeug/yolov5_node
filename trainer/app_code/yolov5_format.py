@@ -7,10 +7,6 @@ from typing import Any
 from learning_loop_node.data_classes import Training
 from learning_loop_node.trainer.exceptions import CriticalError
 from ruamel.yaml import YAML
-from ruamel.yaml.scalarbool import ScalarBoolean
-from ruamel.yaml.scalarfloat import ScalarFloat
-from ruamel.yaml.scalarint import ScalarInt
-from ruamel.yaml.scalarstring import LiteralScalarString
 
 yaml = YAML()
 
@@ -116,21 +112,20 @@ FLIP_PROBABILITY = 0.5
 
 
 def set_hyperparameters_in_file(yaml_path: str, hyperparameter: dict[str, Any]) -> None:
-    """Override the hyperparameters in the yaml file used by the yolov5 trainer with the ones from the hyperparameter dict (coming from the loop configuration).
-    The yaml file is modified in place."""
+    """Override the hyperparameters in the yaml file used by the yolov5 trainer with the training's resolved ones.
+    The yaml file is modified in place.
+
+    Every key of the template is declared with the template's type, so the resolved values need no conversion.
+    """
 
     with open(yaml_path) as f:
         content = yaml.load(f)
 
-    hyperparameter = dict(hyperparameter)  # the training keeps the declared form, the yaml gets probabilities
-    for flip in ('fliplr', 'flipud'):
-        if isinstance(hyperparameter.get(flip), bool):
-            hyperparameter[flip] = FLIP_PROBABILITY if hyperparameter[flip] else 0.0
-
     for param in content:
-        if (hp_value := hyperparameter.get(param)) is not None:
-            yaml_value = content[param]
-            content[param] = convert_type(hp_value, yaml_value)
+        if param in hyperparameter:
+            content[param] = hyperparameter[param]
+    for flip in ('fliplr', 'flipud'):  # the training keeps the declared on or off, the yaml gets a probability
+        content[flip] = FLIP_PROBABILITY if content[flip] else 0.0
 
     logging.info('Hyps after update: %s', content)
 
@@ -140,18 +135,3 @@ def set_hyperparameters_in_file(yaml_path: str, hyperparameter: dict[str, Any]) 
     except Exception as e:
         logging.error('Error writing to %s: %s', yaml_path, e)
         raise CriticalError(f'Error writing to {yaml_path}') from None
-
-
-def convert_type(value, reference: Any):
-
-    if isinstance(reference, (LiteralScalarString, str)):
-        return str(value)
-    # bool before int: a bool is an int, and a yaml flag would otherwise be written as 0 or 1
-    if isinstance(reference, (ScalarBoolean, bool)):
-        return bool(value)
-    if isinstance(reference, (ScalarFloat, float)):
-        return float(value)
-    if isinstance(reference, (ScalarInt, int)):
-        return int(value)
-
-    raise CriticalError(f'Unknown type: {type(reference)}')

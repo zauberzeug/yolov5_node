@@ -9,7 +9,6 @@ from dataclasses import asdict
 from pathlib import Path
 
 import cv2  # type: ignore # pylint: disable=import-error
-import yaml  # type: ignore
 from fastapi.encoders import jsonable_encoder
 from learning_loop_node.data_classes import (
     Detections,
@@ -21,7 +20,7 @@ from learning_loop_node.data_classes import (
 from learning_loop_node.detector.postprocess import Prediction, to_detections
 from learning_loop_node.enums import CategoryType
 from learning_loop_node.trainer import trainer_logic
-from learning_loop_node.trainer.batch_size import REQUESTED_BATCH_SIZE, requested_batch_size
+from learning_loop_node.trainer.batch_size import requested_batch_size
 from learning_loop_node.trainer.exceptions import CriticalError, NodeNeedsRestartError
 from learning_loop_node.trainer.executor import Executor
 
@@ -38,17 +37,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
         logging.info('------ STARTING YOLOV5 TRAINER LOGIC ------')
         self.latest_epoch = 0
-        self.patience = 300  # overwritten by the training's hyperparameters
         self.inference_batch_size = 100  # yolo processes images one by one
-
-        # Following will be overwritten by hyp.yaml
-        self.epochs = 0
-        self.detect_nms_conf_thres = 0.2
-        self.detect_nms_iou_thres = 0.45
-        self.point_sizes_by_uuid: dict[str, float] = {}
-        self.flip_label_uuid_pairs: list[tuple[str, str]] = []
-
-        self.additional_hyperparameters_parsed = False
 
     # ---------------------------------------- IMPLEMENTED ABSTRACT PROPERTIES ----------------------------------------
 
@@ -97,7 +86,6 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     async def _resume(self) -> None:
         checkpoint = model_files.resume_checkpoint(self.training.training_folder_path)
         assert checkpoint is not None
-        self._save_additional_hyperparameters()
         self.training.hyperparameters['trainer_version'] = os.environ.get('NODE_VERSION') or 'unknown'
         self._training_run.clear_failure()
         await self.executor.start(f'python /app/train_det.py --resume {shlex.quote(str(checkpoint))} \
@@ -150,8 +138,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
     async def _detect(self, model_information: ModelInformation, images: list[str],
                       model_folder: str) -> list[Detections]:
-
-        self._save_additional_hyperparameters()
+        hyperparameters = self.training.hyperparameters
 
         images_folder = '/tmp/imagelinks_for_detecting'
         shutil.rmtree(images_folder, ignore_errors=True)
@@ -168,7 +155,8 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         img_size = model_information.resolution
 
         cmd = f'python /app/pred_det.py --weights {model_folder}/model.pt --source {images_folder}'
-        cmd += f' --img-size {img_size} --conf-thres {self.detect_nms_conf_thres} --iou-thres {self.detect_nms_iou_thres}'
+        cmd += f' --img-size {img_size} --conf-thres {hyperparameters["detect_nms_conf_thres"]}'
+        cmd += f' --iou-thres {hyperparameters["detect_nms_iou_thres"]}'
         cmd += f' --vram-limit-gb {self._vram_limit_gb}'
 
         await executor.start(cmd)
@@ -230,25 +218,21 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         await self._start(model, additional_params)
 
     async def _start(self, model: str, additional_parameters: str = ''):
-        resolution = self.training.hyperparameters.get('resolution')
-        batch_size_calculation.check_resolution(resolution, batch_size_calculation.MIN_STRIDE)
-
-        self._save_additional_hyperparameters()
-
-        max_batch_size = self._requested_batch_size()
+        hyperparameters = self.training.hyperparameters
+        batch_size_calculation.check_resolution(hyperparameters['resolution'], batch_size_calculation.MIN_STRIDE)
 
         trainer_version = os.environ.get('NODE_VERSION') or 'unknown'
         logging.info('Training with trainer version %s', trainer_version)
-        self.training.hyperparameters['trainer_version'] = trainer_version
+        hyperparameters['trainer_version'] = trainer_version
 
+        point_sizes_by_uuid = dict(_parse_items(hyperparameters['point_sizes_by_id']))
         p_sizes_by_id = ""
         for i, category in enumerate(self.training.categories):
             if category.type == CategoryType.Point:
-                size = self.point_sizes_by_uuid.get(category.id, 0.03)
-                p_sizes_by_id += f"{i}:{size},"
+                p_sizes_by_id += f"{i}:{float(point_sizes_by_uuid.get(category.id, 0.03))},"
 
         flip_label_pairs = ""
-        for uuid_i, uuid_j in self.flip_label_uuid_pairs:
+        for uuid_i, uuid_j in _parse_items(hyperparameters['flip_label_pairs']):
             id_i = None
             id_j = None
             for i, category in enumerate(self.training.categories):
@@ -259,10 +243,12 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             if id_i is not None and id_j is not None:
                 flip_label_pairs += f"{id_i}:{id_j},"
 
-        cmd = f'python /app/train_det.py --exist-ok --patience {self.patience} \
-            --batch-size -1 --max-batch-size {max_batch_size} --img {resolution} --data dataset.yaml --weights {model} \
+        cmd = f'python /app/train_det.py --exist-ok --patience {hyperparameters["patience"]} \
+            --batch-size -1 --max-batch-size {requested_batch_size(hyperparameters)} --img {hyperparameters["resolution"]} \
+            --data dataset.yaml --weights {model} \
             --project {self.training.training_folder} --name result --hyp {self.hyperparameter_path} \
-            --epochs {self.epochs} --conf-thres {self.detect_nms_conf_thres} --iou-thres {self.detect_nms_iou_thres} \
+            --epochs {hyperparameters["epochs"]} --conf-thres {hyperparameters["detect_nms_conf_thres"]} \
+            --iou-thres {hyperparameters["detect_nms_iou_thres"]} \
             --vram-limit-gb {self._vram_limit_gb} \
             {additional_parameters}'
         if p_sizes_by_id:
@@ -277,55 +263,6 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     def _training_run(self) -> training_run.TrainingRun:
         return training_run.TrainingRun(self.training.training_folder_path / 'result')
 
-    def _requested_batch_size(self) -> int:
-        """The `max_batch_size` the training asked for, which `train_det.py` probes within.
-
-        :raises CriticalError: If it is not a whole number of at least 0, which no retry can fix.
-        """
-        try:
-            max_batch_size = requested_batch_size(self.training.hyperparameters)
-        except (TypeError, ValueError) as e:
-            raise CriticalError(f'Invalid {REQUESTED_BATCH_SIZE}: {e}') from e
-        if max_batch_size < 0:
-            raise CriticalError(f'Invalid {REQUESTED_BATCH_SIZE}: {max_batch_size} is negative')
-        return max_batch_size
-
-    def _save_additional_hyperparameters(self) -> None:
-        """Save additional hyperparameters to attributes of self.
-        These parameters are not passed to the yolov5 trainer, but are used to modify the training (and inference) process.
-        """
-        if self.additional_hyperparameters_parsed:
-            return
-        self.additional_hyperparameters_parsed = True
-
-        if not os.path.exists(self.hyperparameter_path):
-            logging.warning('No hyperparameter file found at %s', self.hyperparameter_path)
-            raise CriticalError(f'No hyperparameter file found at {self.hyperparameter_path}')
-
-        with open(self.hyperparameter_path, errors='ignore') as f:
-            hyp = dict(yaml.safe_load(f))  # load hyps dict
-
-        self.epochs = int(hyp.get('epochs', self.epochs))
-        self.patience = int(self.training.hyperparameters.get('patience', self.patience))
-        self.detect_nms_conf_thres = float(hyp.get('detect_nms_conf_thres', self.detect_nms_conf_thres))
-        self.detect_nms_iou_thres = float(hyp.get('detect_nms_iou_thres', self.detect_nms_iou_thres))
-
-        if point_sizes_by_id_str := str(hyp.get('point_sizes_by_id', '')):
-            for item in point_sizes_by_id_str.split(','):
-                k, v = item.split(':')
-                self.point_sizes_by_uuid[str(k)] = float(v)
-
-        if flip_label_pairs_str := str(hyp.get('flip_label_pairs', '')):
-            for item in flip_label_pairs_str.split(','):
-                k, v = item.split(':')
-                self.flip_label_uuid_pairs.append((str(k), str(v)))
-
-        hyp_str = ', '.join(f'{k}={v}' for k, v in hyp.items())
-        logging.info('parsed hyperparameters %s: epochs: %d, detect_nms_conf_thres: %f, detect_nms_iou_thres: %f',
-                     hyp_str, self.epochs, self.detect_nms_conf_thres, self.detect_nms_iou_thres)
-        logging.info('point_sizes_by_id: %s', self.point_sizes_by_uuid)
-        logging.info('flip_label_pairs: %s', self.flip_label_uuid_pairs)
-
     def _parse(self, labels_path: str, images_folder: str, model_information: ModelInformation) -> list[Detections]:
         detections = []
         if os.path.exists(labels_path):
@@ -337,15 +274,16 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         return detections
 
     def _get_progress_from_log(self) -> float:
-        if self.epochs == 1:
+        epochs = self.training.hyperparameters['epochs']
+        if epochs == 1:
             return 0.0  # NOTE: We would divide by 0 in this case
         lines = list(reversed(self.executor.get_log_by_lines()))
         progress = 0.0
         for line in lines:
-            if re.search(f'/{self.epochs - 1}', line):
+            if re.search(f'/{epochs - 1}', line):
                 found_line = line.split(' ')
                 for item in found_line:
-                    if f'/{self.epochs - 1}' in item:
+                    if f'/{epochs - 1}' in item:
                         epoch, total_epochs = item.split('/')[:2]
                         try:
                             progress = float(epoch) / float(total_epochs)
@@ -404,3 +342,12 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
         for detection in detections:
             print(jsonable_encoder(asdict(detection)))
+
+
+def _parse_items(text: str) -> list[tuple[str, str]]:
+    """The "key:value" items of a hyperparameter such as `flip_label_pairs`, none when it is empty."""
+    items = []
+    for item in text.split(',') if text else []:
+        key, value = item.split(':')
+        items.append((key, value))
+    return items
