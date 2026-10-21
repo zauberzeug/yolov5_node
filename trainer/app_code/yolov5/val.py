@@ -38,7 +38,7 @@ from .utils.general import (LOGGER, TQDM_BAR_FORMAT, Profile, check_dataset,
                             non_max_suppression, print_args, scale_boxes,
                             xywh2xyxy, xyxy2xywh)
 from .utils.metrics import ConfusionMatrix, ap_per_class, box_iou
-from .utils.plots import output_to_target, plot_images, plot_val_study
+from .utils.plots import plot_val_study
 from .utils.torch_utils import select_device, smart_inference_mode
 
 FILE = Path(__file__).resolve()
@@ -269,10 +269,7 @@ def run(
                 save_one_json(predn, jdict, path, class_map)  # append to COCO-JSON dictionary
             callbacks.run('on_val_image_end', pred, predn, path, names, im[si])
 
-        # Plot images
-        if plots and batch_i < 3:
-            plot_images(im, targets, paths, save_dir / f'val_batch{batch_i}_labels.jpg', names)  # labels
-            plot_images(im, output_to_target(preds), paths, save_dir / f'val_batch{batch_i}_pred.jpg', names)  # pred
+        # PATCH (yolov5-node): no val_batch*_labels/pred.jpg images; the node has its own way to look at examples
 
         callbacks.run('on_val_batch_end', batch_i, im, targets, paths, shapes, preds)
 
@@ -302,6 +299,8 @@ def run(
     for i, c in enumerate(ap_class):
         fn = tp[i] / r[i] - tp[i] if r[i] != 0 else 0
         confusion_matrices[names[c]] = {'tp': int(tp[i]), 'fp': int(fp[i]), 'fn': int(fn)}
+    # PATCH (yolov5-node): AP per class (only classes with labels), returned for the node's results table
+    class_aps = {names[c]: {'ap50': float(ap50[i]), 'ap50_95': float(ap[i])} for i, c in enumerate(ap_class)}
 
     # Print speeds
     t = tuple(x.t / seen * 1E3 for x in dt)  # speeds per image
@@ -351,7 +350,8 @@ def run(
     maps = np.zeros(nc) + map
     for i, c in enumerate(ap_class):
         maps[c] = ap[i]
-    return (mp, mr, map50, map, *(loss.cpu() / len(dataloader)).tolist()), confusion_matrices, maps, t, reported_conf
+    return (mp, mr, map50, map, *(loss.cpu() / len(dataloader)).tolist()), confusion_matrices, maps, t, reported_conf, \
+        class_aps
 
 
 def parse_opt():
@@ -412,7 +412,7 @@ def main(opt):
                 x, y = list(range(256, 1536 + 128, 128)), []  # x axis (image sizes), y axis
                 for opt.imgsz in x:  # img-size
                     LOGGER.info(f'\nRunning {f} --imgsz {opt.imgsz}...')
-                    r, _, _, t, _ = run(**vars(opt), plots=False)
+                    r, _, _, t, _, _ = run(**vars(opt), plots=False)
                     y.append(r + t)  # results and times
                 np.savetxt(f, y, fmt='%10.4g')  # save
             os.system('zip -r study.zip study_*.txt')

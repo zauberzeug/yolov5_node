@@ -105,19 +105,22 @@ def test_rows_are_matched_by_epoch_not_by_position(tmp_path: Path):
 
 def test_class_metrics_cover_every_class_in_order(tmp_path: Path):
     counts = {'weed': {'tp': 3, 'fp': 1, 'fn': 1}, 'crop': {'tp': 0, 'fp': 0, 'fn': 2}}
+    aps = {'weed': {'ap50': 0.8, 'ap50_95': 0.5}, 'crop': {'ap50': 0.0, 'ap50_95': 0.0}}
 
-    metrics = training_run.class_metrics({0: 'weed', 1: 'crop', 2: 'stone'}, counts)
+    metrics = training_run.class_metrics({0: 'weed', 1: 'crop', 2: 'stone'}, counts, aps)
 
-    assert list(metrics) == ['metrics/precision/weed', 'metrics/recall/weed', 'metrics/precision/crop',
-                             'metrics/recall/crop', 'metrics/precision/stone', 'metrics/recall/stone']
+    assert list(metrics) == [f'metrics/{metric}/{name}' for name in ('weed', 'crop', 'stone')
+                             for metric in ('precision', 'recall', 'mAP_0.5', 'mAP_0.5:0.95')]
     weed = 3 / (3 + 1)  # tp / (tp + fp) and tp / (tp + fn)
     assert metrics['metrics/precision/weed'] == weed
     assert metrics['metrics/recall/weed'] == weed
+    assert metrics['metrics/mAP_0.5/weed'] == aps['weed']['ap50']
+    assert metrics['metrics/mAP_0.5:0.95/weed'] == aps['weed']['ap50_95']
     assert math.isnan(metrics['metrics/precision/crop'])  # no predictions
     assert metrics['metrics/recall/crop'] == 0
-    assert math.isnan(metrics['metrics/precision/stone'])  # no labels in the validation set
-    assert math.isnan(metrics['metrics/recall/stone'])
+    assert all(math.isnan(value) for key, value in metrics.items() if key.endswith('/stone'))  # no labels
 
     training_run.report_epoch(tmp_path, 1, {'metrics/mAP_0.5': 0.5, **metrics})
 
-    assert (tmp_path / training_run.RESULTS_FILE).read_text().splitlines()[1] == '1,0.5,0.75,0.75,nan,0,nan,nan'
+    assert (tmp_path / training_run.RESULTS_FILE).read_text().splitlines()[1] == \
+        '1,0.5,0.75,0.75,0.8,0.5,nan,0,0,0,nan,nan,nan,nan'

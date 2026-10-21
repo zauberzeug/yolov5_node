@@ -488,7 +488,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         ema.update_attr(model, include=['yaml', 'nc', 'hyp', 'names', 'stride', 'class_weights'])
         final_epoch = (epoch + 1 == epochs) or stopper.possible_stop
         if not noval or final_epoch:  # Calculate mAP
-            results, confusion_matrices, maps, _, val_conf = validate.run(data_dict,
+            results, confusion_matrices, maps, _, val_conf, class_aps = validate.run(data_dict,
                                                                           batch_size=batch_size // 2,
                                                                           imgsz=imgsz,
                                                                           conf_thres=opt.conf_thres,
@@ -511,7 +511,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         log_vals = list(mloss) + list(results) + lr
         callbacks.run('on_fit_epoch_end', log_vals, epoch, best_fitness, fi)
         training_run.report_epoch(save_dir, epoch, {**{key: float(value) for key, value in zip(loggers.keys, log_vals, strict=False)},
-                                                    **training_run.class_metrics(names, confusion_matrices)})
+                                                    **training_run.class_metrics(names, confusion_matrices, class_aps)})
 
         # Save model
         if (not nosave) or (final_epoch and not evolve):  # if save
@@ -547,7 +547,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 save_best(ckpt, w, model_metadata)
                 if val_conf is not None:
                     if test_loader is not val_loader:
-                        _, confusion_matrices, _, _, _ = validate.run(data_dict,
+                        _, confusion_matrices, _, _, _, _ = validate.run(data_dict,
                                                                       batch_size=batch_size // 2,
                                                                       imgsz=imgsz,
                                                                       conf_thres=opt.conf_thres,

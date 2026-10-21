@@ -61,18 +61,23 @@ def report_epoch(result_dir: Path, epoch: int, metrics: dict[str, float]) -> Non
     os.replace(temporary, path)
 
 
-def class_metrics(names: dict[int, str], counts: dict[str, dict[str, int]]) -> dict[str, float]:
-    """Precision and recall of every class from its tp/fp/fn counts, as columns for :func:`report_epoch`.
+def class_metrics(names: dict[int, str], counts: dict[str, dict[str, int]],
+                  aps: dict[str, dict[str, float]]) -> dict[str, float]:
+    """Precision and recall from the tp/fp/fn counts, and AP50 and AP50-95, of every class as columns for
+    :func:`report_epoch`.
 
-    Every class gets both columns, in the order of `names`, so the header stays the same for every epoch;
-    a value without data to compute it from (no counts, or a zero denominator) is NaN.
+    Every class gets all four columns, in the order of `names`, so the header stays the same for every epoch;
+    a value without data to compute it from (no labels, or a zero denominator) is NaN.
     """
     metrics = {}
     for name in names.values():
         class_counts = counts.get(name, {})
         tp, fp, fn = (class_counts.get(key, 0) for key in ('tp', 'fp', 'fn'))
+        class_aps = aps.get(name, {})
         metrics[f'metrics/precision/{name}'] = tp / (tp + fp) if tp + fp else math.nan
         metrics[f'metrics/recall/{name}'] = tp / (tp + fn) if tp + fn else math.nan
+        metrics[f'metrics/mAP_0.5/{name}'] = class_aps.get('ap50', math.nan)
+        metrics[f'metrics/mAP_0.5:0.95/{name}'] = class_aps.get('ap50_95', math.nan)
     return metrics
 
 
