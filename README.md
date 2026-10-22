@@ -49,7 +49,6 @@ When using the script it is required to set up a .env file in the trainer folder
 | HOST_PORT                   | Port on this machine mapped to the container         | Integer        | 7443    | Yes                          |
 | LINKLL                      | Link the node library into the container?            | TRUE/FALSE     | FALSE   | Yes                          |
 | TRAINING_SLOT_DIR           | Host directory the trainers on this machine share their GPU lock through; empty disables it | Path | /var/tmp/training_slot | Yes |
-| TRAINING_ARCHIVE_HOST_DIR   | Host directory the results of each training are copied to; empty disables it | Path | /var/tmp/training_archive | Yes |
 | UVICORN_RELOAD              | Enable hot-reload                                    | TRUE/FALSE/0/1 | FALSE   | No                           |
 | RESTART_AFTER_TRAINING      | Auto-restart after training                          | TRUE/FALSE/0/1 | FALSE   | No                           |
 | KEEP_OLD_TRAININGS          | Do not remove old trainings, when starting a new one | TRUE/FALSE/0/1 | FALSE   | No                           |
@@ -83,14 +82,10 @@ The other trainers on the machine — a second container of this image, or a tra
 The kernel drops the lock with the container, so a crash frees it by itself.
 Set `TRAINING_SLOT_DIR` in `.env` to use another directory, or to the empty string for a trainer that has its GPU to itself.
 
-## Archived training results
+## Training results
 
-The training folder in the data volume is deleted when the next training of the same project starts.
-To keep the results longer, `docker.sh` mounts `/var/tmp/training_archive` and the trainer copies each training's results there when it ends, is stopped or fails (`TRAINING_ARCHIVE_DIR`, see the node library's README) — not when it is aborted.
-They land in `<node name>/<organization>/<project>/<model version>_<start time>` (e.g. `6.1_…` for the first continuation of training 6): everything in `result/` but the weights and the `.png` plots (`results.csv`, `opt.yaml`, `confusion_matrix_test.json` and `curves_test.json` to draw them again, batch images), all of `result/examples/`, `hyp.yaml`, `dataset.yaml` and `last_training.log` — never the dataset.
-`docker.sh` creates the directory readable only by the user who first starts a trainer; the container runs as root, so another container can read the results for everyone.
-Below `/var/tmp` the system deletes results nobody has looked at for about 30 days.
-Set `TRAINING_ARCHIVE_HOST_DIR` in `.env` to use another directory, or to the empty string to keep no archive.
+Together with each model, the trainer uploads the results of its training to the Learning Loop (see the node library's README): everything in `result/` but the weights and the `.png` plots (`results.csv`, `opt.yaml`, `hyp.yaml`, and `confusion_matrix_test.json` and `curves_test.json` to draw the plots again), `hyp.yaml` and `dataset.yaml` — never the dataset.
+`result/examples/` is uploaded only with the hyperparameter `upload_examples: true`, `last_training.log` only with `upload_logs: true`.
 
 # Detector Node
 

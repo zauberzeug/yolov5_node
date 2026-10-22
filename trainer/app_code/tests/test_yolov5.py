@@ -421,19 +421,19 @@ class TestWithDetection:
         assert len(files) == 2  # Note: Do not delete last_training.log and best.pt
 
 
-def test_files_to_archive_are_the_results_without_dataset_weights_or_plots(tmp_path: Path):
+def test_the_training_results_leave_out_dataset_weights_and_plots(tmp_path: Path):
     for name in ['result/results.csv', 'result/opt.yaml', 'result/results.png', 'result/curves_test.json',
-                 'result/val_batch0_pred.jpg', 'result/examples/example_0_0.png',
-                 'result/weights/best.pt', 'result/last.pt', 'hyp.yaml', 'dataset.yaml', 'last_training.log',
-                 'train/images/a.jpg', 'train/labels/a.txt']:
+                 'result/examples/example_0_0.png', 'result/weights/best.pt', 'result/last.pt',
+                 'hyp.yaml', 'dataset.yaml', 'last_training.log', 'train/images/a.jpg', 'train/labels/a.txt']:
         (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
         (tmp_path / name).write_text('0')
 
-    files = Yolov5TrainerLogic()._files_to_archive(tmp_path)  # pylint: disable=protected-access
+    results = Yolov5TrainerLogic()._get_training_results(tmp_path)  # pylint: disable=protected-access
 
-    assert sorted(str(f.relative_to(tmp_path)) for f in files) == [
-        'dataset.yaml', 'hyp.yaml', 'last_training.log', 'result/curves_test.json', 'result/examples',
-        'result/opt.yaml', 'result/results.csv', 'result/val_batch0_pred.jpg']
+    assert {part: sorted(str(f.relative_to(tmp_path)) for f in files) for part, files in results.items()} == {
+        'core': ['dataset.yaml', 'hyp.yaml', 'result/curves_test.json', 'result/opt.yaml', 'result/results.csv'],
+        'examples': ['result/examples'],
+        'logs': ['last_training.log']}
 
 
 def test_update_hyperparameter():
