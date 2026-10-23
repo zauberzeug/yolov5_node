@@ -105,10 +105,12 @@ writes `val/` only when the validation images differ from the test images and ot
 in `dataset.yaml` at `test/`, so no image is linked twice. `train_det.py` validates on `val` every
 epoch; for a new best model it evaluates `test` at the confidence where the mean F1 peaked on `val`,
 and those test counts are the confusion matrix the loop gets. Its one concession to the two being the
-same folder is to reuse the validation loader and the counts that pass already produced. While nothing
-is found on `val` there is no such confidence and zeros are reported. The picked confidence is kept in
-`best.pt`, so the final evaluation of `best.pt` runs on the test set at that confidence too, also
-after a restart; only hyperparameter evolution keeps the validation set.
+same folder is to reuse the validation loader and the counts that pass already produced. The picked
+confidence travels with the checkpoint as `epoch<n>.model.json` → `published/latest.model.json` into
+the uploaded `model.json` (`conf_threshold`, via `_get_model_metadata`), where the detectors pick it
+up unless `CONF_THRESHOLD` is set. While nothing is found on `val` there is no such confidence: zeros
+are reported and the model carries none. The final evaluation of `best.pt` runs on the test set at
+that confidence too; only hyperparameter evolution keeps the validation set.
 
 **Point detection rides on boxes.** A point annotation is written as a box of `point_size` and turned
 back into a point by category type. The point hyperparameters are not handed to yolov5 as
