@@ -53,6 +53,14 @@ def test_best_keeps_only_ema_weights_and_links_the_published_epoch(tmp_path: Pat
     assert (tmp_path / 'epoch4.json').read_text() == '{"cat": {"tp": 2}}'
 
 
+def test_best_carries_its_model_metadata_for_the_final_evaluation(tmp_path: Path) -> None:
+    save_best(full_checkpoint(4), tmp_path, {'cat': {'tp': 2}}, {'conf_threshold': 0.4})
+    assert torch.load(tmp_path / 'best.pt', weights_only=False)['model_metadata'] == {'conf_threshold': 0.4}
+
+    save_best(full_checkpoint(5), tmp_path, {'cat': {'tp': 3}})
+    assert torch.load(tmp_path / 'best.pt', weights_only=False)['model_metadata'] == {}
+
+
 def test_restart_discards_best_of_an_epoch_without_last(tmp_path: Path) -> None:
     weights = tmp_path / 'result/weights'
     weights.mkdir(parents=True)

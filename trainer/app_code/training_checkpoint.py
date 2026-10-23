@@ -8,14 +8,18 @@ import torch
 from .model_files import delete_newer_epochs
 
 
-def save_best(checkpoint: dict[str, Any], folder: Path, confusion_matrices: dict[str, Any]) -> None:
+def save_best(checkpoint: dict[str, Any], folder: Path, confusion_matrices: dict[str, Any],
+              model_metadata: dict[str, Any] | None = None) -> None:
     """Save the EMA weights as `best.pt` and, with metrics, as the `epoch<n>.pt` the node publishes.
 
+    `model_metadata` (e.g. the confidence picked for the model) is saved in `best.pt` for the final
+    evaluation, which may run after a restart.
     Must run before `last.pt` of the same epoch is written.
     """
     best = folder / 'best.pt'
     atomic_save({'epoch': checkpoint['epoch'], 'best_fitness': checkpoint['best_fitness'],
                  'model': checkpoint['ema'], 'ema': None, 'updates': None, 'optimizer': None,
+                 'model_metadata': model_metadata or {},
                  'opt': checkpoint['opt'], 'date': checkpoint['date']}, best)
     if confusion_matrices:
         path = folder / f"epoch{checkpoint['epoch']}.pt"
