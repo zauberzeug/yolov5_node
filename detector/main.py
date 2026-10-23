@@ -15,7 +15,8 @@ parser.add_argument('--builder-optimization-level', type=int, default=4,
                     help='TensorRT builder optimization level; higher levels search more kernel '
                          'tactics for potentially faster inference at the cost of longer engine builds')
 parser.add_argument('--iou-threshold', type=float, default=0.45, help='Threshold for non-maximum-suppression')
-parser.add_argument('--conf-threshold', type=float, default=0.2, help='Minimum confidence for detections')
+parser.add_argument('--conf-threshold', type=float, default=None,
+                    help='Minimum confidence for detections (default: the one the model was trained with, else 0.2)')
 
 args = parser.parse_args()
 
