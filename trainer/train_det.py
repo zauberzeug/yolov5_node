@@ -236,9 +236,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     cuda = device.type != 'cpu'
     init_seeds(opt.seed + 1, deterministic=True)
     data_dict = check_dataset(data)
-    train_path, val_path, test_path = data_dict['train'], data_dict['val'], data_dict.get('test', data_dict['val'])
-    # with a separate validation set the test set only reports the counts of a new best model, never selects one
-    separate_testset = val_path != test_path
+    # the model is selected on val; test only reports the counts of a new best model (both may be the same folder)
+    train_path, val_path, test_path = data_dict['train'], data_dict['val'], data_dict['test']
     nc = 1 if single_cls else int(data_dict['nc'])  # number of classes
     names = {0: 'item'} if single_cls and len(data_dict['names']) != 1 else data_dict['names']  # class names
     is_coco = isinstance(val_path, str) and val_path.endswith('coco/val2017.txt')  # COCO dataset
@@ -356,19 +355,18 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                    pad=training_recipe.VAL_PAD,
                                    prefix=colorstr('val: '),
                                    point_sizes_by_id=point_sizes_by_id)[0]
-    if separate_testset:
-        test_loader = create_dataloader(test_path,
-                                        imgsz,
-                                        batch_size // 2,
-                                        gs,
-                                        single_cls,
-                                        hyp=hyp,
-                                        rect=True,
-                                        rank=-1,
-                                        workers=workers * 2,
-                                        pad=training_recipe.VAL_PAD,
-                                        prefix=colorstr('test: '),
-                                        point_sizes_by_id=point_sizes_by_id)[0]
+    test_loader = val_loader if test_path == val_path else create_dataloader(test_path,
+                                                                             imgsz,
+                                                                             batch_size // 2,
+                                                                             gs,
+                                                                             single_cls,
+                                                                             hyp=hyp,
+                                                                             rect=True,
+                                                                             rank=-1,
+                                                                             workers=workers * 2,
+                                                                             pad=training_recipe.VAL_PAD,
+                                                                             prefix=colorstr('test: '),
+                                                                             point_sizes_by_id=point_sizes_by_id)[0]
 
     if not resume:
         if not opt.noautoanchor:
@@ -394,6 +392,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     last_opt_step = -1
     maps = np.zeros(nc)  # mAP per class
     results = (0, 0, 0, 0, 0, 0, 0)  # P, R, mAP@.5, mAP@.5-.95, val_loss(box, obj, cls)
+    val_conf = None  # confidence where the mean F1 peaked on val; None while nothing is found there
     scheduler.last_epoch = start_epoch - 1  # do not move
     scaler = torch.cuda.amp.GradScaler(enabled=amp)
     stopper, stop = EarlyStopping(patience=opt.patience), False
@@ -541,11 +540,10 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             # Save last, best and delete
             # PATCH (yolov5-node): best keeps only the EMA weights; readers only see fully written checkpoints.
             if best_fitness == fi:
-                model_metadata = None
-                zero_counts = {name: {'tp': 0, 'fp': 0, 'fn': 0} for name in names.values()}
-                if separate_testset and fi == 0:  # nothing found on the validation set yet, so report zeros
-                    confusion_matrices = zero_counts
-                elif separate_testset:  # report at the confidence where the mean F1 peaked on the validation set
+                # the loop gets the counts on the test set at the confidence where the mean F1 peaked on the
+                # validation set; the validation pass has already reported them when both are the same folder,
+                # and while nothing is found on val there is no such confidence
+                if val_conf is not None and test_loader is not val_loader:
                     _, confusion_matrices, _, _, _ = validate.run(data_dict,
                                                                   batch_size=batch_size // 2,
                                                                   imgsz=imgsz,
@@ -559,9 +557,9 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                                                   plots=False,
                                                                   callbacks=callbacks,
                                                                   report_conf=val_conf)
-                    confusion_matrices = confusion_matrices or zero_counts  # nothing found on test, still publish
-                    model_metadata = {'conf_threshold': float(val_conf)}  # for the final evaluation
-                save_best(ckpt, w, confusion_matrices, model_metadata)
+                zero_counts = {name: {'tp': 0, 'fp': 0, 'fn': 0} for name in names.values()}
+                model_metadata = {'conf_threshold': float(val_conf)} if val_conf is not None else None
+                save_best(ckpt, w, confusion_matrices or zero_counts, model_metadata)  # nothing found: still publish
             if (epoch > 0) and (opt.save_period > 0) and (epoch % opt.save_period == 0):
                 atomic_save(ckpt, w / f'epoch{epoch}.pt')
             atomic_save(ckpt, last)
@@ -579,12 +577,11 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         if f.exists():
             # PATCH (yolov5-node): checkpoints retain their resume state after the final epoch.
             if f is best:
-                # with a separate validation set the final evaluation reports on the test set,
-                # at the confidence picked for the best model; evolution keeps selecting on the validation set.
-                use_testset = separate_testset and not evolve
-                LOGGER.info(f"\n{'Testing' if use_testset else 'Validating'} {f}...")
+                # the final evaluation reports on the test set at the confidence picked for the best model;
+                # only hyperparameter evolution keeps selecting on the validation set.
+                LOGGER.info(f"\n{'Validating' if evolve else 'Testing'} {f}...")
                 model_metadata = torch.load(f, map_location='cpu', weights_only=False).get('model_metadata', {})
-                report_conf = model_metadata.get('conf_threshold') if use_testset else None
+                report_conf = None if evolve else model_metadata.get('conf_threshold')
                 results, _, _, _, _ = validate.run(
                     data_dict,
                     batch_size=batch_size // 2,
@@ -593,7 +590,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                     iou_thres=opt.iou_thres,
                     model=attempt_load(f, device).half(),
                     single_cls=single_cls,
-                    dataloader=test_loader if use_testset else val_loader,
+                    dataloader=val_loader if evolve else test_loader,
                     save_dir=save_dir,
                     save_json=is_coco,
                     verbose=True,

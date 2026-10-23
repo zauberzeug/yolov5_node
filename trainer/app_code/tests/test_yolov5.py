@@ -216,7 +216,7 @@ class TestWithDetection:
         return {path.stem for path in Path(folder).glob('*.txt')}
 
     @pytest.mark.usefixtures('use_training_dir')
-    async def test_create_file_structure_selects_on_test_set_without_val_images(self):
+    async def test_create_file_structure_validates_on_the_test_folder_when_both_hold_the_same_images(self):
         yolov5_format.create_file_structure(self._training_with_sets(train_count=3, val_count=0))
 
         assert self._ids('./train') == {'train_0', 'train_1', 'train_2'}

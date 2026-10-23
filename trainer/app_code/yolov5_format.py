@@ -74,13 +74,14 @@ def _create_set(training: Training, set_name: str, images: list[dict]) -> int:
     return img_count
 
 
-def create_dataset_yaml(training: Training, has_val_set: bool) -> None:
+def create_dataset_yaml(training: Training, val_set: str) -> None:
+    """`val_set` is the folder yolov5 validates on, `val` or `test` (see `create_file_structure`)."""
     categories = category_lookup_from_training(training)
     path = training.training_folder
     data = {
         'train': path + '/train',
         'test': path + '/test',
-        'val': path + ('/val' if has_val_set else '/test'),
+        'val': f'{path}/{val_set}',
         'nc': len(categories),
         'names': list(categories.keys())
     }
@@ -94,24 +95,30 @@ def create_file_structure(training: Training) -> None:
     - training.training_folder to create the file structure.
     - training.image_data to create the image links and annotations.
     - training.categories to create the annotations.
-    Models are selected on the `val` images if the training has any, otherwise on the test set."""
+    The model is selected on `training.val_images()` and its counts are reported on `training.test_images()`.
+    When both are the same images, `dataset.yaml` points `val` at the `test/` folder instead of linking them twice."""
     path = training.training_folder
     Path(path).mkdir(parents=True, exist_ok=True)
 
     val_images = training.val_images()
-    num_test_imgs = _create_set(training, 'test', training.test_images())
+    test_images = training.test_images()
+    num_test_imgs = _create_set(training, 'test', test_images)
     num_train_imgs = _create_set(training, 'train', training.train_images())
-    num_val_imgs = _create_set(training, 'val', val_images) if val_images else 0
 
     if num_train_imgs == 0:
         raise CriticalError('No training images found. Cannot start training without images in the train set.')
     if num_test_imgs == 0:
         raise CriticalError('No test images found. Training requires at least 1 image in the test set.')
 
-    create_dataset_yaml(training, has_val_set=num_val_imgs > 0)
-
-    logging.info('Prepared file structure with %d training, %d validation and %d test images',
-                 num_train_imgs, num_val_imgs, num_test_imgs)
+    if val_images == test_images:
+        create_dataset_yaml(training, val_set='test')
+        logging.info('Prepared file structure with %d training and %d test images, which are also validated on',
+                     num_train_imgs, num_test_imgs)
+    else:
+        num_val_imgs = _create_set(training, 'val', val_images)
+        create_dataset_yaml(training, val_set='val')
+        logging.info('Prepared file structure with %d training, %d validation and %d test images',
+                     num_train_imgs, num_val_imgs, num_test_imgs)
 
 
 def set_hyperparameters_in_file(yaml_path: str, hyperparameter: dict[str, Any]) -> None:
