@@ -7,8 +7,7 @@ from yolov5_detector import Yolov5DetectorParams
 
 parser = node_parser(description='Run the YOLOv5 CPU detector node')
 parser.add_argument('--iou-threshold', type=float, default=0.45, help='Threshold for non-maximum-suppression')
-parser.add_argument('--conf-threshold', type=float, default=None,
-                    help='Minimum confidence for detections (default: the one the model was trained with, else 0.2)')
+parser.add_argument('--conf-threshold', type=float, default=0.2, help='Minimum confidence for detections')
 
 args = parser.parse_args()
 

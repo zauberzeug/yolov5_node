@@ -104,10 +104,9 @@ counts are the confusion matrix the loop gets. The node never splits anything it
 learning_loop_node's `validation_set` either keeps a `val` set the loop sent or, with the
 `separate_testset` hyperparameter, moves a hash-chosen tenth of the train images to `val` right after
 the download. `train_det.py` takes the mode from `dataset.yaml` alone (`val` differing from `test`).
-The picked confidence travels with the checkpoint as `epoch<n>.model.json` →
-`published/latest.model.json` into the uploaded `model.json` (`conf_threshold`, via
-`_get_model_metadata`), where the detectors pick it up unless `CONF_THRESHOLD` is set. While the
-validation fitness is still 0 the test set is skipped and zeros are reported.
+The picked confidence is kept in `best.pt`, so the final evaluation reports the test set at it, also
+after a restart. While the validation fitness is still 0 the test set is skipped and zeros are
+reported.
 
 **Point detection rides on boxes.** A point annotation is written as a box of `point_size` and turned
 back into a point by category type. The point hyperparameters are not handed to yolov5 as

@@ -560,7 +560,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                                                   callbacks=callbacks,
                                                                   report_conf=val_conf)
                     confusion_matrices = confusion_matrices or zero_counts  # nothing found on test, still publish
-                    model_metadata = {'conf_threshold': float(val_conf)}  # detectors filter at it
+                    model_metadata = {'conf_threshold': float(val_conf)}  # for the final evaluation
                 save_best(ckpt, w, confusion_matrices, model_metadata)
             if (epoch > 0) and (opt.save_period > 0) and (epoch % opt.save_period == 0):
                 atomic_save(ckpt, w / f'epoch{epoch}.pt')

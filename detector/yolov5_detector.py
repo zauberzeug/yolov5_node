@@ -24,7 +24,6 @@ from typing_extensions import override
 
 import yolov5
 
-DEFAULT_CONF_THRESHOLD = 0.2
 
 
 @final
@@ -32,7 +31,7 @@ DEFAULT_CONF_THRESHOLD = 0.2
 class Yolov5DetectorParams(DetectorLogicFactory):
     weight_type: Literal['FP16', 'FP32', 'INT8']
     iou_threshold: float
-    conf_threshold: float | None  # None: the model's, else DEFAULT_CONF_THRESHOLD
+    conf_threshold: float
     builder_optimization_level: int
 
     @property
@@ -43,14 +42,6 @@ class Yolov5DetectorParams(DetectorLogicFactory):
     @override
     async def build(self, model_info: ModelInformation) -> Yolov5Detector:
         return await asyncio.to_thread(Yolov5Detector, model_info, self)
-
-    def conf_threshold_for(self, model_info: ModelInformation) -> float:
-        """The configured threshold, else the one the model was trained with, else DEFAULT_CONF_THRESHOLD."""
-        if self.conf_threshold is not None:
-            return self.conf_threshold
-        if model_info.conf_threshold is not None:
-            return model_info.conf_threshold
-        return DEFAULT_CONF_THRESHOLD
 
 
 _LOG = logging.getLogger('Yolov5Detector')
@@ -85,7 +76,7 @@ class Yolov5Detector(DetectorLogic):
         ctypes.CDLL(str(_LIB_FILE))
 
         try:
-            self.yolov5 = yolov5.YoLov5TRT(engine_file, params.iou_threshold, params.conf_threshold_for(model_info))
+            self.yolov5 = yolov5.YoLov5TRT(engine_file, params.iou_threshold, params.conf_threshold)
         except RuntimeError as e:
             if 'TensorRT version mismatch' in str(e) or 'deserialize' in str(e):
                 _LOG.error('TensorRT engine compatibility issue: %s', e)
