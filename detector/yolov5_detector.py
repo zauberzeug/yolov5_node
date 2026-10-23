@@ -25,7 +25,6 @@ from typing_extensions import override
 import yolov5
 
 
-
 @final
 @dataclass(frozen=True)
 class Yolov5DetectorParams(DetectorLogicFactory):
