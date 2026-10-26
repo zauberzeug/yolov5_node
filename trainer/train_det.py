@@ -541,9 +541,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             # Save last, best and delete
             # PATCH (yolov5-node): best keeps only the EMA weights; readers only see fully written checkpoints.
             if best_fitness == fi:
-                # fitness 0 ties the initial best: a model that finds nothing on val is kept as best.pt but not
-                # reported, there are no counts. val_conf is the confidence where the mean F1 peaked on the
-                # validation set; the loop gets the test counts at that confidence.
+                # a model that finds nothing on val is kept as best.pt but not reported;
+                # otherwise the loop gets the test counts at val_conf, where the mean F1 peaked on val.
                 save_best(ckpt, w, {'conf_threshold': float(val_conf)} if val_conf is not None else None)
                 if val_conf is not None:
                     if test_loader is not val_loader:
@@ -580,7 +579,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             if f is best:
                 # the final evaluation reports on the test set at the confidence picked for the best model;
                 # only hyperparameter evolution keeps selecting on the validation set.
-                LOGGER.info(f"\n{'Validating' if evolve else 'Testing'} {f}...")
+                LOGGER.info(f"\n{'Validating' if evolve or test_loader is val_loader else 'Testing'} {f}...")
                 model_metadata = torch.load(f, map_location='cpu', weights_only=False).get('model_metadata', {})
                 report_conf = None if evolve else model_metadata.get('conf_threshold')
                 results, _, _, _, _ = validate.run(
