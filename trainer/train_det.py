@@ -41,7 +41,7 @@ from app_code.training_checkpoint import (
     atomic_save,
     discard_unfinished_epochs,
     finished,
-    publish_best,
+    report_best,
     restore_training_state,
     resume_fields,
     resume_state,
@@ -541,27 +541,26 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             # Save last, best and delete
             # PATCH (yolov5-node): best keeps only the EMA weights; readers only see fully written checkpoints.
             if best_fitness == fi:
-                # val_conf is the confidence where the mean F1 peaked on the validation set, None while nothing is
-                # found there. The loop gets the test counts at that confidence; when test and val are the same
-                # folder, the validation pass above has already produced them.
-                if val_conf is not None and test_loader is not val_loader:
-                    _, confusion_matrices, _, _, _ = validate.run(data_dict,
-                                                                  batch_size=batch_size // 2,
-                                                                  imgsz=imgsz,
-                                                                  conf_thres=opt.conf_thres,
-                                                                  iou_thres=opt.iou_thres,
-                                                                  half=amp,
-                                                                  model=ema.ema,
-                                                                  single_cls=single_cls,
-                                                                  dataloader=test_loader,
-                                                                  save_dir=save_dir,
-                                                                  plots=False,
-                                                                  callbacks=callbacks,
-                                                                  report_conf=val_conf)
-                model_metadata = {'conf_threshold': float(val_conf)} if val_conf is not None else None
-                save_best(ckpt, w, model_metadata)
-                if confusion_matrices:
-                    publish_best(w, epoch, confusion_matrices)
+                # fitness 0 ties the initial best: a model that finds nothing on val is kept as best.pt but not
+                # reported, there are no counts. val_conf is the confidence where the mean F1 peaked on the
+                # validation set; the loop gets the test counts at that confidence.
+                save_best(ckpt, w, {'conf_threshold': float(val_conf)} if val_conf is not None else None)
+                if val_conf is not None:
+                    if test_loader is not val_loader:
+                        _, confusion_matrices, _, _, _ = validate.run(data_dict,
+                                                                      batch_size=batch_size // 2,
+                                                                      imgsz=imgsz,
+                                                                      conf_thres=opt.conf_thres,
+                                                                      iou_thres=opt.iou_thres,
+                                                                      half=amp,
+                                                                      model=ema.ema,
+                                                                      single_cls=single_cls,
+                                                                      dataloader=test_loader,
+                                                                      save_dir=save_dir,
+                                                                      plots=False,
+                                                                      callbacks=callbacks,
+                                                                      report_conf=val_conf)
+                    report_best(w, epoch, confusion_matrices)
             if (epoch > 0) and (opt.save_period > 0) and (epoch % opt.save_period == 0):
                 atomic_save(ckpt, w / f'epoch{epoch}.pt')
             atomic_save(ckpt, last)

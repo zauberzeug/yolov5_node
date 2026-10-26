@@ -21,8 +21,8 @@ def save_best(checkpoint: dict[str, Any], folder: Path, model_metadata: dict[str
                  'opt': checkpoint['opt'], 'date': checkpoint['date']}, folder / 'best.pt')
 
 
-def publish_best(folder: Path, epoch: int, confusion_matrices: dict[str, Any]) -> None:
-    """Publish `best.pt` with its metrics as the `epoch<n>.pt` and `epoch<n>.json` the node picks up.
+def report_best(folder: Path, epoch: int, confusion_matrices: dict[str, Any]) -> None:
+    """Report `best.pt` with its metrics to the node as the `epoch<n>.pt` and `epoch<n>.json` it picks up.
 
     Must run after `save_best` and before `last.pt` of the same epoch is written.
     """

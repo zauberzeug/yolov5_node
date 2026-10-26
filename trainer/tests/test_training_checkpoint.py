@@ -15,7 +15,7 @@ from app_code.training_checkpoint import (
     atomic_save,
     discard_unfinished_epochs,
     finished,
-    publish_best,
+    report_best,
     restore_training_state,
     resume_fields,
     resume_state,
@@ -43,10 +43,10 @@ def full_checkpoint(epoch: int) -> dict[str, Any]:
             'updates': 3, 'optimizer': {'state': {}}, 'opt': {}, 'date': 'today'}
 
 
-def test_best_keeps_only_ema_weights_and_links_the_published_epoch(tmp_path: Path) -> None:
+def test_best_keeps_only_ema_weights_and_links_the_reported_epoch(tmp_path: Path) -> None:
     checkpoint = full_checkpoint(4)
     save_best(checkpoint, tmp_path)
-    publish_best(tmp_path, 4, {'cat': {'tp': 2}})
+    report_best(tmp_path, 4, {'cat': {'tp': 2}})
 
     best = torch.load(tmp_path / 'best.pt', weights_only=False)
     assert best['optimizer'] is None and best['ema'] is None
@@ -68,7 +68,7 @@ def test_restart_discards_best_of_an_epoch_without_last(tmp_path: Path) -> None:
     weights.mkdir(parents=True)
     for epoch, tp in ((4, 2), (5, 3)):
         save_best(full_checkpoint(epoch), weights)
-        publish_best(weights, epoch, {'cat': {'tp': tp}})
+        report_best(weights, epoch, {'cat': {'tp': tp}})
 
     discard_unfinished_epochs(weights, last_epoch=4)
 
