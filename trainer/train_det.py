@@ -41,6 +41,7 @@ from app_code.training_checkpoint import (
     atomic_save,
     discard_unfinished_epochs,
     finished,
+    publish_best,
     restore_training_state,
     resume_fields,
     resume_state,
@@ -557,9 +558,10 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                                                   plots=False,
                                                                   callbacks=callbacks,
                                                                   report_conf=val_conf)
-                zero_counts = {name: {'tp': 0, 'fp': 0, 'fn': 0} for name in names.values()}
                 model_metadata = {'conf_threshold': float(val_conf)} if val_conf is not None else None
-                save_best(ckpt, w, confusion_matrices or zero_counts, model_metadata)  # nothing found: still publish
+                save_best(ckpt, w, model_metadata)
+                if confusion_matrices:
+                    publish_best(w, epoch, confusion_matrices)
             if (epoch > 0) and (opt.save_period > 0) and (epoch % opt.save_period == 0):
                 atomic_save(ckpt, w / f'epoch{epoch}.pt')
             atomic_save(ckpt, last)

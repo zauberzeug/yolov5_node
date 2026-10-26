@@ -8,25 +8,29 @@ import torch
 from .model_files import delete_newer_epochs
 
 
-def save_best(checkpoint: dict[str, Any], folder: Path, confusion_matrices: dict[str, Any],
-              model_metadata: dict[str, Any] | None = None) -> None:
-    """Save the EMA weights as `best.pt` and, with metrics, as the `epoch<n>.pt` the node publishes.
+def save_best(checkpoint: dict[str, Any], folder: Path, model_metadata: dict[str, Any] | None = None) -> None:
+    """Save the EMA weights as `best.pt`.
 
     `model_metadata` (e.g. the confidence picked for the model) is saved in `best.pt` for the final
     evaluation, which may run after a restart.
     Must run before `last.pt` of the same epoch is written.
     """
-    best = folder / 'best.pt'
     atomic_save({'epoch': checkpoint['epoch'], 'best_fitness': checkpoint['best_fitness'],
                  'model': checkpoint['ema'], 'ema': None, 'updates': None, 'optimizer': None,
                  'model_metadata': model_metadata or {},
-                 'opt': checkpoint['opt'], 'date': checkpoint['date']}, best)
-    if confusion_matrices:
-        path = folder / f"epoch{checkpoint['epoch']}.pt"
-        metrics = path.with_suffix('.json.tmp')
-        metrics.write_text(json.dumps(confusion_matrices))
-        metrics.replace(path.with_suffix('.json'))
-        _atomic_link(best, path)
+                 'opt': checkpoint['opt'], 'date': checkpoint['date']}, folder / 'best.pt')
+
+
+def publish_best(folder: Path, epoch: int, confusion_matrices: dict[str, Any]) -> None:
+    """Publish `best.pt` with its metrics as the `epoch<n>.pt` and `epoch<n>.json` the node picks up.
+
+    Must run after `save_best` and before `last.pt` of the same epoch is written.
+    """
+    path = folder / f'epoch{epoch}.pt'
+    metrics = path.with_suffix('.json.tmp')
+    metrics.write_text(json.dumps(confusion_matrices))
+    metrics.replace(path.with_suffix('.json'))
+    _atomic_link(folder / 'best.pt', path)
 
 
 def discard_unfinished_epochs(folder: Path, last_epoch: int) -> None:

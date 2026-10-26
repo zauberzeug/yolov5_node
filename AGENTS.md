@@ -106,9 +106,9 @@ in `dataset.yaml` at `test/`, so no image is linked twice. `train_det.py` valida
 epoch; for a new best model it evaluates `test` at the confidence where the mean F1 peaked on `val`,
 and those test counts are the confusion matrix the loop gets. Its one concession to the two being the
 same folder is to reuse the validation loader and the counts that pass already produced. While nothing
-is found on `val` there is no such confidence and zeros are reported. The picked confidence is kept in
-`best.pt`, so the final evaluation of `best.pt` runs on the test set at that confidence too, also
-after a restart; only hyperparameter evolution keeps the validation set.
+is found there is nothing to publish. The picked confidence is kept in `best.pt`, so the final
+evaluation of `best.pt` runs on the test set at that confidence too, also after a restart; only
+hyperparameter evolution keeps the validation set.
 
 **Point detection rides on boxes.** A point annotation is written as a box of `point_size` and turned
 back into a point by category type. The point hyperparameters are not handed to yolov5 as
