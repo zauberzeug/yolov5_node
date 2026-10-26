@@ -89,28 +89,17 @@ CUDA messages, `_get_new_best_training_state` picks up the newest weight file th
 `model_files.py`. Changing what `train_det.py` prints or where it writes breaks those parsers.
 
 **Category order is the wire format.** `yolov5_format.create_file_structure` converts the loop's
-`image_data` into the layout yolov5 expects — `train/`, `test/` and `val/` folders (the last only when
-the validation images are not the test images) of image symlinks with one `class x y w h` text file per image — encoding each category uuid as its *index* in
+`image_data` into the layout yolov5 expects — `train/`, `val/` and `test/` folders of image symlinks
+with one `class x y w h` text file per image — encoding each category uuid as its *index* in
 `training.categories`. Every conversion back (`_parse_file`, the confusion matrix in
 `_get_new_best_training_state`, the `--point_sizes_by_id`/`--flip_label_pairs` arguments) depends on
 that same ordering.
 
-**Models are selected on the validation images and reported on the test images.** Both come from the
-library and the node never chooses between them: `Training.val_images()` is always a set to select
-on, the test images unless the training has `val` images of its own, and `Training.test_images()` is
-what the loop's counts are read on. learning_loop_node's `validation_set` either keeps a `val` set the
-loop sent or, with the `separate_testset` hyperparameter, moves a hash-chosen tenth of the train
-images to `val` right after the download; the node splits nothing itself. `create_file_structure`
-writes `val/` only when the validation images differ from the test images and otherwise points `val`
-in `dataset.yaml` at `test/`, so no image is linked twice. `train_det.py` validates on `val` every
-epoch; for a new best model it evaluates `test` at the confidence where the mean F1 peaked on `val`,
-and those test counts are the confusion matrix the loop gets. Its one concession to the two being the
-same folder is to reuse the validation loader and the counts that pass already produced. The picked
-confidence travels with the checkpoint as `epoch<n>.model.json` → `published/latest.model.json` into
-the uploaded `model.json` (`conf_threshold`, via `_get_model_metadata`), where the detectors pick it
-up unless `CONF_THRESHOLD` is set. While nothing is found on `val` there is no such confidence: zeros
-are reported and the model carries none. The final evaluation of `best.pt` runs on the test set at
-that confidence too; only hyperparameter evolution keeps the validation set.
+**Models are selected on validation images and reported on the test images.** When they are the same,
+we optimize data loading by creating only one folder and loader for both sets. The confidence picked on
+the validation images travels with the reported epoch as `epoch<n>.model.json` → `published/latest.model.json`
+into the uploaded `model.json` (`conf_threshold`, via `_get_model_metadata`), where the detectors pick it up
+unless `CONF_THRESHOLD` is set.
 
 **Point detection rides on boxes.** A point annotation is written as a box of `point_size` and turned
 back into a point by category type. The point hyperparameters are not handed to yolov5 as

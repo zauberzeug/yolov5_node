@@ -41,6 +41,7 @@ from app_code.training_checkpoint import (
     atomic_save,
     discard_unfinished_epochs,
     finished,
+    report_best,
     restore_training_state,
     resume_fields,
     resume_state,
@@ -540,26 +541,27 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             # Save last, best and delete
             # PATCH (yolov5-node): best keeps only the EMA weights; readers only see fully written checkpoints.
             if best_fitness == fi:
-                # the loop gets the counts on the test set at the confidence where the mean F1 peaked on the
-                # validation set, which the detectors filter at; the validation pass has already reported them
-                # when both are the same folder, and while nothing is found on val there is no such confidence
-                if val_conf is not None and test_loader is not val_loader:
-                    _, confusion_matrices, _, _, _ = validate.run(data_dict,
-                                                                  batch_size=batch_size // 2,
-                                                                  imgsz=imgsz,
-                                                                  conf_thres=opt.conf_thres,
-                                                                  iou_thres=opt.iou_thres,
-                                                                  half=amp,
-                                                                  model=ema.ema,
-                                                                  single_cls=single_cls,
-                                                                  dataloader=test_loader,
-                                                                  save_dir=save_dir,
-                                                                  plots=False,
-                                                                  callbacks=callbacks,
-                                                                  report_conf=val_conf)
-                zero_counts = {name: {'tp': 0, 'fp': 0, 'fn': 0} for name in names.values()}
+                # a model that finds nothing on val is kept as best.pt but not reported;
+                # otherwise the loop gets the test counts at val_conf, where the mean F1 peaked on val
+                # and which the detectors filter at.
                 model_metadata = {'conf_threshold': float(val_conf)} if val_conf is not None else None
-                save_best(ckpt, w, confusion_matrices or zero_counts, model_metadata)  # nothing found: still publish
+                save_best(ckpt, w, model_metadata)
+                if val_conf is not None:
+                    if test_loader is not val_loader:
+                        _, confusion_matrices, _, _, _ = validate.run(data_dict,
+                                                                      batch_size=batch_size // 2,
+                                                                      imgsz=imgsz,
+                                                                      conf_thres=opt.conf_thres,
+                                                                      iou_thres=opt.iou_thres,
+                                                                      half=amp,
+                                                                      model=ema.ema,
+                                                                      single_cls=single_cls,
+                                                                      dataloader=test_loader,
+                                                                      save_dir=save_dir,
+                                                                      plots=False,
+                                                                      callbacks=callbacks,
+                                                                      report_conf=val_conf)
+                    report_best(w, epoch, confusion_matrices, model_metadata)
             if (epoch > 0) and (opt.save_period > 0) and (epoch % opt.save_period == 0):
                 atomic_save(ckpt, w / f'epoch{epoch}.pt')
             atomic_save(ckpt, last)
@@ -579,7 +581,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             if f is best:
                 # the final evaluation reports on the test set at the confidence picked for the best model;
                 # only hyperparameter evolution keeps selecting on the validation set.
-                LOGGER.info(f"\n{'Validating' if evolve else 'Testing'} {f}...")
+                LOGGER.info(f"\n{'Validating' if evolve or test_loader is val_loader else 'Testing'} {f}...")
                 model_metadata = torch.load(f, map_location='cpu', weights_only=False).get('model_metadata', {})
                 report_conf = None if evolve else model_metadata.get('conf_threshold')
                 results, _, _, _, _ = validate.run(
