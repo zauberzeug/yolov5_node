@@ -15,6 +15,7 @@ from app_code.training_checkpoint import (
     atomic_save,
     discard_unfinished_epochs,
     finished,
+    report_best,
     restore_training_state,
     resume_fields,
     resume_state,
@@ -42,9 +43,10 @@ def full_checkpoint(epoch: int) -> dict[str, Any]:
             'updates': 3, 'optimizer': {'state': {}}, 'opt': {}, 'date': 'today'}
 
 
-def test_best_keeps_only_ema_weights_and_links_the_published_epoch(tmp_path: Path) -> None:
+def test_best_keeps_only_ema_weights_and_links_the_reported_epoch(tmp_path: Path) -> None:
     checkpoint = full_checkpoint(4)
-    save_best(checkpoint, tmp_path, {'cat': {'tp': 2}})
+    save_best(checkpoint, tmp_path)
+    report_best(tmp_path, 4, {'cat': {'tp': 2}})
 
     best = torch.load(tmp_path / 'best.pt', weights_only=False)
     assert best['optimizer'] is None and best['ema'] is None
@@ -53,11 +55,20 @@ def test_best_keeps_only_ema_weights_and_links_the_published_epoch(tmp_path: Pat
     assert (tmp_path / 'epoch4.json').read_text() == '{"cat": {"tp": 2}}'
 
 
+def test_best_carries_its_model_metadata_for_the_final_evaluation(tmp_path: Path) -> None:
+    save_best(full_checkpoint(4), tmp_path, {'conf_threshold': 0.4})
+    assert torch.load(tmp_path / 'best.pt', weights_only=False)['model_metadata'] == {'conf_threshold': 0.4}
+
+    save_best(full_checkpoint(5), tmp_path)
+    assert torch.load(tmp_path / 'best.pt', weights_only=False)['model_metadata'] == {}
+
+
 def test_restart_discards_best_of_an_epoch_without_last(tmp_path: Path) -> None:
     weights = tmp_path / 'result/weights'
     weights.mkdir(parents=True)
-    save_best(full_checkpoint(4), weights, {'cat': {'tp': 2}})
-    save_best(full_checkpoint(5), weights, {'cat': {'tp': 3}})
+    for epoch, tp in ((4, 2), (5, 3)):
+        save_best(full_checkpoint(epoch), weights)
+        report_best(weights, epoch, {'cat': {'tp': tp}})
 
     discard_unfinished_epochs(weights, last_epoch=4)
 
@@ -218,7 +229,7 @@ def test_completed_checkpoint_does_not_start_another_epoch(tmp_path: Path, monke
     atomic_save({'epoch': 3, 'stopped_early': True}, Path(options.weights))
     monkeypatch.setattr(train_det, 'Loggers', lambda *_: SimpleNamespace(remote_dataset=None))
     monkeypatch.setattr(train_det, 'methods', lambda _: [])
-    monkeypatch.setattr(train_det, 'check_dataset', lambda _: {'train': 'train', 'val': 'val', 'nc': 1, 'names': ['cat']})
+    monkeypatch.setattr(train_det, 'check_dataset', lambda _: {'train': 'train', 'val': 'val', 'test': 'test', 'nc': 1, 'names': ['cat']})
     model = MagicMock(side_effect=AssertionError('completed training must not build another model'))
     monkeypatch.setattr(train_det, 'Model', model)
     assert train_det.train({}, options, torch.device('cpu'), train_det.Callbacks()) == (0.0,) * 7
