@@ -541,9 +541,9 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             # Save last, best and delete
             # PATCH (yolov5-node): best keeps only the EMA weights; readers only see fully written checkpoints.
             if best_fitness == fi:
-                # the loop gets the counts on the test set at the confidence where the mean F1 peaked on the
-                # validation set; the validation pass has already reported them when both are the same folder,
-                # and while nothing is found on val there is no such confidence
+                # val_conf is the confidence where the mean F1 peaked on the validation set, None while nothing is
+                # found there. The loop gets the test counts at that confidence; when test and val are the same
+                # folder, the validation pass above has already produced them.
                 if val_conf is not None and test_loader is not val_loader:
                     _, confusion_matrices, _, _, _ = validate.run(data_dict,
                                                                   batch_size=batch_size // 2,

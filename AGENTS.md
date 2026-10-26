@@ -89,8 +89,8 @@ CUDA messages, `_get_new_best_training_state` picks up the newest weight file th
 `model_files.py`. Changing what `train_det.py` prints or where it writes breaks those parsers.
 
 **Category order is the wire format.** `yolov5_format.create_file_structure` converts the loop's
-`image_data` into the layout yolov5 expects — `train/`, `test/` and `val/` folders (the last only when
-the validation images are not the test images) of image symlinks with one `class x y w h` text file per image — encoding each category uuid as its *index* in
+`image_data` into the layout yolov5 expects — `train/`, `val/` and `test/` folders of image symlinks
+with one `class x y w h` text file per image — encoding each category uuid as its *index* in
 `training.categories`. Every conversion back (`_parse_file`, the confusion matrix in
 `_get_new_best_training_state`, the `--point_sizes_by_id`/`--flip_label_pairs` arguments) depends on
 that same ordering.
