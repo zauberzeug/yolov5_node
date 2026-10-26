@@ -99,7 +99,7 @@ that same ordering.
 library and the node never chooses between them: `Training.val_images()` is always a set to select
 on, the test images unless the training has `val` images of its own, and `Training.test_images()` is
 what the loop's counts are read on. learning_loop_node's `validation_set` either keeps a `val` set the
-loop sent or, with the `separate_testset` hyperparameter, moves a hash-chosen tenth of the train
+loop sent or, with the `compute_validation_set` hyperparameter, moves a hash-chosen tenth of the train
 images to `val` right after the download; the node splits nothing itself. `create_file_structure`
 writes `val/` only when the validation images differ from the test images and otherwise points `val`
 in `dataset.yaml` at `test/`, so no image is linked twice. `train_det.py` validates on `val` every
