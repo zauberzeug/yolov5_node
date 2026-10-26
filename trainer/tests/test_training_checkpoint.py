@@ -279,7 +279,7 @@ def test_completed_checkpoint_does_not_start_another_epoch(tmp_path: Path, monke
     atomic_save({'epoch': 3, 'stopped_early': True}, Path(options.weights))
     monkeypatch.setattr(train_det, 'Loggers', lambda *_: SimpleNamespace(remote_dataset=None))
     monkeypatch.setattr(train_det, 'methods', lambda _: [])
-    monkeypatch.setattr(train_det, 'check_dataset', lambda _: {'train': 'train', 'val': 'val', 'nc': 1, 'names': ['cat']})
+    monkeypatch.setattr(train_det, 'check_dataset', lambda _: {'train': 'train', 'val': 'val', 'test': 'test', 'nc': 1, 'names': ['cat']})
     model = MagicMock(side_effect=AssertionError('completed training must not build another model'))
     monkeypatch.setattr(train_det, 'Model', model)
     assert train_det.train({}, options, torch.device('cpu'), train_det.Callbacks()) == (0.0,) * 7
