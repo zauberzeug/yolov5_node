@@ -52,6 +52,7 @@ When using the script it is required to set up a .env file in the trainer folder
 | UVICORN_RELOAD              | Enable hot-reload                                    | TRUE/FALSE/0/1 | FALSE   | No                           |
 | RESTART_AFTER_TRAINING      | Auto-restart after training                          | TRUE/FALSE/0/1 | FALSE   | No                           |
 | KEEP_OLD_TRAININGS          | Do not remove old trainings, when starting a new one | TRUE/FALSE/0/1 | FALSE   | No                           |
+| DATALOADER_WORKERS          | Dataloader worker processes `train_det.py` uses, for training and validation alike. The node passes it as `--workers`, also when it resumes an interrupted training | Integer | available CPUs − 2, between 2 and 16 | No |
 | VRAM_LIMIT_GB               | Gigabytes of GPU memory a training may use. The batch size is probed against this limit instead of the whole card, and `train_det.py` and `pred_det.py` cap themselves to it, so a lower limit yields a smaller batch size rather than an out-of-memory error. Useful to share one GPU between processes. The limit is relative to the card's *total* memory, not to what is currently free | Number | 0 (no limit) | No |
 
 ## Interrupted Training

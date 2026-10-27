@@ -192,7 +192,7 @@ def test_node_resumes_from_last_checkpoint_into_the_result_folder(tmp_path: Path
     (weights / 'last.pt').touch()
     (weights / 'published/latest.pt').touch()
     (tmp_path / 'hyp.yaml').write_text('epochs: 10\n')
-    logic = Yolov5TrainerLogic()
+    logic = Yolov5TrainerLogic(dataloader_workers=12)
     logic._training = SimpleNamespace(training_folder=str(tmp_path), training_folder_path=tmp_path, hyperparameters={})
     logic._executor = MagicMock(start=AsyncMock())
     assert logic._can_resume()
@@ -204,6 +204,29 @@ def test_node_resumes_from_last_checkpoint_into_the_result_folder(tmp_path: Path
     assert command[command.index('--project') + 1] == str(tmp_path)
     assert command[command.index('--name') + 1] == 'result'
     assert '--vram-limit-gb' in command
+    assert command[command.index('--workers') + 1] == '12'
+
+
+def test_main_resumes_with_the_current_worker_count(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    weights = tmp_path / 'result/weights'
+    weights.mkdir(parents=True)
+    checkpoint = weights / 'last.pt'
+    checkpoint.touch()
+    monkeypatch.setattr('sys.argv', ['train_det.py'])
+    options = train_det.parse_opt()
+    options.workers = 8
+    options.save_dir = str(weights.parent)
+    train_det.yaml_save(str(weights.parent / 'opt.yaml'), vars(options))
+    options.resume = str(checkpoint)
+    options.workers = current_workers = 16
+    train = MagicMock()
+    monkeypatch.setattr(train_det, 'train', train)
+    monkeypatch.setattr(train_det, 'select_device', lambda *_a, **_kw: torch.device('cpu'))
+    monkeypatch.setattr(train_det, 'check_comet_resume', lambda _: False)
+
+    train_det.main(options)
+
+    assert train.call_args.args[1].workers == current_workers
 
 
 def test_finished_after_early_stop_or_last_epoch() -> None:

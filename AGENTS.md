@@ -78,7 +78,11 @@ smaller batch adds no optimizer steps. What the probe has to mirror of the train
 nominal batch, the validation padding, the loss-weight scaling — lives in `training_recipe`, and
 `train_det.py` reads it from there too. `--vram-limit-gb` narrows the card the probe measures
 against, through the `limit_cuda_memory` call `train_det.py` makes at its start; because the cap
-does not survive a spawn, the node hands the same number to `train_det.py` and `pred_det.py`.
+does not survive a spawn, the node hands the same number to `train_det.py` and `pred_det.py`. The
+worker count comes from the library's `node_parser(dataloader_workers=True)` (`DATALOADER_WORKERS`)
+and reaches `train_det.py` as `--workers`, on a fresh start and on a resume alike: the resume
+branch of `train_det.py` keeps the current `--workers` instead of the one in the interrupted run's
+`opt.yaml`. The validation loader uses the same count, not twice it.
 
 **The trainer never trains in-process.** `Yolov5TrainerLogic` (`trainer/app_code/yolov5_trainer.py`)
 implements the library's abstract `TrainerLogic` hooks and shells out through the library's
