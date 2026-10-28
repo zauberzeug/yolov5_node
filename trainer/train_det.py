@@ -679,6 +679,7 @@ def main(opt, callbacks=Callbacks()):
         opt_yaml = last.parent.parent / 'opt.yaml'  # train options yaml
         opt_data = opt.data  # original dataset
         result_dir = Path(opt.project) / opt.name  # PATCH (yolov5-node): the folder the node passed.
+        cache = opt.cache  # PATCH (yolov5-node): the node's current image cache setting, not the interrupted run's.
         if opt_yaml.is_file():
             with open(opt_yaml, errors='ignore') as f:
                 d = yaml.safe_load(f)
@@ -687,6 +688,7 @@ def main(opt, callbacks=Callbacks()):
         opt = argparse.Namespace(**d)  # replace
         opt.cfg, opt.weights, opt.resume = '', str(last), True  # reinstate
         opt.clear = False  # PATCH (yolov5-node): --clear belongs only to a fresh training.
+        opt.cache = cache
         if opt.batch_size == -1:  # PATCH (yolov5-node): keep the batch size the interrupted run measured.
             opt.batch_size = training_run.TrainingRun(result_dir).batch_size or -1
         if is_url(opt_data):
