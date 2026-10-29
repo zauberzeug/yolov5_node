@@ -11,9 +11,8 @@ Trainer is tested with Nvidia Driver Version: 580.95.05 and CUDA Version: 13.0. 
 ## Hyperparameters
 
 We support all native hyperparameters of YOLOv5 (cf. `hyp_det.yaml` for reference).
-The trainer declares every hyperparameter it accepts in [`hyperparameters.py`](trainer/app_code/hyperparameters.py) — type, default, range and a short note — and reports that declaration to the Learning Loop, which offers it in the project's training configuration and in the enqueue dialog.
-The defaults of everything in `hyp_det.yaml` are taken from that file. Only `resolution`, `epochs`, `patience`, `max_batch_size`, `lr0`, `fliplr`, `flipud`, `flip_label_pairs` and `compute_validation_set` are standard hyperparameters; all others, the native YOLOv5 knobs included, are declared as expert ones, which the loop shows only on request or when a project sets them.
-The loop sends only what a project sets, and the declared defaults fill in the rest before the training starts.
+The trainer declares every hyperparameter it accepts in [`hyperparameters.py`](trainer/app_code/hyperparameters.py) — type, default, range and a short note — and reports that declaration to the Learning Loop; a hyperparameter the loop does not send takes its default, which for the native ones comes from `hyp_det.yaml`.
+Standard hyperparameters: `resolution`, `epochs`, `patience`, `max_batch_size`, `lr0`, `fliplr`, `flipud`, `flip_label_pairs` and `compute_validation_set`. All others, the native YOLOv5 ones included, are expert hyperparameters.
 In addition, we support the following hyperparameters:
 
 - `resolution`: The input size of the model, `832` by default. It must be a multiple of the model's largest stride (32, or 64 for the P6 `*6` variants) and at least twice that; otherwise the training fails before its first epoch.
