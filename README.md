@@ -11,10 +11,14 @@ Trainer is tested with Nvidia Driver Version: 580.95.05 and CUDA Version: 13.0. 
 ## Hyperparameters
 
 We support all native hyperparameters of YOLOv5 (cf. `hyp_det.yaml` for reference).
+The trainer declares every hyperparameter it accepts in [`hyperparameters.py`](trainer/app_code/hyperparameters.py) — type, default, range and a short note — and reports that declaration to the Learning Loop; a hyperparameter the loop does not send takes its default, which for the native ones comes from `hyp_det.yaml`.
+Standard hyperparameters: `resolution`, `epochs`, `patience`, `max_batch_size`, `lr0`, `fliplr`, `flipud`, `flip_label_pairs` and `compute_validation_set`. All others, the native YOLOv5 ones included, are expert hyperparameters.
 In addition, we support the following hyperparameters:
 
-- `resolution`: The input size of the model. It must be a multiple of the model's largest stride (32, or 64 for the P6 `*6` variants) and at least twice that; otherwise the training fails before its first epoch.
+- `resolution`: The input size of the model, `832` by default. It must be a multiple of the model's largest stride (32, or 64 for the P6 `*6` variants) and at least twice that; otherwise the training fails before its first epoch.
 - `epochs`: The number of epochs to train the model.
+- `fliplr` and `flipud`: Flip half of the images horizontally or vertically. They are on or off rather than a probability.
+- `patience`: The number of epochs without improvement after which the training stops early, `300` by default. `0` disables early stopping.
 - `max_batch_size`: The largest batch size the training may use. It is measured rather than trusted: if it fits it is used as given, and if it does not, the largest power of two below it that does is used instead. `0` (the default) means 128. The training set bounds it as well: by an eighth of the training images, but never below 64. A training of fewer than 1 024 images therefore uses at most 64, and a `max_batch_size` above that bound is not tried as given. The training never uses fewer than 2 samples per batch, because validation halves the batch, so a `max_batch_size` of 1 is raised to 2. The value that was actually used is reported back as `batch_size` (see below).
 - `detect_nms_conf_thres`: The confidence threshold for the NMS during inference and validation (not relevant for training).
 - `detect_nms_iou_thres`: The IoU threshold for the NMS during inference and validation (not used for training).

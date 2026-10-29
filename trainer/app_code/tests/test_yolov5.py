@@ -15,9 +15,11 @@ from learning_loop_node.helpers.misc import create_image_folder
 from learning_loop_node.loop_communication import LoopCommunicator
 from learning_loop_node.trainer.downloader import TrainingsDownloader
 from learning_loop_node.trainer.executor import Executor
+from learning_loop_node.trainer.hyperparameters import resolve
 from ruamel.yaml import YAML
 
 from .. import batch_size_calculation, model_files, yolov5_format
+from ..hyperparameters import HYPERPARAMETERS
 from ..yolov5_format import set_hyperparameters_in_file
 from ..yolov5_trainer import Yolov5TrainerLogic
 
@@ -133,7 +135,7 @@ class TestWithLoop:
     async def test_parse_progress_from_log(self, data_exchanger: DataExchanger, glc: LoopCommunicator):
         """Test if progress is parsed correctly from log"""
         trainer = Yolov5TrainerLogic()
-        trainer.epochs = 2
+        epochs = 2
         project_folder = os.getcwd()
         images_folder = create_image_folder(project_folder)
         categories, image_data = await download_training_data(images_folder, data_exchanger, glc)
@@ -144,7 +146,7 @@ class TestWithLoop:
             images_folder=images_folder,
             model_variant='',
             context=Context(project='pytest_yolo5det', organization='zauberzeug'),
-            categories=categories, hyperparameters={}, training_number=1,
+            categories=categories, hyperparameters=resolve(HYPERPARAMETERS, {'epochs': epochs}), training_number=1,
             training_state=TrainerState.Initialized.value,
             image_data=image_data,
         )
@@ -152,13 +154,13 @@ class TestWithLoop:
 
         trainer._executor = Executor(os.getcwd())
         ROOT = Path(__file__).resolve().parents[2]
-        cmd = f'python {ROOT/"train_det.py"} --project training --name result --batch 4 --img 416 --data training/dataset.yaml --weights model.pt --epochs {trainer.epochs}'
+        cmd = f'python {ROOT/"train_det.py"} --project training --name result --batch 4 --img 416 --data training/dataset.yaml --weights model.pt --epochs {epochs}'
         await trainer.executor.start(cmd, env={'WANDB_MODE': 'disabled'})
         while trainer.executor.is_running():
             await asyncio.sleep(1)
 
         logging.info(trainer.executor.get_log())
-        assert f'{trainer.epochs} epochs completed' in trainer.executor.get_log()
+        assert f'{epochs} epochs completed' in trainer.executor.get_log()
         assert trainer.training_progress == 1.0
 
 # =======================================================================================================================
