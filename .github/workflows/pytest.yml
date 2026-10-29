@@ -19,12 +19,34 @@ jobs:
           LOOP_HOST: ${{ secrets.LOOP_HOST }}
           LOOP_USERNAME: "admin"
           LOOP_PASSWORD: ${{ secrets.LEARNING_LOOP_ADMIN_PASSWORD }}
+          # the test project is created and deleted on a loop other runs use too; the suffix gives
+          # every run its own, so two runs on different runners cannot delete each other's
+          LOOP_TEST_PROJECT_SUFFIX: ${{ github.run_id }}_${{ github.run_attempt }}
         run: |
-          docker run -d -it --rm -v /home/zauberzeug/data:/data -h n6 -e LOOP_HOST=$LOOP_HOST -e LOOP_USERNAME=$LOOP_USERNAME -e LOOP_PASSWORD=$LOOP_PASSWORD --name yolov5_trainer_node_github_action --device=nvidia.com/gpu=all --ipc host zauberzeug/yolov5-trainer:latest
+          docker run -d -it --rm -v /home/zauberzeug/data:/data -h n6 -e LOOP_HOST=$LOOP_HOST -e LOOP_USERNAME=$LOOP_USERNAME -e LOOP_PASSWORD=$LOOP_PASSWORD -e LOOP_TEST_PROJECT_SUFFIX=$LOOP_TEST_PROJECT_SUFFIX --name yolov5_trainer_node_github_action --device=nvidia.com/gpu=all --ipc host zauberzeug/yolov5-trainer:latest
       - name: tests
         run: |
           docker exec yolov5_trainer_node_github_action uv sync --frozen --group dev
           docker exec yolov5_trainer_node_github_action pytest -vv
+      - name: delete test project
+        # the test's teardown deletes it, but not after a cancellation, which always() still runs for
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 5
+        run: |
+          docker exec -i yolov5_trainer_node_github_action python - <<'EOF'
+          import asyncio, os
+          from learning_loop_node.loop_communication import LoopCommunicator
+
+          async def main():
+              loop_communicator = LoopCommunicator()
+              project = f"pytest_yolo5det_{os.environ['LOOP_TEST_PROJECT_SUFFIX']}"
+              response = await loop_communicator.delete(f'/zauberzeug/projects/{project}?keep_images=true', timeout=120)
+              print(f'deleting {project}: {response.status_code}')
+              await loop_communicator.shutdown()
+
+          asyncio.run(main())
+          EOF
       - name: cleanup
         if: always() # also execute when pytest fails
         run: |

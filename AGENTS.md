@@ -127,7 +127,9 @@ cd detector_cpu && uv run --no-sync python -m pytest -v -k test_name   # needs d
 `./run_tests.sh` runs the `detector_cpu` suite, and passes a single argument on as a `-k` filter; the
 trainer and detector lines in it are commented out because they need a GPU and a reachable loop. The
 trainer suite additionally generates and deletes a project in the loop from its `conftest.py`
-fixtures, so it cannot run offline. **CI is therefore the only real check of the trainer code** —
+fixtures, so it cannot run offline. In CI that project is `pytest_yolo5det_<run id>_<attempt>`
+(`LOOP_TEST_PROJECT_SUFFIX`), so runs on two runners at once cannot delete each other's, and a last
+`if: always()` step deletes it after a cancellation too. **CI is therefore the only real check of the trainer code** —
 `.github/workflows/pytest.yml` builds the trainer image on a self-hosted GPU runner and runs
 `pytest -vv` inside it against a live loop, `build.yml` compiles the TensorRT detector. When asked,
 report the CI result rather than claiming the trainer was verified locally.
