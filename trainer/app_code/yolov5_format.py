@@ -33,8 +33,8 @@ def category_lookup_from_training(training: Training) -> dict[str, str]:
     return {c.name: c.id for c in training.categories}
 
 
-def _create_set(training: Training, set_name: str) -> int:
-    """Create training folder structure for a set (train or test).
+def _create_set(training: Training, set_name: str, images: list[dict]) -> int:
+    """Create training folder structure for a set (train, val or test).
     - Images in the set are linked from the images folder (symlinks)
     - Annotations are created in the set folder
     Annotations are boxes in the format:
@@ -51,51 +51,51 @@ def _create_set(training: Training, set_name: str) -> int:
     os.makedirs(images_path, exist_ok=True)
     img_count = 0
 
-    for image in training.image_data or []:
-        if image['set'] == set_name:
-            img_count += 1
-            image_name = image['id'] + '.jpg'
-            image_path = f"{images_path}/{image_name}"
-            width = float(image['width'])
-            height = float(image['height'])
-            os.symlink(f'{os.path.abspath(training.images_folder)}/{image_name}', image_path)
+    for image in images:
+        img_count += 1
+        image_name = image['id'] + '.jpg'
+        image_path = f"{images_path}/{image_name}"
+        width = float(image['width'])
+        height = float(image['height'])
+        os.symlink(f'{os.path.abspath(training.images_folder)}/{image_name}', image_path)
 
-            # Create annotation file
-            yolo_boxes = []
-            for box in image['box_annotations']:
-                coords = [
-                    (box['x'] + box['width'] / 2) / width,
-                    (box['y'] + box['height'] / 2) / height,
-                    box['width'] / width,
-                    box['height'] / height,
-                ]
-                c_id = str(category_uuids.index(box['category_id']))
-                yolo_boxes.append(c_id + ' ' + ' '.join([f"{c:.6f}" for c in coords]) + '\n')
+        # Create annotation file
+        yolo_boxes = []
+        for box in image['box_annotations']:
+            coords = [
+                (box['x'] + box['width'] / 2) / width,
+                (box['y'] + box['height'] / 2) / height,
+                box['width'] / width,
+                box['height'] / height,
+            ]
+            c_id = str(category_uuids.index(box['category_id']))
+            yolo_boxes.append(c_id + ' ' + ' '.join([f"{c:.6f}" for c in coords]) + '\n')
 
-            for point in image['point_annotations']:
-                size = next(c for c in training.categories if c.id == point['category_id']).point_size or 20
-                coords = [
-                    point['x']/width,
-                    point['y']/height,
-                    size/width,
-                    size/height,
-                ]
-                c_id = str(category_uuids.index(point['category_id']))
-                yolo_boxes.append(c_id + ' ' + ' '.join([f"{c:.6f}" for c in coords]) + '\n')
+        for point in image['point_annotations']:
+            size = next(c for c in training.categories if c.id == point['category_id']).point_size or 20
+            coords = [
+                point['x']/width,
+                point['y']/height,
+                size/width,
+                size/height,
+            ]
+            c_id = str(category_uuids.index(point['category_id']))
+            yolo_boxes.append(c_id + ' ' + ' '.join([f"{c:.6f}" for c in coords]) + '\n')
 
-            with open(f'{images_path}/{image["id"]}.txt', 'w') as l:
-                l.writelines(yolo_boxes)
+        with open(f'{images_path}/{image["id"]}.txt', 'w') as l:
+            l.writelines(yolo_boxes)
 
     return img_count
 
 
-def create_dataset_yaml(training: Training) -> None:
+def create_dataset_yaml(training: Training, val_set: str) -> None:
+    """`val_set` is the folder yolov5 validates on, `val` or `test` (see `create_file_structure`)."""
     categories = category_lookup_from_training(training)
     path = training.training_folder
     data = {
         'train': path + '/train',
         'test': path + '/test',
-        'val': path + '/test',
+        'val': f'{path}/{val_set}',
         'nc': len(categories),
         'names': list(categories.keys())
     }
@@ -108,21 +108,31 @@ def create_file_structure(training: Training) -> None:
     """Uses:
     - training.training_folder to create the file structure.
     - training.image_data to create the image links and annotations.
-    - training.categories to create the annotations."""
+    - training.categories to create the annotations.
+    The model is selected on `training.val_images()` and its counts are reported on `training.test_images()`.
+    When both are the same images, `dataset.yaml` points `val` at the `test/` folder instead of linking them twice."""
     path = training.training_folder
     Path(path).mkdir(parents=True, exist_ok=True)
 
-    num_test_imgs = _create_set(training, 'test')
-    num_train_imgs = _create_set(training, 'train')
+    val_images = training.val_images()
+    test_images = training.test_images()
+    num_test_imgs = _create_set(training, 'test', test_images)
+    num_train_imgs = _create_set(training, 'train', training.train_images())
 
     if num_train_imgs == 0:
         raise CriticalError('No training images found. Cannot start training without images in the train set.')
     if num_test_imgs == 0:
-        raise CriticalError('No validation images found. Training requires at least 1 image in the test set.')
+        raise CriticalError('No test images found. Training requires at least 1 image in the test set.')
 
-    create_dataset_yaml(training)
-
-    logging.info('Prepared file structure with %d training images and %d test images', num_train_imgs, num_test_imgs)
+    if val_images == test_images:
+        create_dataset_yaml(training, val_set='test')
+        logging.info('Prepared file structure with %d training and %d test images, which are also validated on',
+                     num_train_imgs, num_test_imgs)
+    else:
+        num_val_imgs = _create_set(training, 'val', val_images)
+        create_dataset_yaml(training, val_set='val')
+        logging.info('Prepared file structure with %d training, %d validation and %d test images',
+                     num_train_imgs, num_val_imgs, num_test_imgs)
 
 
 FLIP_PROBABILITY = 0.5
