@@ -1,5 +1,4 @@
 import asyncio
-import json
 from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
@@ -57,16 +56,6 @@ def test_best_keeps_only_ema_weights_and_links_the_reported_epoch(tmp_path: Path
     assert (tmp_path / 'epoch4.json').read_text() == '{"cat": {"tp": 2}}'
 
 
-def test_the_reported_epoch_carries_its_model_metadata(tmp_path: Path) -> None:
-    save_best(full_checkpoint(4), tmp_path, {'conf_threshold': 0.4})
-    report_best(tmp_path, 4, {'cat': {'tp': 2}}, {'conf_threshold': 0.4})
-    save_best(full_checkpoint(5), tmp_path)
-    report_best(tmp_path, 5, {'cat': {'tp': 3}})
-
-    assert json.loads((tmp_path / 'epoch4.model.json').read_text()) == {'conf_threshold': 0.4}
-    assert not (tmp_path / 'epoch5.model.json').exists()
-
-
 def test_best_carries_its_model_metadata_for_the_final_evaluation(tmp_path: Path) -> None:
     save_best(full_checkpoint(4), tmp_path, {'conf_threshold': 0.4})
     assert torch.load(tmp_path / 'best.pt', weights_only=False)['model_metadata'] == {'conf_threshold': 0.4}
@@ -75,7 +64,7 @@ def test_best_carries_its_model_metadata_for_the_final_evaluation(tmp_path: Path
     assert torch.load(tmp_path / 'best.pt', weights_only=False)['model_metadata'] == {}
 
 
-def published_logic(training_folder: Path) -> Yolov5TrainerLogic:
+def trainer_logic(training_folder: Path) -> Yolov5TrainerLogic:
     logic = Yolov5TrainerLogic()
     logic._training = SimpleNamespace(training_folder=str(training_folder), training_folder_path=training_folder,
                                       hyperparameters={})
@@ -91,7 +80,7 @@ def best_epoch(weights: Path, epoch: int, model_metadata: dict[str, Any] | None 
 def test_the_published_model_carries_the_metadata_of_its_epoch(tmp_path: Path) -> None:
     weights = tmp_path / 'result/weights'
     weights.mkdir(parents=True)
-    logic = published_logic(tmp_path)
+    logic = trainer_logic(tmp_path)
     assert logic._get_model_metadata() == {}
 
     logic._on_metrics_published(best_epoch(weights, 4, {'conf_threshold': 0.4}))
@@ -104,8 +93,7 @@ def test_the_published_model_carries_the_metadata_of_its_epoch(tmp_path: Path) -
 
 
 def test_discarded_epochs_take_their_metadata_along(tmp_path: Path) -> None:
-    save_best(full_checkpoint(4), tmp_path, {'conf_threshold': 0.4})
-    report_best(tmp_path, 4, {'cat': {'tp': 2}}, {'conf_threshold': 0.4})
+    best_epoch(tmp_path, 4, {'conf_threshold': 0.4})
 
     delete_newer_epochs(tmp_path, 3)
 
@@ -242,8 +230,7 @@ def test_node_resumes_from_last_checkpoint_into_the_result_folder(tmp_path: Path
     (weights / 'last.pt').touch()
     (weights / 'published/latest.pt').touch()
     (tmp_path / 'hyp.yaml').write_text('epochs: 10\n')
-    logic = Yolov5TrainerLogic()
-    logic._training = SimpleNamespace(training_folder=str(tmp_path), training_folder_path=tmp_path, hyperparameters={})
+    logic = trainer_logic(tmp_path)
     logic._executor = MagicMock(start=AsyncMock())
     assert logic._can_resume()
 

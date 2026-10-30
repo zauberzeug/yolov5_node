@@ -51,7 +51,7 @@ def delete_json_for_weightfile(weightfile: Path) -> None:
 
 
 def metadata_for_weightfile(weightfile: Path) -> Path:
-    """The model metadata (e.g. `conf_threshold`) `train_det.py` saves next to a weight file, if it chose any."""
+    """The model metadata (e.g. `conf_threshold`) saved next to a weight file, if there is any."""
     return weightfile.with_suffix('.model.json')
 
 

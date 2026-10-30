@@ -542,8 +542,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             # PATCH (yolov5-node): best keeps only the EMA weights; readers only see fully written checkpoints.
             if best_fitness == fi:
                 # a model that finds nothing on val is kept as best.pt but not reported;
-                # otherwise the loop gets the test counts at val_conf, where the mean F1 peaked on val
-                # and which the detectors filter at.
+                # otherwise the loop gets the test counts at val_conf, where the mean F1 peaked on val.
                 model_metadata = {'conf_threshold': float(val_conf)} if val_conf is not None else None
                 save_best(ckpt, w, model_metadata)
                 if val_conf is not None:
