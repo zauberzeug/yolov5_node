@@ -80,6 +80,14 @@ nominal batch, the validation padding, the loss-weight scaling — lives in `tra
 against, through the `limit_cuda_memory` call `train_det.py` makes at its start; because the cap
 does not survive a spawn, the node hands the same number to `train_det.py` and `pred_det.py`.
 
+**Images are cached in RAM within a budget.** The node starts `train_det.py` with `--cache ram`
+unless `IMAGE_CACHE=off`, on a resume too: the resume branch keeps the current `--cache` instead of
+the interrupted run's. Upstream caches a set whenever it fits into the host's available memory;
+`check_cache_ram` asks `image_cache.budget` instead, which gives all sets of one run together
+`RAM_SHARE` of the memory available before the first, capped by a cgroup v2 memory limit, because
+the dataloader workers start only after the cache is filled. A set that does not fit is loaded from
+disk, as without the cache.
+
 **The trainer never trains in-process.** `Yolov5TrainerLogic` (`trainer/app_code/yolov5_trainer.py`)
 implements the library's abstract `TrainerLogic` hooks and shells out through the library's
 `Executor` to `trainer/train_det.py` (and `pred_det.py` for `_detect`). What a hook has to return is

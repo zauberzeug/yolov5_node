@@ -204,6 +204,42 @@ def test_node_resumes_from_last_checkpoint_into_the_result_folder(tmp_path: Path
     assert command[command.index('--project') + 1] == str(tmp_path)
     assert command[command.index('--name') + 1] == 'result'
     assert '--vram-limit-gb' in command
+    assert command[command.index('--cache') + 1] == 'ram'
+
+
+def test_node_resumes_without_image_cache_when_switched_off(tmp_path: Path) -> None:
+    (tmp_path / 'result/weights').mkdir(parents=True)
+    (tmp_path / 'result/weights/last.pt').touch()
+    (tmp_path / 'hyp.yaml').write_text('epochs: 10\n')
+    logic = Yolov5TrainerLogic(cache_images=False)
+    logic._training = SimpleNamespace(training_folder=str(tmp_path), training_folder_path=tmp_path, hyperparameters={})
+    logic._executor = MagicMock(start=AsyncMock())
+
+    asyncio.run(logic._resume())
+
+    assert '--cache' not in logic.executor.start.call_args.args[0].split()
+
+
+def test_main_resumes_with_the_current_image_cache_setting(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    weights = tmp_path / 'result/weights'
+    weights.mkdir(parents=True)
+    checkpoint = weights / 'last.pt'
+    checkpoint.touch()
+    monkeypatch.setattr('sys.argv', ['train_det.py'])
+    options = train_det.parse_opt()
+    options.cache = 'ram'
+    options.save_dir = str(weights.parent)
+    train_det.yaml_save(str(weights.parent / 'opt.yaml'), vars(options))
+    options.resume = str(checkpoint)
+    options.cache = None
+    train = MagicMock()
+    monkeypatch.setattr(train_det, 'train', train)
+    monkeypatch.setattr(train_det, 'select_device', lambda *_a, **_kw: torch.device('cpu'))
+    monkeypatch.setattr(train_det, 'check_comet_resume', lambda _: False)
+
+    train_det.main(options)
+
+    assert train.call_args.args[1].cache is None
 
 
 def test_finished_after_early_stop_or_last_epoch() -> None:
