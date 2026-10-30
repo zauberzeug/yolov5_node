@@ -19,14 +19,12 @@ from learning_loop_node.data_classes import (
 from learning_loop_node.detector.postprocess import bbox_iou, predictions_from_xyxy, to_image_metadata
 
 MAX_DETECTIONS = 1000
-DEFAULT_CONF_THRESHOLD = 0.2
 
 
 @final
 @dataclass(frozen=True)
 class Yolov5DetectorParams(DetectorLogicFactory):
     iou_threshold: float
-    conf_threshold: float | None  # None: the model's, else DEFAULT_CONF_THRESHOLD
 
     @property
     @override
@@ -37,14 +35,6 @@ class Yolov5DetectorParams(DetectorLogicFactory):
     async def build(self, model_info: ModelInformation) -> Yolov5Detector:
         return await asyncio.to_thread(Yolov5Detector, model_info, self)
 
-    def conf_threshold_for(self, model_info: ModelInformation) -> float:
-        """The configured threshold, else the one the model was trained with, else DEFAULT_CONF_THRESHOLD."""
-        if self.conf_threshold is not None:
-            return self.conf_threshold
-        if model_info.conf_threshold is not None:
-            return model_info.conf_threshold
-        return DEFAULT_CONF_THRESHOLD
-
 
 @final
 class Yolov5Detector(DetectorLogic):
@@ -54,8 +44,7 @@ class Yolov5Detector(DetectorLogic):
         self.log = logging.getLogger('Yolov5Detector')
         self.log.setLevel(logging.INFO)
         self.iou_threshold = params.iou_threshold
-        self.conf_threshold = params.conf_threshold_for(model_info)
-        self.log.info('Filtering detections below a confidence of %s', self.conf_threshold)
+        self.conf_threshold = model_info.conf_threshold
 
         if not isinstance(model_info.resolution, int) or model_info.resolution <= 0:
             raise RuntimeError("model_info.resolution must be an integer > 0")

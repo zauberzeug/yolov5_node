@@ -105,7 +105,7 @@ Besides, the following parameters may be set:
 | HOST_PORT                   | Port on this machine mapped to the container | Integer               | 8004    | Yes                            |
 | WEIGHT_TYPE                 | Data type to convert weights to           | String [FP32, FP16, INT8] | FP16    | No                             |
 | IOU_THRESHOLD               | IoU threshold for NMS                     | Float                     | 0.45    | No                             |
-| CONF_THRESHOLD              | Confidence threshold for NMS; unset, the model's `conf_threshold` if it has one, else 0.2 | Float | unset | No          |
+| CONF_THRESHOLD              | Minimum confidence of a detection, overriding the one the model was trained with (0.2 for a model without one) | Float | unset | No |
 | BUILDER_OPTIMIZATION_LEVEL  | TensorRT builder optimization level       | Integer [0-5]             | 4       | No                             |
 
 Each of these is also a command line flag — `--weight-type`, `--iou-threshold`, `--conf-threshold`,

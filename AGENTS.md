@@ -98,8 +98,8 @@ that same ordering.
 **Models are selected on validation images and reported on the test images.** When they are the same,
 we optimize data loading by creating only one folder and loader for both sets. The confidence picked on
 the validation images travels with the reported epoch as `epoch<n>.model.json` → `published/latest.model.json`
-into the uploaded `model.json` (`conf_threshold`, via `_get_model_metadata`), where the detectors pick it up
-unless `CONF_THRESHOLD` is set.
+into the uploaded `model.json` (`conf_threshold`, via `_get_model_metadata`). The node library hands it to the
+detectors as `model_info.conf_threshold`, replaced by `CONF_THRESHOLD` when that is set.
 
 **Point detection rides on boxes.** A point annotation is written as a box of `point_size` and turned
 back into a point by category type. The point hyperparameters are not handed to yolov5 as
