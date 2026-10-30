@@ -5,7 +5,7 @@ from typing import Any
 
 import torch
 
-from .model_files import delete_newer_epochs
+from .model_files import delete_newer_epochs, metadata_for_weightfile
 
 
 def save_best(checkpoint: dict[str, Any], folder: Path, model_metadata: dict[str, Any] | None = None) -> None:
@@ -21,15 +21,17 @@ def save_best(checkpoint: dict[str, Any], folder: Path, model_metadata: dict[str
                  'opt': checkpoint['opt'], 'date': checkpoint['date']}, folder / 'best.pt')
 
 
-def report_best(folder: Path, epoch: int, confusion_matrices: dict[str, Any]) -> None:
-    """Report `best.pt` with its metrics to the node as the `epoch<n>.pt` and `epoch<n>.json` it picks up.
+def report_best(folder: Path, epoch: int, confusion_matrices: dict[str, Any],
+                model_metadata: dict[str, Any] | None = None) -> None:
+    """Report `best.pt` to the node as `epoch<n>.pt`, with its metrics as `epoch<n>.json` and its
+    `model_metadata`, if any, as `epoch<n>.model.json`.
 
     Must run after `save_best` and before `last.pt` of the same epoch is written.
     """
     path = folder / f'epoch{epoch}.pt'
-    metrics = path.with_suffix('.json.tmp')
-    metrics.write_text(json.dumps(confusion_matrices))
-    metrics.replace(path.with_suffix('.json'))
+    _atomic_write_json(confusion_matrices, path.with_suffix('.json'))
+    if model_metadata:
+        _atomic_write_json(model_metadata, metadata_for_weightfile(path))
     _atomic_link(folder / 'best.pt', path)
 
 
@@ -89,6 +91,12 @@ def atomic_save(checkpoint: dict[str, Any], path: Path) -> None:
         torch.save(checkpoint, handle)
         handle.flush()
         os.fsync(handle.fileno())
+    temporary.replace(path)
+
+
+def _atomic_write_json(content: Any, path: Path) -> None:
+    temporary = path.with_suffix(path.suffix + '.tmp')
+    temporary.write_text(json.dumps(content))
     temporary.replace(path)
 
 
