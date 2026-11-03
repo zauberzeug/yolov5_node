@@ -30,7 +30,6 @@ import yolov5
 class Yolov5DetectorParams(DetectorLogicFactory):
     weight_type: Literal['FP16', 'FP32', 'INT8']
     iou_threshold: float
-    conf_threshold: float
     builder_optimization_level: int
 
     @property
@@ -75,7 +74,7 @@ class Yolov5Detector(DetectorLogic):
         ctypes.CDLL(str(_LIB_FILE))
 
         try:
-            self.yolov5 = yolov5.YoLov5TRT(engine_file, params.iou_threshold, params.conf_threshold)
+            self.yolov5 = yolov5.YoLov5TRT(engine_file, params.iou_threshold, model_info.conf_threshold)
         except RuntimeError as e:
             if 'TensorRT version mismatch' in str(e) or 'deserialize' in str(e):
                 _LOG.error('TensorRT engine compatibility issue: %s', e)
