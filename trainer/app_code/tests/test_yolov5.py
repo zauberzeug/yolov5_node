@@ -26,8 +26,6 @@ from ..yolov5_trainer import Yolov5TrainerLogic
 logging.basicConfig(level=logging.DEBUG)
 yaml = YAML()
 
-# CI appends LOOP_TEST_PROJECT_SUFFIX, so two runs at once on different runners cannot delete each
-# other's project; locally the bare name is used
 _SUFFIX = os.environ.get('LOOP_TEST_PROJECT_SUFFIX')
 PROJECT = f'pytest_yolo5det_{_SUFFIX}' if _SUFFIX else 'pytest_yolo5det'
 

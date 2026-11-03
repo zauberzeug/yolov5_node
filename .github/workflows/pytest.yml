@@ -19,8 +19,7 @@ jobs:
           LOOP_HOST: ${{ secrets.LOOP_HOST }}
           LOOP_USERNAME: "admin"
           LOOP_PASSWORD: ${{ secrets.LEARNING_LOOP_ADMIN_PASSWORD }}
-          # the test project is created and deleted on a loop other runs use too; the suffix gives
-          # every run its own, so two runs on different runners cannot delete each other's
+          # one test project per run on the shared loop
           LOOP_TEST_PROJECT_SUFFIX: ${{ github.run_id }}_${{ github.run_attempt }}
         run: |
           docker run -d -it --rm -v /home/zauberzeug/data:/data -h n6 -e LOOP_HOST=$LOOP_HOST -e LOOP_USERNAME=$LOOP_USERNAME -e LOOP_PASSWORD=$LOOP_PASSWORD -e LOOP_TEST_PROJECT_SUFFIX=$LOOP_TEST_PROJECT_SUFFIX --name yolov5_trainer_node_github_action --device=nvidia.com/gpu=all --ipc host zauberzeug/yolov5-trainer:latest
@@ -29,7 +28,7 @@ jobs:
           docker exec yolov5_trainer_node_github_action uv sync --frozen --group dev
           docker exec yolov5_trainer_node_github_action pytest -vv
       - name: delete test project
-        # the test's teardown deletes it, but not after a cancellation, which always() still runs for
+        # always() also runs after a cancellation
         if: always()
         continue-on-error: true
         timeout-minutes: 5

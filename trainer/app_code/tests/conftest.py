@@ -18,15 +18,8 @@ logging.basicConfig(level=logging.INFO)
 
 # load_dotenv()
 
-# outlasts the loop's own 60 s limit, so its answer comes through instead of a bare timeout
+# outlasts the loop's own 60 s limit, so its answer comes through
 DELETE_TIMEOUT = 75
-
-
-async def delete_project(glc: LoopCommunicator, project: str) -> None:
-    """Delete the test project; keep its images only for the bare name, which the next local run reuses."""
-    keep_images = '' if os.environ.get('LOOP_TEST_PROJECT_SUFFIX') else '?keep_images=true'
-    # May not return 200 if project does not exist
-    await glc.delete(f'/zauberzeug/projects/{project}{keep_images}', timeout=DELETE_TIMEOUT)
 
 
 # -------------------- Session fixtures --------------------
@@ -105,3 +98,13 @@ def use_training_dir(prepare_model, request: SubRequest):
     yield
     shutil.rmtree('/tmp/test_training', ignore_errors=True)
     os.chdir(request.config.invocation_dir)  # type: ignore
+
+
+# -------------------- Helpers --------------------
+
+
+async def delete_project(glc: LoopCommunicator, project: str) -> None:
+    """Delete the test project, keeping its images only under the bare local name."""
+    keep_images = '' if os.environ.get('LOOP_TEST_PROJECT_SUFFIX') else '?keep_images=true'
+    # May not return 200 if project does not exist
+    await glc.delete(f'/zauberzeug/projects/{project}{keep_images}', timeout=DELETE_TIMEOUT)
