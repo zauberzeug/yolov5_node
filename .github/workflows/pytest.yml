@@ -41,7 +41,7 @@ jobs:
           async def main():
               loop_communicator = LoopCommunicator()
               project = f"pytest_yolo5det_{os.environ['LOOP_TEST_PROJECT_SUFFIX']}"
-              response = await loop_communicator.delete(f'/zauberzeug/projects/{project}?keep_images=true', timeout=120)
+              response = await loop_communicator.delete(f'/zauberzeug/projects/{project}', timeout=75)
               print(f'deleting {project}: {response.status_code}')
               await loop_communicator.shutdown()
 
