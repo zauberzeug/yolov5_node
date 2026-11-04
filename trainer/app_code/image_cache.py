@@ -14,6 +14,7 @@ RAM_SHARE = 0.5
 
 CGROUP_MEMORY_MAX = Path('/sys/fs/cgroup/memory.max')
 CGROUP_MEMORY_CURRENT = Path('/sys/fs/cgroup/memory.current')
+CGROUP_MEMORY_STAT = Path('/sys/fs/cgroup/memory.stat')
 
 
 class CacheBudget:
@@ -46,15 +47,17 @@ def available_memory() -> int:
 
 
 def _cgroup_headroom() -> int | None:
-    """Bytes left below the container's memory limit; ``None`` without a limit."""
+    """Bytes left below the container's memory limit, counting inactive page cache as free; ``None`` without a limit."""
     try:
         limit = CGROUP_MEMORY_MAX.read_text().strip()
         current = int(CGROUP_MEMORY_CURRENT.read_text())
+        stat = dict(line.split() for line in CGROUP_MEMORY_STAT.read_text().splitlines())
     except (OSError, ValueError):
         return None
     if limit == 'max':
         return None
-    return max(0, int(limit) - current)
+    used = current - int(stat.get('inactive_file', 0))
+    return max(0, int(limit) - used)
 
 
 budget = CacheBudget()

@@ -22,10 +22,12 @@ def test_caches_share_half_of_the_memory_available_before_the_first() -> None:
 def test_cgroup_limit_caps_the_available_memory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     (tmp_path / 'memory.max').write_text(f'{8 << 30}\n')
     (tmp_path / 'memory.current').write_text(f'{6 << 30}\n')
+    (tmp_path / 'memory.stat').write_text(f'anon {3 << 30}\nactive_file {1 << 30}\ninactive_file {2 << 30}\n')
     monkeypatch.setattr(image_cache, 'CGROUP_MEMORY_MAX', tmp_path / 'memory.max')
     monkeypatch.setattr(image_cache, 'CGROUP_MEMORY_CURRENT', tmp_path / 'memory.current')
+    monkeypatch.setattr(image_cache, 'CGROUP_MEMORY_STAT', tmp_path / 'memory.stat')
     monkeypatch.setattr(image_cache.psutil, 'virtual_memory', lambda: SimpleNamespace(available=28 << 30))
-    assert image_cache.available_memory() == 2 << 30
+    assert image_cache.available_memory() == 4 << 30
 
 
 @pytest.mark.parametrize(('available', 'cached'), [(10 << 20, True), (1 << 20, False)])
