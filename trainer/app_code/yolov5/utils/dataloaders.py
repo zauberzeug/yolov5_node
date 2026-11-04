@@ -642,7 +642,7 @@ class LoadImagesAndLabels(Dataset):
             ratio = self.img_size / max(im.shape[0], im.shape[1])  # max(h, w)  # ratio
             b += im.nbytes * ratio ** 2
         mem_required = b * self.n / n  # GB required to cache dataset into RAM
-        # PATCH (yolov5-node): the budget leaves room for the dataloader workers, which start after the cache.
+        # PATCH (yolov5-node): claims from image_cache.budget instead of comparing with psutil's available memory.
         left = image_cache.budget.remaining
         cache = image_cache.budget.claim(mem_required * (1 + safety_margin))
         if not cache:

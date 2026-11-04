@@ -1,9 +1,8 @@
 """How much memory `train_det.py` may fill with decoded images under ``--cache ram``.
 
-The cache holds every image decoded and resized to ``--img`` for the whole training. The
-dataloader workers start only after it is filled and need memory of their own, so the caches of
-the training, validation and test sets together stay within :data:`RAM_SHARE` of the memory that
-was available before the first of them, and a set that does not fit is loaded from disk instead.
+The cache holds every image decoded and resized to ``--img`` for the whole training. The caches
+of all sets of one run together stay within :data:`RAM_SHARE` of the memory that was available
+before the first of them, and a set that does not fit is loaded from disk instead.
 """
 from collections.abc import Callable
 from pathlib import Path
@@ -15,6 +14,28 @@ RAM_SHARE = 0.5
 
 CGROUP_MEMORY_MAX = Path('/sys/fs/cgroup/memory.max')
 CGROUP_MEMORY_CURRENT = Path('/sys/fs/cgroup/memory.current')
+
+
+class CacheBudget:
+    """The bytes the image caches of one `train_det.py` run may still take."""
+
+    def __init__(self, available: Callable[[], int] | None = None) -> None:
+        """:param available: Read once, when the first cache asks; defaults to :func:`available_memory`."""
+        self._available = available or available_memory
+        self._remaining: int | None = None
+
+    @property
+    def remaining(self) -> int:
+        if self._remaining is None:
+            self._remaining = int(self._available() * RAM_SHARE)
+        return self._remaining
+
+    def claim(self, required_bytes: float) -> bool:
+        """Take ``required_bytes`` from the budget, or leave it untouched and return ``False``."""
+        if required_bytes > self.remaining:
+            return False
+        self._remaining = self.remaining - int(required_bytes)
+        return True
 
 
 def available_memory() -> int:
@@ -34,28 +55,6 @@ def _cgroup_headroom() -> int | None:
     if limit == 'max':
         return None
     return max(0, int(limit) - current)
-
-
-class CacheBudget:
-    """The bytes the image caches of one `train_det.py` run may still take."""
-
-    def __init__(self, available: Callable[[], int] = available_memory) -> None:
-        """:param available: Read once, when the first cache asks."""
-        self._available = available
-        self._remaining: int | None = None
-
-    @property
-    def remaining(self) -> int:
-        if self._remaining is None:
-            self._remaining = int(self._available() * RAM_SHARE)
-        return self._remaining
-
-    def claim(self, required_bytes: float) -> bool:
-        """Take ``required_bytes`` from the budget, or leave it untouched and return ``False``."""
-        if required_bytes > self.remaining:
-            return False
-        self._remaining = self.remaining - int(required_bytes)
-        return True
 
 
 budget = CacheBudget()
