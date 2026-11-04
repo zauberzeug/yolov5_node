@@ -28,7 +28,7 @@ def smooth(y, f=0.05):
     return np.convolve(yp, np.ones(nf) / nf, mode='valid')  # y-smoothed
 
 
-def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='.', names=(), eps=1e-16, prefix=""):
+def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='.', names=(), eps=1e-16, prefix="", report_conf=None):
     """ Compute the average precision, given the recall and precision curves.
     Source: https://github.com/rafaelpadilla/Object-Detection-Metrics.
     # Arguments
@@ -38,8 +38,9 @@ def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='.', names
         target_cls:  True object classes (nparray).
         plot:  Plot precision-recall curve at mAP@0.5
         save_dir:  Plot save directory
+        report_conf:  Confidence at which p, r, f1, tp and fp are reported (default: where the mean F1 peaks)
     # Returns
-        The average precision as computed in py-faster-rcnn.
+        The average precision as computed in py-faster-rcnn, plus the confidence p, r, f1, tp and fp are reported at.
     """
 
     # Sort by objectness
@@ -88,11 +89,15 @@ def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='.', names
         plot_mc_curve(px, p, Path(save_dir) / f'{prefix}P_curve.png', names, ylabel='Precision')
         plot_mc_curve(px, r, Path(save_dir) / f'{prefix}R_curve.png', names, ylabel='Recall')
 
-    i = smooth(f1.mean(0), 0.1).argmax()  # max F1 index
+    # PATCH (yolov5-node): report at a given confidence (picked on the validation set) and return it
+    if report_conf is None:
+        i = smooth(f1.mean(0), 0.1).argmax()  # max F1 index
+    else:
+        i = np.abs(px - report_conf).argmin()  # index of the given confidence
     p, r, f1 = p[:, i], r[:, i], f1[:, i]
     tp = (r * nt).round()  # true positives
     fp = (tp / (p + eps) - tp).round()  # false positives
-    return tp, fp, p, r, f1, ap, unique_classes.astype(int)
+    return tp, fp, p, r, f1, ap, unique_classes.astype(int), px[i]
 
 
 def compute_ap(recall, precision):

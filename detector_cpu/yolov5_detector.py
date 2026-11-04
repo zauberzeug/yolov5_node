@@ -25,7 +25,6 @@ MAX_DETECTIONS = 1000
 @dataclass(frozen=True)
 class Yolov5DetectorParams(DetectorLogicFactory):
     iou_threshold: float
-    conf_threshold: float
 
     @property
     @override
@@ -45,7 +44,7 @@ class Yolov5Detector(DetectorLogic):
         self.log = logging.getLogger('Yolov5Detector')
         self.log.setLevel(logging.INFO)
         self.iou_threshold = params.iou_threshold
-        self.conf_threshold = params.conf_threshold
+        self.conf_threshold = model_info.conf_threshold
 
         if not isinstance(model_info.resolution, int) or model_info.resolution <= 0:
             raise RuntimeError("model_info.resolution must be an integer > 0")

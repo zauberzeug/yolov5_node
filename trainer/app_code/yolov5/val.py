@@ -126,6 +126,8 @@ def run(
         plots=True,
         callbacks=Callbacks(),
         compute_loss=None,
+        # PATCH (yolov5-node): report_conf and the returned reported_conf
+        report_conf=None,  # confidence the per-class counts are reported at (default: where the mean F1 peaks)
 ):
     # Initialize/load model and set device
     training = model is not None
@@ -194,6 +196,7 @@ def run(
     dt = Profile(), Profile(), Profile()  # profiling times
     loss = torch.zeros(3, device=device)
     jdict, stats, ap, ap_class = [], [], [], []
+    reported_conf = None
     callbacks.run('on_val_start')
     pbar = tqdm(dataloader, desc=s, bar_format=TQDM_BAR_FORMAT)  # progress bar
     for batch_i, (im, targets, paths, shapes) in enumerate(pbar):
@@ -274,7 +277,8 @@ def run(
     # Compute metrics
     stats = [torch.cat(x, 0).cpu().numpy() for x in zip(*stats)]  # to numpy
     if len(stats) and stats[0].any():
-        tp, fp, p, r, f1, ap, ap_class = ap_per_class(*stats, plot=plots, save_dir=save_dir, names=names)
+        tp, fp, p, r, f1, ap, ap_class, reported_conf = ap_per_class(*stats, plot=plots, save_dir=save_dir, names=names,
+                                                                     report_conf=report_conf)
         ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
         mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
     nt = np.bincount(stats[3].astype(int), minlength=nc)  # number of targets per class
@@ -340,7 +344,7 @@ def run(
     maps = np.zeros(nc) + map
     for i, c in enumerate(ap_class):
         maps[c] = ap[i]
-    return (mp, mr, map50, map, *(loss.cpu() / len(dataloader)).tolist()), confusion_matrices, maps, t
+    return (mp, mr, map50, map, *(loss.cpu() / len(dataloader)).tolist()), confusion_matrices, maps, t, reported_conf
 
 
 def parse_opt():
@@ -401,7 +405,7 @@ def main(opt):
                 x, y = list(range(256, 1536 + 128, 128)), []  # x axis (image sizes), y axis
                 for opt.imgsz in x:  # img-size
                     LOGGER.info(f'\nRunning {f} --imgsz {opt.imgsz}...')
-                    r, _, _, t = run(**vars(opt), plots=False)
+                    r, _, _, t, _ = run(**vars(opt), plots=False)
                     y.append(r + t)  # results and times
                 np.savetxt(f, y, fmt='%10.4g')  # save
             os.system('zip -r study.zip study_*.txt')
