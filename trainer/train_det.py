@@ -364,7 +364,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                                                              hyp=hyp,
                                                                              rect=True,
                                                                              rank=-1,
-                                                                             workers=workers * 2,
+                                                                             workers=workers,
                                                                              pad=training_recipe.VAL_PAD,
                                                                              prefix=colorstr('test: '),
                                                                              point_sizes_by_id=point_sizes_by_id)[0]
