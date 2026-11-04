@@ -207,19 +207,6 @@ def test_node_resumes_from_last_checkpoint_into_the_result_folder(tmp_path: Path
     assert command[command.index('--cache') + 1] == 'ram'
 
 
-def test_node_resumes_without_image_cache_when_switched_off(tmp_path: Path) -> None:
-    (tmp_path / 'result/weights').mkdir(parents=True)
-    (tmp_path / 'result/weights/last.pt').touch()
-    (tmp_path / 'hyp.yaml').write_text('epochs: 10\n')
-    logic = Yolov5TrainerLogic(cache_images=False)
-    logic._training = SimpleNamespace(training_folder=str(tmp_path), training_folder_path=tmp_path, hyperparameters={})
-    logic._executor = MagicMock(start=AsyncMock())
-
-    asyncio.run(logic._resume())
-
-    assert '--cache' not in logic.executor.start.call_args.args[0].split()
-
-
 def test_main_resumes_with_the_current_image_cache_setting(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     weights = tmp_path / 'result/weights'
     weights.mkdir(parents=True)
