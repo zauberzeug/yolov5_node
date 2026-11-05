@@ -39,11 +39,9 @@ jobs:
     permissions:
       contents: read
       actions: read # the sweep looks up runs
-    # TODO: @main and no ref once learning_loop_node#105 is merged
-    uses: zauberzeug/learning_loop_node/.github/workflows/cleanup-test-projects.yml@ci/per-run-test-projects
+    uses: zauberzeug/learning_loop_node/.github/workflows/cleanup-test-projects.yml@main
     with:
       projects: pytest_yolo5det
-      ref: ci/per-run-test-projects
     secrets: inherit
 
   pytest_detector_cpu:
