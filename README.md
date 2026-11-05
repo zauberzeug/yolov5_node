@@ -10,7 +10,7 @@ Trainer is tested with Nvidia Driver Version: 580.95.05 and CUDA Version: 13.0. 
 
 ## Hyperparameters
 
-We support all native hyperparameters of YOLOv5 (cf. `hyp_det.yaml` for reference).
+We support all native hyperparameters of YOLOv5. Their defaults are upstream's for the model size: `hyp.scratch-low.yaml` for n and s, `hyp.scratch-med.yaml` for m and `hyp.scratch-high.yaml` for l and x, the P6 variants (`n6` … `x6`) included (cf. `trainer/app_code/yolov5/data/hyps/`). The flips `fliplr` and `flipud` stay off unless a training sets them (cf. `trainer/hyp_det.yaml`).
 In addition, we support the following hyperparameters:
 
 - `resolution`: The input size of the model. It must be a multiple of the model's largest stride (32, or 64 for the P6 `*6` variants) and at least twice that; otherwise the training fails before its first epoch.

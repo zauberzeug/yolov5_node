@@ -233,10 +233,8 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         yolov5_format.create_file_structure(self.training)
         additional_params = ' --clear'
 
-        base_hyp_path = Path(__file__).resolve().parents[1] / ('hyp_det.yaml')
-        assert (base_hyp_path).exists(), f'Hyperparameter file not found at "{base_hyp_path}"'
-        shutil.copy(base_hyp_path, self.hyperparameter_path)
-        yolov5_format.set_hyperparameters_in_file(self.hyperparameter_path, self.hyperparameters)
+        yolov5_format.create_hyperparameter_file(self.hyperparameter_path, self.training.model_variant,
+                                                 self.hyperparameters)
 
         await self._start(model, additional_params)
 

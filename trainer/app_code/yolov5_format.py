@@ -14,6 +14,10 @@ from ruamel.yaml.scalarstring import LiteralScalarString
 
 yaml = YAML()
 
+NODE_HYPERPARAMETERS = Path(__file__).resolve().parents[1] / 'hyp_det.yaml'
+UPSTREAM_HYPERPARAMETERS = Path(__file__).resolve().parent / 'yolov5' / 'data' / 'hyps'
+UPSTREAM_LEVEL_BY_SIZE = {'n': 'low', 's': 'low', 'm': 'med', 'l': 'high', 'x': 'high'}
+
 
 def category_lookup_from_training(training: Training) -> dict[str, str]:
     return {c.name: c.id for c in training.categories}
@@ -119,6 +123,30 @@ def create_file_structure(training: Training) -> None:
         create_dataset_yaml(training, val_set='val')
         logging.info('Prepared file structure with %d training, %d validation and %d test images',
                      num_train_imgs, num_val_imgs, num_test_imgs)
+
+
+def upstream_hyperparameter_file(model_variant: str) -> Path:
+    """The upstream yolov5 hyperparameter file for the size of `model_variant`, the P6 variants included.
+
+    Upstream pairs its hyperparameter files with the model size: `low` for n and s, `med` for m, `high`
+    for l and x.
+    """
+    size = model_variant.removesuffix('6')
+    if size not in UPSTREAM_LEVEL_BY_SIZE:
+        raise CriticalError(f'No hyperparameters for the model variant "{model_variant}"')
+    return UPSTREAM_HYPERPARAMETERS / f'hyp.scratch-{UPSTREAM_LEVEL_BY_SIZE[size]}.yaml'
+
+
+def create_hyperparameter_file(yaml_path: str, model_variant: str, hyperparameter: dict[str, Any]) -> None:
+    """Write the hyperparameter file `train_det.py` reads: the upstream values for the model size,
+    overridden by `hyp_det.yaml`, overridden by the training's hyperparameters."""
+    with open(upstream_hyperparameter_file(model_variant)) as f:
+        content = yaml.load(f)
+    with open(NODE_HYPERPARAMETERS) as f:
+        content.update(yaml.load(f))
+    with open(yaml_path, 'w') as f:
+        yaml.dump(content, f)
+    set_hyperparameters_in_file(yaml_path, hyperparameter)
 
 
 def set_hyperparameters_in_file(yaml_path: str, hyperparameter: dict[str, Any]) -> None:
