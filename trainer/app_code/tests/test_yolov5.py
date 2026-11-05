@@ -453,7 +453,7 @@ def test_unknown_model_variant_has_no_hyperparameters():
 
 def test_hyperparameter_file_layers_upstream_node_and_training(tmp_path: Path):
     target = tmp_path / 'hyp.yaml'
-    yolov5_format.create_hyperparameter_file(str(target), 'm6', {'fliplr': 0.5, 'mixup': 0.0})
+    yolov5_format.create_hyperparameter_file(str(target), 'm6', {'fliplr': 0.5, 'mixup': 0.0, 'patience': 50})
 
     with open(target) as f:
         content = yaml.load(f)
@@ -463,6 +463,7 @@ def test_hyperparameter_file_layers_upstream_node_and_training(tmp_path: Path):
     assert content['detect_nms_conf_thres'] == 0.2  # hyp_det.yaml
     assert content['fliplr'] == 0.5  # training over hyp_det.yaml
     assert content['mixup'] == 0.0  # training over upstream's 0.1
+    assert content['patience'] == 50  # training over hyp_det.yaml's 300
 
 # =======================================================================================================================
 # ---------------------------------------------- HELPERS ----------------------------------------------------------------

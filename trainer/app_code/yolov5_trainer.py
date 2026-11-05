@@ -315,6 +315,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             hyp = dict(yaml.safe_load(f))  # load hyps dict
 
         self.epochs = int(hyp.get('epochs', self.epochs))
+        self.patience = int(hyp.get('patience', self.patience))
         self.detect_nms_conf_thres = float(hyp.get('detect_nms_conf_thres', self.detect_nms_conf_thres))
         self.detect_nms_iou_thres = float(hyp.get('detect_nms_iou_thres', self.detect_nms_iou_thres))
 
@@ -329,8 +330,9 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
                 self.flip_label_uuid_pairs.append((str(k), str(v)))
 
         hyp_str = ', '.join(f'{k}={v}' for k, v in hyp.items())
-        logging.info('parsed hyperparameters %s: epochs: %d, detect_nms_conf_thres: %f, detect_nms_iou_thres: %f',
-                     hyp_str, self.epochs, self.detect_nms_conf_thres, self.detect_nms_iou_thres)
+        logging.info('parsed hyperparameters %s: epochs: %d, patience: %d, detect_nms_conf_thres: %f, '
+                     'detect_nms_iou_thres: %f',
+                     hyp_str, self.epochs, self.patience, self.detect_nms_conf_thres, self.detect_nms_iou_thres)
         logging.info('point_sizes_by_id: %s', self.point_sizes_by_uuid)
         logging.info('flip_label_pairs: %s', self.flip_label_uuid_pairs)
 

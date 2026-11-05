@@ -7,6 +7,7 @@ fliplr: 0.0 # image flip left-right (probability), off unless the training sets 
 
 #own parameters
 epochs: 2000
+patience: 300 # epochs without improvement before the training stops
 detect_nms_conf_thres: 0.2 # minimum confidence, applied to compute validation scores as well as in detection step
 detect_nms_iou_thres: 0.45 # maximum iou between detections of the same category, applied to compute validation scores as well as in detection step
 
