@@ -1,0 +1,50 @@
+# How node-testing (github.com/zauberzeug/node-testing) tests this node; its README documents the keys.
+name = "yolov5"
+architecture = "yolov5"
+model_variant = "n"
+model_format = "yolov5_pytorch"
+needs_gpu = true
+finish_timeout = 3600
+
+[trainer]
+image = "zauberzeug/yolov5-trainer:{version}"
+build = { dockerfile = "trainer/Dockerfile", context = "trainer" }
+
+# `-cloud`: the release's build for everything but Jetson.
+[[detectors]]
+name = "trt"
+image = "zauberzeug/yolov5-detector:{version}-cloud"
+model_format = "yolov5_wts"
+build = { dockerfile = "detector/Dockerfile", context = "detector" }
+model_timeout = 1800
+# Level 0 instead of the shipped 4, for a fast engine build.
+round_trip_environment = { BUILDER_OPTIMIZATION_LEVEL = "0" }
+
+[[detectors]]
+name = "cpu"
+image = "zauberzeug/yolov5-detector:{version}-cloud-cpu"
+model_format = "yolov5_pytorch"
+build = "detector_cpu"
+
+# The trainer publishes no model before 100 warmup steps, and on a small set an epoch is one step:
+# 150 epochs is the minimum, and lr0 0.01 instead of the node's 0.0032 is what makes them enough.
+# No --quick for the same reason.
+[hyperparameters]
+epochs = 150
+resolution = 320
+lr0 = 0.01
+
+# Real photos of faces and hands, at mixed sizes and aspect ratios.
+[[datasets]]
+name = "testing/facedetection"
+fscore_floor = 0.5
+max_f1_drop = 0.03
+
+[datasets.hyperparameters]
+resolution = 640
+
+# Red and blue triangles: an RGB/BGR swap flips every box. One of the 15 test boxes is worth ~0.07 F1.
+[[datasets]]
+name = "testing/small_set"
+fscore_floor = 0.9
+max_f1_drop = 0.1

@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
-# check=skip=InvalidDefaultArgInFrom
 
-ARG BASE_IMAGE
+# The cloud build; Jetson passes its own.
+ARG BASE_IMAGE=nvcr.io/nvidia/tensorrt:26.05-py3
 FROM ${BASE_IMAGE}
 
 ARG INSTALL_OPENCV=true
