@@ -543,7 +543,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             if best_fitness == fi:
                 # a model that finds nothing on val is kept as best.pt but not reported;
                 # otherwise the loop gets the test counts at val_conf, where the mean F1 peaked on val.
-                save_best(ckpt, w, {'conf_threshold': float(val_conf)} if val_conf is not None else None)
+                model_metadata = {'conf_threshold': float(val_conf)} if val_conf is not None else None
+                save_best(ckpt, w, model_metadata)
                 if val_conf is not None:
                     if test_loader is not val_loader:
                         _, confusion_matrices, _, _, _ = validate.run(data_dict,
@@ -559,7 +560,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                                                       plots=False,
                                                                       callbacks=callbacks,
                                                                       report_conf=val_conf)
-                    report_best(w, epoch, confusion_matrices)
+                    report_best(w, epoch, confusion_matrices, model_metadata)
             if (epoch > 0) and (opt.save_period > 0) and (epoch % opt.save_period == 0):
                 atomic_save(ckpt, w / f'epoch{epoch}.pt')
             atomic_save(ckpt, last)

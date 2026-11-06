@@ -18,11 +18,9 @@ RUN apt-get update && \
     make \
     libjpeg8 \
     zlib1g \
-    ca-certificates
-
-RUN if [ "$INSTALL_OPENCV" = "true" ]; then apt-get install -y --no-install-recommends libopencv-dev; fi
-
-RUN rm -rf /var/lib/apt/lists/* \
+    ca-certificates \
+    $([ "$INSTALL_OPENCV" = "true" ] && echo libopencv-dev) \
+    && rm -rf /var/lib/apt/lists/* \
     && rm -rf /usr/share/doc/* \
     && rm -rf /usr/share/man/* \
     && rm -rf /usr/share/locale/* \

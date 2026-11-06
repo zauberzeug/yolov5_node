@@ -28,12 +28,15 @@ from ..yolov5_trainer import Yolov5TrainerLogic
 logging.basicConfig(level=logging.DEBUG)
 yaml = YAML()
 
+_SUFFIX = os.environ.get('LOOP_TEST_PROJECT_SUFFIX')
+PROJECT = f'pytest_yolo5det_{_SUFFIX}' if _SUFFIX else 'pytest_yolo5det'
+
 project_configuration = {
-    'project_name': 'pytest_yolo5det', 'box_categories': 2, 'point_categories': 2, 'inbox': 4, 'annotate': 0, 'review': 0,
+    'project_name': PROJECT, 'box_categories': 2, 'point_categories': 2, 'inbox': 4, 'annotate': 0, 'review': 0,
     'complete': 14, 'image_style': 'beautiful', 'thumbs': False, 'trainings': 1}
 
 
-@pytest.mark.environment(organization='zauberzeug', project='pytest_yolo5det', mode='DETECTION')
+@pytest.mark.environment(organization='zauberzeug', project=PROJECT, mode='DETECTION')
 @pytest.mark.generate_project(configuration=project_configuration)
 class TestWithLoop:
     """This test environment sets up the environment vars and
@@ -51,7 +54,7 @@ class TestWithLoop:
                             training_folder=project_folder + '/training',
                             images_folder=images_folder,
                             model_variant='',
-                            context=Context(project='pytest_yolo5det', organization='zauberzeug'),
+                            context=Context(project=PROJECT, organization='zauberzeug'),
                             categories=categories, hyperparameters={}, training_number=1,
                             training_state=TrainerState.Initialized.value,
                             image_data=image_data)
@@ -81,7 +84,7 @@ class TestWithLoop:
             training_folder=project_folder + '/training',
             images_folder=images_folder,
             model_variant='',
-            context=Context(project='pytest_yolo5det', organization='zauberzeug'),
+            context=Context(project=PROJECT, organization='zauberzeug'),
             categories=categories, hyperparameters={}, training_number=1,
             training_state=TrainerState.Initialized.value,
             image_data=image_data,
@@ -113,7 +116,7 @@ class TestWithLoop:
             training_folder=project_folder + '/training',
             images_folder=images_folder,
             model_variant='',
-            context=Context(project='pytest_yolo5det', organization='zauberzeug'),
+            context=Context(project=PROJECT, organization='zauberzeug'),
             categories=categories, hyperparameters={}, training_number=1,
             training_state=TrainerState.Initialized.value,
             image_data=image_data,
@@ -145,7 +148,7 @@ class TestWithLoop:
             training_folder=project_folder + '/training',
             images_folder=images_folder,
             model_variant='',
-            context=Context(project='pytest_yolo5det', organization='zauberzeug'),
+            context=Context(project=PROJECT, organization='zauberzeug'),
             categories=categories, hyperparameters=resolve(HYPERPARAMETERS, {'epochs': epochs}), training_number=1,
             training_state=TrainerState.Initialized.value,
             image_data=image_data,
