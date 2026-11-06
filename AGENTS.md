@@ -83,7 +83,7 @@ does not survive a spawn, the node hands the same number to `train_det.py` and `
 **The trainer never trains in-process.** `Yolov5TrainerLogic` (`trainer/app_code/yolov5_trainer.py`)
 implements the library's abstract `TrainerLogic` hooks and shells out through the library's
 `Executor` to `trainer/train_det.py` (and `pred_det.py` for `_detect`). After `train_det.py` has
-ended, `_train` runs `eval_det.py`, the final evaluation of `best.pt` with its plots, so a stopped
+ended, `_train` runs `eval_det.py`, the final evaluation of `best.pt`, so a stopped
 training gets one as well; a stop while it runs is ignored, an abort ends it. Its JSON outputs are among the
 files `_get_training_results` names, which the library uploads beside the model. What a hook has to return is
 therefore recovered *from the subprocess log and from files on disk*, never from a return value:

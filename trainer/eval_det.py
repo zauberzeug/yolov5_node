@@ -1,7 +1,7 @@
-"""The final evaluation of a training's best model, with per-class table and plots.
+"""The final evaluation of a training's best model: the per-class table, the confusion matrix and the curve data.
 
 The node runs it after `train_det.py` has ended, whether the training finished or was stopped, so a stopped
-training gets its plots too. Everything it needs comes from the result folder `train_det.py` wrote:
+training gets its evaluation too. Everything it needs comes from the result folder `train_det.py` wrote:
 `opt.yaml`, `hyp.yaml`, the measured batch size and `weights/best.pt`.
 
 Usage:
@@ -78,7 +78,7 @@ def evaluate(result_dir: Path) -> None:
                  task='test',
                  save_dir=result_dir,
                  verbose=True,
-                 plots=not opt.noplots,
+                 plots=False,
                  report_conf=report_conf)
 
 

@@ -19,6 +19,7 @@ In addition, we support the following hyperparameters:
 - `detect_nms_conf_thres`: The confidence threshold for the NMS during inference and validation (not relevant for training).
 - `detect_nms_iou_thres`: The IoU threshold for the NMS during inference and validation (not used for training).
 - `compute_validation_set`: Whether to split a validation set off the train images to select models on (default `false`). The best model, the early stopping and the confidence threshold are chosen on the validation set, and the counts the Learning Loop shows are read on the test set at that confidence. By default both are the same images, which makes the reported scores optimistic. With `true`, about a tenth of the train images (chosen by image id, so the same images stay out when new ones arrive) becomes the validation set instead, and the test set is only ever reported on. A validation set sent by the Learning Loop is used whatever this parameter says. Must be `true` or `false` (`1`/`0` and `yes`/`no` work too); anything else stops the training. Needs at least two train images; with fewer the training stops. Detectors without their own `CONF_THRESHOLD` filter at the picked confidence.
+- `upload_examples`, `upload_logs`: Whether to upload the example images and the training log with the results (default `false`, see [Training results](#training-results)).
 
 Further, we support the following hyperparameters for point detection:
 
