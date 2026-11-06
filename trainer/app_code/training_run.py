@@ -1,5 +1,4 @@
-"""What `train_det.py` leaves in its result folder for the trainer node, and for its own resume, to read,
-and for people to inspect.
+"""What `train_det.py` leaves in its result folder for the trainer node, its own resume and the training results.
 
 `train_det.py` writes through :func:`report_batch_size`, :func:`report_epoch` and :func:`reporting`; the node
 reads through :class:`TrainingRun`, and so does a resumed `train_det.py` for the batch size the
@@ -43,10 +42,8 @@ def report_batch_size(result_dir: Path, batch_size: int) -> None:
 
 
 def report_epoch(result_dir: Path, epoch: int, metrics: dict[str, float]) -> None:
-    """Add an epoch's losses, metrics and learning rates to the results table.
-
-    A resumed run repeats epochs the interrupted one already reported; their rows, and any later ones, are replaced.
-    """
+    """Add an epoch's losses, metrics and learning rates to the results table, replacing the row of a repeated
+    epoch and any later ones."""
     path = result_dir / RESULTS_FILE
     try:
         with path.open(newline='') as f:
@@ -63,11 +60,9 @@ def report_epoch(result_dir: Path, epoch: int, metrics: dict[str, float]) -> Non
 
 def class_metrics(names: dict[int, str], counts: dict[str, dict[str, int]],
                   aps: dict[str, dict[str, float]]) -> dict[str, float]:
-    """Precision and recall from the tp/fp/fn counts, and AP50 and AP50-95, of every class as columns for
-    :func:`report_epoch`.
+    """Precision, recall, AP50 and AP50-95 of every class in `names`, in order, as columns for :func:`report_epoch`.
 
-    Every class gets all four columns, in the order of `names`, so the header stays the same for every epoch;
-    a value without data to compute it from (no labels, or a zero denominator) is NaN.
+    A value without data to compute it from (no labels, or a zero denominator) is NaN.
     """
     metrics = {}
     for name in names.values():

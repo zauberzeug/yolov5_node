@@ -19,7 +19,7 @@ In addition, we support the following hyperparameters:
 - `detect_nms_conf_thres`: The confidence threshold for the NMS during inference and validation (not relevant for training).
 - `detect_nms_iou_thres`: The IoU threshold for the NMS during inference and validation (not used for training).
 - `compute_validation_set`: Whether to split a validation set off the train images to select models on (default `false`). The best model, the early stopping and the confidence threshold are chosen on the validation set, and the counts the Learning Loop shows are read on the test set at that confidence. By default both are the same images, which makes the reported scores optimistic. With `true`, about a tenth of the train images (chosen by image id, so the same images stay out when new ones arrive) becomes the validation set instead, and the test set is only ever reported on. A validation set sent by the Learning Loop is used whatever this parameter says. Must be `true` or `false` (`1`/`0` and `yes`/`no` work too); anything else stops the training. Needs at least two train images; with fewer the training stops. Detectors without their own `CONF_THRESHOLD` filter at the picked confidence.
-- `upload_examples`, `upload_logs`: Whether to upload the example images and the training log with the results (default `false`, see [Training results](#training-results)).
+- `upload_examples`, `upload_logs`: Also upload the example images or the training log with the [training results](#training-results) (default `false`).
 
 Further, we support the following hyperparameters for point detection:
 
@@ -85,8 +85,8 @@ Set `TRAINING_SLOT_DIR` in `.env` to use another directory, or to the empty stri
 
 ## Training results
 
-Together with each model, the trainer uploads the results of its training to the Learning Loop (see the node library's README): from `result/` the files `results.csv`, `opt.yaml` and `hyp.yaml`, and `confusion_matrix_test.json` and `curves_test.json` to draw the plots again, plus the training's `hyp.yaml` and `dataset.yaml` — never the dataset, the weights or the plots.
-`result/examples/` is uploaded only with the hyperparameter `upload_examples: true`, `last_training.log` only with `upload_logs: true`.
+With each model, the trainer uploads the results of its training to the Learning Loop (see the node library's README): `results.csv`, `batch_size.json`, `opt.yaml`, `hyp.yaml`, `confusion_matrix_test.json` and `curves_test.json` from `result/`, and the training's `hyp.yaml` and `dataset.yaml`.
+With `upload_examples: true` also `result/examples/`, with `upload_logs: true` also `last_training.log`.
 
 # Detector Node
 

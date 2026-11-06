@@ -215,7 +215,7 @@ class ConfusionMatrix:
                     self.matrix[dc, self.nc] += 1  # predicted background
 
     def save(self, save_dir='', names=(), task='val'):
-        # PATCH (yolov5-node): keep the raw counts with what they mean, to be evaluated later
+        # PATCH (yolov5-node): the raw counts and what they mean, as JSON
         names = list(names) if len(names) == self.nc else [str(i) for i in range(self.nc)]
         content = {
             'set': task,

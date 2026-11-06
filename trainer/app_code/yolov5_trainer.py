@@ -198,13 +198,10 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         return await asyncio.get_event_loop().run_in_executor(None, self._parse, labels_path, images_folder, model_information)
 
     def _get_training_results(self, training_folder: Path) -> dict[str, list[Path]]:
-        """`core`: the results table, the options and hyperparameters `train_det.py` ran with, the confusion matrix
-        and curve data of the test set, and the node's `hyp.yaml` and `dataset.yaml`. `examples`: the example
-        images. `logs`: the training log.
-        """
+        """Never the dataset, the weights or the plots."""
         result = training_folder / 'result'
-        core = [result / name for name in
-                (training_run.RESULTS_FILE, 'opt.yaml', 'hyp.yaml', 'confusion_matrix_test.json', 'curves_test.json')]
+        core = [result / name for name in (training_run.RESULTS_FILE, training_run.BATCH_SIZE_FILE, 'opt.yaml',
+                                           'hyp.yaml', 'confusion_matrix_test.json', 'curves_test.json')]
         return {'core': [*core, training_folder / 'hyp.yaml', training_folder / 'dataset.yaml'],
                 'examples': [result / 'examples'],
                 'logs': [training_folder / 'last_training.log']}
@@ -212,7 +209,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     async def _clear_training_data(self, training_folder: str) -> None:
         keep_files = ['hyp.yaml', 'dataset.yaml', 'best.pt']
         keep_dirs = ['result', 'weights', 'examples']
-        # keep the training logs (results.csv, plots, batch and example images); only drop dataset and extra weights
+        # keep result/ and its examples; drop only the dataset and the extra weights
         result_path = Path(training_folder, 'result').resolve()
         keep_log_dirs = [result_path, result_path / 'examples']
         for root, dirs, files in os.walk(training_folder, topdown=False):
@@ -245,12 +242,12 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         return super()._get_executor_error_from_log()
 
     async def _train(self) -> None:
-        """Train, then evaluate the best model, also when the training was stopped. An abort cancels both."""
+        """Train, then evaluate the best model, also after a stop."""
         await super()._train()
         await self._final_evaluation()
 
     async def stop(self) -> None:
-        """Let the final evaluation finish like the upload after it: a stop keeps the model and its evaluation."""
+        """Ignore a stop during the final evaluation, which the library would turn into an abort."""
         if self._evaluating and not self.shutdown_event.is_set():
             logging.info('Stop during the final evaluation: letting it finish')
             return
@@ -259,7 +256,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     # ---------------------------------------- ADDITIONAL METHODS ----------------------------------------
 
     async def _final_evaluation(self) -> None:
-        """Run `eval_det.py` on the best model. A failure is logged, never raised: it must not restart the training."""
+        """Run `eval_det.py` on the best model; a failure is logged, not raised."""
         executor = Executor(self.training.training_folder)  # appends to the training's log
         self._evaluating = True
         try:

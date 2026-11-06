@@ -1,8 +1,6 @@
-"""The final evaluation of a training's best model: the per-class table, the confusion matrix and the curve data.
+"""The final evaluation of a training's best model on the test set: per-class table, confusion matrix, curve data.
 
-The node runs it after `train_det.py` has ended, whether the training finished or was stopped, so a stopped
-training gets its evaluation too. Everything it needs comes from the result folder `train_det.py` wrote:
-`opt.yaml`, `hyp.yaml`, the measured batch size and `weights/best.pt`.
+Reads `opt.yaml`, `hyp.yaml`, the measured batch size and `weights/best.pt` from the result folder of `train_det.py`.
 
 Usage:
     $ python eval_det.py --result-dir <training folder>/result
@@ -34,7 +32,7 @@ ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 def evaluate(result_dir: Path) -> None:
     best = result_dir / 'weights' / 'best.pt'
     if not best.exists():
-        LOGGER.info(f'No {best} to evaluate')
+        LOGGER.info('No %s to evaluate', best)
         return
     opt = argparse.Namespace(**yaml.safe_load((result_dir / 'opt.yaml').read_text()))
     hyp = yaml.safe_load((result_dir / 'hyp.yaml').read_text())
@@ -43,7 +41,6 @@ def evaluate(result_dir: Path) -> None:
                          for item in str(opt.point_sizes_by_id).split(','))} if opt.point_sizes_by_id else {}
 
     data_dict = check_dataset(opt.data)
-    # the final evaluation reports on the test set at the confidence picked for the best model;
     # the test set may be the validation folder
     val_path, test_path = data_dict['val'], data_dict['test']
     model_metadata = torch.load(best, map_location='cpu', weights_only=False).get('model_metadata', {})
@@ -66,7 +63,7 @@ def evaluate(result_dir: Path) -> None:
                                    prefix=colorstr('test: '),
                                    point_sizes_by_id=point_sizes_by_id)[0]
 
-    LOGGER.info(f"\n{'Validating' if test_path == val_path else 'Testing'} {best}...")
+    LOGGER.info('\n%s %s...', 'Validating' if test_path == val_path else 'Testing', best)
     validate.run(data_dict,
                  batch_size=batch_size // 2,
                  imgsz=imgsz,

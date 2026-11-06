@@ -82,10 +82,9 @@ does not survive a spawn, the node hands the same number to `train_det.py` and `
 
 **The trainer never trains in-process.** `Yolov5TrainerLogic` (`trainer/app_code/yolov5_trainer.py`)
 implements the library's abstract `TrainerLogic` hooks and shells out through the library's
-`Executor` to `trainer/train_det.py` (and `pred_det.py` for `_detect`). After `train_det.py` has
-ended, `_train` runs `eval_det.py`, the final evaluation of `best.pt`, so a stopped
-training gets one as well; a stop while it runs is ignored, an abort ends it. Its JSON outputs are among the
-files `_get_training_results` names, which the library uploads beside the model. What a hook has to return is
+`Executor` to `trainer/train_det.py` (and `pred_det.py` for `_detect`). `_train` then runs
+`eval_det.py`, the final evaluation of `best.pt`, after a stop too; a stop during it is ignored,
+because the library would turn it into an abort. What a hook has to return is
 therefore recovered *from the subprocess log and from files on disk*, never from a return value:
 `_get_progress_from_log` scrapes the `epoch/total` column, `_get_executor_error_from_log` greps for
 CUDA messages, `_get_new_best_training_state` picks up the newest weight file through
@@ -160,7 +159,7 @@ cd trainer && uv run --no-sync ruff check .
   `grep -rn "PATCH (yolov5-node)"` lists every deviation. Only `detector/tensorrtx` follows this
   today; `trainer/app_code/yolov5` carries older unmarked deviations (the point-detection support in
   `utils/dataloaders.py`), so do not read a clean grep there as "unmodified". `trainer/train_det.py`,
-  `trainer/eval_det.py` and `trainer/pred_det.py` are not vendored: they started as upstream's `train.py` and `detect.py`
-  but are our own entry scripts now, so changes there carry no marker.
+  `trainer/eval_det.py` and `trainer/pred_det.py` are not vendored: they started as upstream's
+  `train.py` and `detect.py` but are our own entry scripts now, so changes there carry no marker.
 - Each sub-project pins its own `learning_loop_node` version; the image tag `A.B.C-nlvX.Y.Z`
   encodes the node version and the library version it was built against.
