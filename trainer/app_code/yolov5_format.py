@@ -7,12 +7,26 @@ from typing import Any
 from learning_loop_node.data_classes import Training
 from learning_loop_node.trainer.exceptions import CriticalError
 from ruamel.yaml import YAML
-from ruamel.yaml.scalarbool import ScalarBoolean
-from ruamel.yaml.scalarfloat import ScalarFloat
-from ruamel.yaml.scalarint import ScalarInt
-from ruamel.yaml.scalarstring import LiteralScalarString
+from ruamel.yaml.representer import RoundTripRepresenter
+
+
+class _Representer(RoundTripRepresenter):
+    """Writes floats the way PyYAML does, since ``train_det.py`` reads the hyp.yaml with it.
+
+    PyYAML follows YAML 1.1, which reads ``5e-05`` as a string and only ``5.0e-05`` as a number.
+    """
+
+    def represent_float(self, data: float) -> Any:
+        text = repr(data).lower()
+        if '.' not in text and 'e' in text:
+            text = text.replace('e', '.0e', 1)
+        return self.represent_scalar('tag:yaml.org,2002:float', text)
+
+
+_Representer.add_representer(float, _Representer.represent_float)
 
 yaml = YAML()
+yaml.Representer = _Representer
 
 
 def category_lookup_from_training(training: Training) -> dict[str, str]:
@@ -121,24 +135,25 @@ def create_file_structure(training: Training) -> None:
                      num_train_imgs, num_val_imgs, num_test_imgs)
 
 
+FLIP_PROBABILITY = 0.5
+"""How often a flip is applied when it is on: half of the images, so flipped and original views are equally likely."""
+
+
 def set_hyperparameters_in_file(yaml_path: str, hyperparameter: dict[str, Any]) -> None:
-    """Override the hyperparameters in the yaml file used by the yolov5 trainer with the ones from the hyperparameter dict (coming from the loop configuration).
-    The yaml file is modified in place."""
+    """Override the hyperparameters in the yaml file used by the yolov5 trainer with the training's resolved ones.
+    The yaml file is modified in place.
+
+    Every key of the template is declared with the template's type, so the resolved values need no conversion.
+    """
 
     with open(yaml_path) as f:
         content = yaml.load(f)
 
-    if 'flip_rl' in hyperparameter:
-        hyperparameter['fliplr'] = 0.5 if hyperparameter['flip_rl'] else 0.0
-    if 'flip_lr' in hyperparameter:
-        hyperparameter['fliplr'] = 0.5 if hyperparameter['flip_lr'] else 0.0
-    if 'flip_ud' in hyperparameter:
-        hyperparameter['flipud'] = 0.5 if hyperparameter['flip_ud'] else 0.0
-
     for param in content:
-        if (hp_value := hyperparameter.get(param)) is not None:
-            yaml_value = content[param]
-            content[param] = convert_type(hp_value, yaml_value)
+        if param in hyperparameter:
+            content[param] = hyperparameter[param]
+    for flip in ('fliplr', 'flipud'):  # the training keeps the declared on or off, the yaml gets a probability
+        content[flip] = FLIP_PROBABILITY if content[flip] else 0.0
 
     logging.info('Hyps after update: %s', content)
 
@@ -148,17 +163,3 @@ def set_hyperparameters_in_file(yaml_path: str, hyperparameter: dict[str, Any]) 
     except Exception as e:
         logging.error('Error writing to %s: %s', yaml_path, e)
         raise CriticalError(f'Error writing to {yaml_path}') from None
-
-
-def convert_type(value, reference: Any):
-
-    if isinstance(reference, (LiteralScalarString, str)):
-        return str(value)
-    if isinstance(reference, (ScalarFloat, float)):
-        return float(value)
-    if isinstance(reference, (ScalarInt, int)):
-        return int(value)
-    if isinstance(reference, (ScalarBoolean, bool)):
-        return bool(value)
-
-    raise CriticalError(f'Unknown type: {type(reference)}')
