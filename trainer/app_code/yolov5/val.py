@@ -38,7 +38,7 @@ from .utils.general import (LOGGER, TQDM_BAR_FORMAT, Profile, check_dataset,
                             non_max_suppression, print_args, scale_boxes,
                             xywh2xyxy, xyxy2xywh)
 from .utils.metrics import ConfusionMatrix, ap_per_class, box_iou
-from .utils.plots import output_to_target, plot_images, plot_val_study
+from .utils.plots import plot_val_study
 from .utils.torch_utils import select_device, smart_inference_mode
 
 FILE = Path(__file__).resolve()
@@ -186,7 +186,9 @@ def run(
                                        prefix=colorstr(f'{task}: '))[0]
 
     seen = 0
-    confusion_matrix = ConfusionMatrix(nc=nc)
+    # PATCH (yolov5-node): count at the confidence the per-class counts are reported at, and at IoU 0.5 like them
+    confusion_matrix = ConfusionMatrix(nc=nc, conf=0.25 if report_conf is None else report_conf, iou_thres=0.5)
+    keep = task == 'test'  # PATCH (yolov5-node): count and save the confusion matrix and curve data on the test set only
     names = model.names if hasattr(model, 'names') else model.module.names  # get class names
     if isinstance(names, (list, tuple)):  # old format
         names = dict(enumerate(names))
@@ -240,7 +242,7 @@ def run(
             if npr == 0:
                 if nl:
                     stats.append((correct, *torch.zeros((2, 0), device=device), labels[:, 0]))
-                    if plots:
+                    if keep:
                         confusion_matrix.process_batch(detections=None, labels=labels[:, 0])
                 continue
 
@@ -256,7 +258,7 @@ def run(
                 scale_boxes(im[si].shape[1:], tbox, shape, shapes[si][1])  # native-space labels
                 labelsn = torch.cat((labels[:, 0:1], tbox), 1)  # native-space labels
                 correct = process_batch(predn, labelsn, iouv)
-                if plots:
+                if keep:
                     confusion_matrix.process_batch(predn, labelsn)
             stats.append((correct, pred[:, 4], pred[:, 5], labels[:, 0]))  # (correct, conf, pcls, tcls)
 
@@ -267,18 +269,17 @@ def run(
                 save_one_json(predn, jdict, path, class_map)  # append to COCO-JSON dictionary
             callbacks.run('on_val_image_end', pred, predn, path, names, im[si])
 
-        # Plot images
-        if plots and batch_i < 3:
-            plot_images(im, targets, paths, save_dir / f'val_batch{batch_i}_labels.jpg', names)  # labels
-            plot_images(im, output_to_target(preds), paths, save_dir / f'val_batch{batch_i}_pred.jpg', names)  # pred
+        # PATCH (yolov5-node): no val_batch*_labels/pred.jpg images; the node has its own way to look at examples
 
         callbacks.run('on_val_batch_end', batch_i, im, targets, paths, shapes, preds)
 
     # Compute metrics
     stats = [torch.cat(x, 0).cpu().numpy() for x in zip(*stats)]  # to numpy
     if len(stats) and stats[0].any():
+        # PATCH (yolov5-node): plots and curve data named after the set
         tp, fp, p, r, f1, ap, ap_class, reported_conf = ap_per_class(*stats, plot=plots, save_dir=save_dir, names=names,
-                                                                     report_conf=report_conf)
+                                                                     prefix=f'{task}_', report_conf=report_conf,
+                                                                     task=task if keep else None)
         ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
         mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
     nt = np.bincount(stats[3].astype(int), minlength=nc)  # number of targets per class
@@ -298,6 +299,8 @@ def run(
     for i, c in enumerate(ap_class):
         fn = tp[i] / r[i] - tp[i] if r[i] != 0 else 0
         confusion_matrices[names[c]] = {'tp': int(tp[i]), 'fp': int(fp[i]), 'fn': int(fn)}
+    # PATCH (yolov5-node): AP per class (only classes with labels), returned for the node's results table
+    class_aps = {names[c]: {'ap50': float(ap50[i]), 'ap50_95': float(ap[i])} for i, c in enumerate(ap_class)}
 
     # Print speeds
     t = tuple(x.t / seen * 1E3 for x in dt)  # speeds per image
@@ -306,8 +309,11 @@ def run(
         LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {shape}' % t)
 
     # Plots
+    if keep:
+        confusion_matrix.save(save_dir=save_dir, names=list(names.values()), task=task)  # PATCH (yolov5-node): raw counts
     if plots:
-        confusion_matrix.plot(save_dir=save_dir, names=list(names.values()))
+        if keep:
+            confusion_matrix.plot(save_dir=save_dir, names=list(names.values()), task=task)
         callbacks.run('on_val_end', nt, tp, fp, p, r, f1, ap, ap50, ap_class, confusion_matrix)
 
     # Save JSON
@@ -344,7 +350,8 @@ def run(
     maps = np.zeros(nc) + map
     for i, c in enumerate(ap_class):
         maps[c] = ap[i]
-    return (mp, mr, map50, map, *(loss.cpu() / len(dataloader)).tolist()), confusion_matrices, maps, t, reported_conf
+    return (mp, mr, map50, map, *(loss.cpu() / len(dataloader)).tolist()), confusion_matrices, maps, t, reported_conf, \
+        class_aps
 
 
 def parse_opt():
@@ -405,7 +412,7 @@ def main(opt):
                 x, y = list(range(256, 1536 + 128, 128)), []  # x axis (image sizes), y axis
                 for opt.imgsz in x:  # img-size
                     LOGGER.info(f'\nRunning {f} --imgsz {opt.imgsz}...')
-                    r, _, _, t, _ = run(**vars(opt), plots=False)
+                    r, _, _, t, _, _ = run(**vars(opt), plots=False)
                     y.append(r + t)  # results and times
                 np.savetxt(f, y, fmt='%10.4g')  # save
             os.system('zip -r study.zip study_*.txt')
