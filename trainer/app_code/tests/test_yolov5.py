@@ -14,6 +14,7 @@ from learning_loop_node.enums import TrainerState
 from learning_loop_node.helpers.misc import create_image_folder
 from learning_loop_node.loop_communication import LoopCommunicator
 from learning_loop_node.trainer.downloader import TrainingsDownloader
+from learning_loop_node.trainer.exceptions import CriticalError
 from learning_loop_node.trainer.executor import Executor
 from ruamel.yaml import YAML
 
@@ -437,6 +438,32 @@ def test_update_hyperparameter():
     assert_yaml_content('/tmp/hyp.yaml', fliplr=0.0, flipud=0.0)
     set_hyperparameters_in_file('/tmp/hyp.yaml', hyperparameter)
     assert_yaml_content('/tmp/hyp.yaml', fliplr=0.5, flipud=0.5)
+
+
+@pytest.mark.parametrize('variant, level', [('n', 'low'), ('s', 'low'), ('s6', 'low'), ('m', 'med'), ('m6', 'med'),
+                                            ('l', 'high'), ('x6', 'high')])
+def test_upstream_hyperparameters_follow_the_model_size(variant: str, level: str):
+    assert yolov5_format.upstream_hyperparameter_file(variant).name == f'hyp.scratch-{level}.yaml'
+
+
+def test_unknown_model_variant_has_no_hyperparameters():
+    with pytest.raises(CriticalError):
+        yolov5_format.upstream_hyperparameter_file('xl')
+
+
+def test_hyperparameter_file_layers_upstream_node_and_training(tmp_path: Path):
+    target = tmp_path / 'hyp.yaml'
+    yolov5_format.create_hyperparameter_file(str(target), 'm6', {'fliplr': 0.5, 'mixup': 0.0, 'patience': 50})
+
+    with open(target) as f:
+        content = yaml.load(f)
+    assert content['lr0'] == 0.01  # upstream
+    assert content['scale'] == 0.9  # upstream, med for m
+    assert content['flipud'] == 0.0  # hyp_det.yaml over upstream's 0.5
+    assert content['detect_nms_conf_thres'] == 0.2  # hyp_det.yaml
+    assert content['fliplr'] == 0.5  # training over hyp_det.yaml
+    assert content['mixup'] == 0.0  # training over upstream's 0.1
+    assert content['patience'] == 50  # training over hyp_det.yaml's 300
 
 # =======================================================================================================================
 # ---------------------------------------------- HELPERS ----------------------------------------------------------------

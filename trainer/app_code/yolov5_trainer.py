@@ -233,10 +233,8 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         yolov5_format.create_file_structure(self.training)
         additional_params = ' --clear'
 
-        base_hyp_path = Path(__file__).resolve().parents[1] / ('hyp_det.yaml')
-        assert (base_hyp_path).exists(), f'Hyperparameter file not found at "{base_hyp_path}"'
-        shutil.copy(base_hyp_path, self.hyperparameter_path)
-        yolov5_format.set_hyperparameters_in_file(self.hyperparameter_path, self.hyperparameters)
+        yolov5_format.create_hyperparameter_file(self.hyperparameter_path, self.training.model_variant,
+                                                 self.hyperparameters)
 
         await self._start(model, additional_params)
 
@@ -317,6 +315,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             hyp = dict(yaml.safe_load(f))  # load hyps dict
 
         self.epochs = int(hyp.get('epochs', self.epochs))
+        self.patience = int(hyp.get('patience', self.patience))
         self.detect_nms_conf_thres = float(hyp.get('detect_nms_conf_thres', self.detect_nms_conf_thres))
         self.detect_nms_iou_thres = float(hyp.get('detect_nms_iou_thres', self.detect_nms_iou_thres))
 
@@ -331,8 +330,9 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
                 self.flip_label_uuid_pairs.append((str(k), str(v)))
 
         hyp_str = ', '.join(f'{k}={v}' for k, v in hyp.items())
-        logging.info('parsed hyperparameters %s: epochs: %d, detect_nms_conf_thres: %f, detect_nms_iou_thres: %f',
-                     hyp_str, self.epochs, self.detect_nms_conf_thres, self.detect_nms_iou_thres)
+        logging.info('parsed hyperparameters %s: epochs: %d, patience: %d, detect_nms_conf_thres: %f, '
+                     'detect_nms_iou_thres: %f',
+                     hyp_str, self.epochs, self.patience, self.detect_nms_conf_thres, self.detect_nms_iou_thres)
         logging.info('point_sizes_by_id: %s', self.point_sizes_by_uuid)
         logging.info('flip_label_pairs: %s', self.flip_label_uuid_pairs)
 
