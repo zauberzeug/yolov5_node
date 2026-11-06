@@ -84,7 +84,7 @@ Set `TRAINING_SLOT_DIR` in `.env` to use another directory, or to the empty stri
 
 ## Training results
 
-Together with each model, the trainer uploads the results of its training to the Learning Loop (see the node library's README): everything in `result/` but the weights and the `.png` plots (`results.csv`, `opt.yaml`, `hyp.yaml`, and `confusion_matrix_test.json` and `curves_test.json` to draw the plots again), `hyp.yaml` and `dataset.yaml` — never the dataset.
+Together with each model, the trainer uploads the results of its training to the Learning Loop (see the node library's README): from `result/` the files `results.csv`, `opt.yaml` and `hyp.yaml`, and `confusion_matrix_test.json` and `curves_test.json` to draw the plots again, plus the training's `hyp.yaml` and `dataset.yaml` — never the dataset, the weights or the plots.
 `result/examples/` is uploaded only with the hyperparameter `upload_examples: true`, `last_training.log` only with `upload_logs: true`.
 
 # Detector Node

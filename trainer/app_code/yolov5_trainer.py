@@ -198,10 +198,13 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         return await asyncio.get_event_loop().run_in_executor(None, self._parse, labels_path, images_folder, model_information)
 
     def _get_training_results(self, training_folder: Path) -> dict[str, list[Path]]:
-        # core: results.csv, opt.yaml, hyp.yaml, the confusion matrix and curve data; never the dataset or weights,
-        # and no plots (.png), which can be drawn again from the data
+        """`core`: the results table, the options and hyperparameters `train_det.py` ran with, the confusion matrix
+        and curve data of the test set, and the node's `hyp.yaml` and `dataset.yaml`. `examples`: the example
+        images. `logs`: the training log.
+        """
         result = training_folder / 'result'
-        core = [f for f in result.glob('*') if f.is_file() and f.suffix not in ('.pt', '.png')] if result.is_dir() else []
+        core = [result / name for name in
+                (training_run.RESULTS_FILE, 'opt.yaml', 'hyp.yaml', 'confusion_matrix_test.json', 'curves_test.json')]
         return {'core': [*core, training_folder / 'hyp.yaml', training_folder / 'dataset.yaml'],
                 'examples': [result / 'examples'],
                 'logs': [training_folder / 'last_training.log']}
