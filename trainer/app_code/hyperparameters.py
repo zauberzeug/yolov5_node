@@ -1,8 +1,7 @@
 """The hyperparameters this trainer accepts, as reported to the loop.
 
-YOLOv5's own hyperparameters take upstream's defaults for the model size (see
-``yolov5_format.create_hyperparameter_file``); those that differ between the sizes are declared without a default,
-the trainer fills them in when a training starts. The node's own ones take theirs from ``hyp_det.yaml``. The ones the
+YOLOv5's own hyperparameters take upstream's defaults for the model variant (see
+``yolov5_format.create_hyperparameter_file``), the node's own ones take theirs from ``hyp_det.yaml``. The ones the
 trainer reads itself are the standard ones, the rest are expert hyperparameters. The loop sends only what a project
 sets, and the declared defaults fill in the rest before a training starts.
 """
@@ -24,11 +23,9 @@ def _load(path: Path) -> dict[str, Any]:
 
 
 _TEMPLATE = _load(NODE_HYPERPARAMETERS)
-_UPSTREAM_BY_SIZE = {size: _load(upstream_hyperparameter_file(size)) for size in UPSTREAM_LEVEL_BY_SIZE}
-
-SIZE_DEPENDENT = [name for name in _UPSTREAM_BY_SIZE['s']
-                  if len({str(values[name]) for values in _UPSTREAM_BY_SIZE.values()}) > 1]
-"""YOLOv5's hyperparameters whose upstream default differs between the model sizes."""
+MODEL_VARIANTS = [size + p6 for p6 in ('', '6') for size in UPSTREAM_LEVEL_BY_SIZE]
+"""The names of ``provided_pretrained_models``."""
+_UPSTREAM_BY_VARIANT = {variant: _load(upstream_hyperparameter_file(variant)) for variant in MODEL_VARIANTS}
 
 _TYPES = {bool: 'bool', int: 'int', float: 'float', str: 'str'}
 
@@ -36,36 +33,13 @@ DEFAULT_POINT_SIZE = 0.03
 """The point size, as a fraction of the image, of a point category ``point_sizes_by_id`` does not name."""
 
 
-def size_dependent_values(model_variant: str) -> dict[str, Any]:
-    """The upstream values of the ``SIZE_DEPENDENT`` hyperparameters for the size of ``model_variant``.
-
-    :raises CriticalError: If the model variant has no upstream hyperparameters.
-    """
-    upstream = _load(upstream_hyperparameter_file(model_variant))
-    return {name: upstream[name] for name in SIZE_DEPENDENT}
-
-
 def _native(name: str, *, notes: str, minimum: float | None = None, maximum: float | None = None,
             expert: bool = True) -> Hyperparameter:
-    """One of YOLOv5's own hyperparameters with upstream's default, or none where that depends on the model size."""
-    by_size = {size: values[name] for size, values in _UPSTREAM_BY_SIZE.items()}
-    value = by_size['s']
-    if name in SIZE_DEPENDENT:
-        notes = f'{notes}; default {_by_size_text(by_size)}'
-    return Hyperparameter(name=name, type=_TYPES[type(value)], default=None if name in SIZE_DEPENDENT else value,
-                          minimum=minimum, maximum=maximum, notes=notes, expert=expert)
-
-
-def _by_size_text(by_size: dict[str, Any]) -> str:
-    """E.g. ``0.5 for n and s, 0.9 for m, l and x``."""
-    sizes_by_value: dict[str, list[str]] = {}
-    for size, value in by_size.items():
-        sizes_by_value.setdefault(str(value), []).append(size)
-    return ', '.join(f'{value} for {_and(sizes)}' for value, sizes in sizes_by_value.items())
-
-
-def _and(items: list[str]) -> str:
-    return items[0] if len(items) == 1 else f'{", ".join(items[:-1])} and {items[-1]}'
+    """One of YOLOv5's own hyperparameters with upstream's default for each model variant."""
+    default = _UPSTREAM_BY_VARIANT['s'][name]
+    by_variant = {variant: values[name] for variant, values in _UPSTREAM_BY_VARIANT.items() if values[name] != default}
+    return Hyperparameter(name=name, type=_TYPES[type(default)], default=default, minimum=minimum, maximum=maximum,
+                          notes=notes, expert=expert, default_by_variant=by_variant or None)
 
 
 def _from_template(name: str, *, notes: str, minimum: float | None = None, maximum: float | None = None,
