@@ -10,11 +10,15 @@ Trainer is tested with Nvidia Driver Version: 580.95.05 and CUDA Version: 13.0. 
 
 ## Hyperparameters
 
-We support all native hyperparameters of YOLOv5 (cf. `hyp_det.yaml` for reference).
+We support all native hyperparameters of YOLOv5. Their defaults are upstream's for the model size: `hyp.scratch-low.yaml` for n and s, `hyp.scratch-med.yaml` for m and `hyp.scratch-high.yaml` for l and x, the P6 variants (`n6` … `x6`) included (cf. `trainer/app_code/yolov5/data/hyps/`). The flips `fliplr` and `flipud` stay off unless a training sets them (cf. `trainer/hyp_det.yaml`).
+The trainer declares every hyperparameter it accepts in [`hyperparameters.py`](trainer/app_code/hyperparameters.py) — type, default, range and a short note — and reports that declaration to the Learning Loop; a hyperparameter the loop does not send takes its default. The six native ones whose upstream default differs between the sizes (`lrf`, `cls`, `obj`, `scale`, `mixup` and `copy_paste`) are declared without a default, their note lists the value per size, and the trainer fills them in when a training starts.
+Standard hyperparameters: `resolution`, `epochs`, `patience`, `max_batch_size`, `lr0`, `fliplr`, `flipud`, `flip_label_pairs` and `compute_validation_set`. All others, the native YOLOv5 ones included, are expert hyperparameters.
 In addition, we support the following hyperparameters:
 
-- `resolution`: The input size of the model. It must be a multiple of the model's largest stride (32, or 64 for the P6 `*6` variants) and at least twice that; otherwise the training fails before its first epoch.
+- `resolution`: The input size of the model, `832` by default. It must be a multiple of the model's largest stride (32, or 64 for the P6 `*6` variants) and at least twice that; otherwise the training fails before its first epoch.
 - `epochs`: The number of epochs to train the model.
+- `fliplr` and `flipud`: Flip half of the images horizontally or vertically. They are on or off rather than a probability.
+- `patience`: The number of epochs without improvement after which the training stops early, `300` by default. `0` disables early stopping.
 - `max_batch_size`: The largest batch size the training may use. It is measured rather than trusted: if it fits it is used as given, and if it does not, the largest power of two below it that does is used instead. `0` (the default) means 128. The training set bounds it as well: by an eighth of the training images, but never below 64. A training of fewer than 1 024 images therefore uses at most 64, and a `max_batch_size` above that bound is not tried as given. The training never uses fewer than 2 samples per batch, because validation halves the batch, so a `max_batch_size` of 1 is raised to 2. The value that was actually used is reported back as `batch_size` (see below).
 - `detect_nms_conf_thres`: The confidence threshold for the NMS during inference and validation (not relevant for training).
 - `detect_nms_iou_thres`: The IoU threshold for the NMS during inference and validation (not used for training).
@@ -30,6 +34,7 @@ Further, we support the following hyperparameters for point detection:
 The trainer reports these hyperparameters back to the Learning Loop:
 
 - `batch_size`: The batch size the training actually ran with, which is at most `max_batch_size` when that is set (but never below 2). Output only; never read as input, so a training resumed after a restart of the node measures again instead of taking its first run's result as its bound.
+- `lrf`, `cls`, `obj`, `scale`, `mixup` and `copy_paste`, unless the training sets them: the values the model size gave them, so the model shows what it was trained with. A training that restarts without a checkpoint to resume from reads them back, which gives the same values for the same model size.
 - `trainer_version`: The version of the trainer node, which the release build bakes into the docker image as `NODE_VERSION`. Locally built images report `unknown`. Output only; never read as input.
 
 ## Images
