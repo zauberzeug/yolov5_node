@@ -28,7 +28,7 @@ from learning_loop_node.trainer.executor import Executor
 from learning_loop_node.trainer.hyperparameters import parse_pairs
 
 from . import batch_size_calculation, model_files, training_run, yolov5_format
-from .hyperparameters import DEFAULT_POINT_SIZE, HYPERPARAMETERS, TEMPLATE_PATH
+from .hyperparameters import DEFAULT_POINT_SIZE, HYPERPARAMETERS, size_dependent_values
 
 
 class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
@@ -228,8 +228,10 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         yolov5_format.create_file_structure(self.training)
         additional_params = ' --clear'
 
-        shutil.copy(TEMPLATE_PATH, self.hyperparameter_path)
-        yolov5_format.set_hyperparameters_in_file(self.hyperparameter_path, self.hyperparameters)
+        for name, value in size_dependent_values(self.training.model_variant).items():
+            self.hyperparameters.setdefault(name, value)  # reported with the training, so the model shows them
+        yolov5_format.create_hyperparameter_file(self.hyperparameter_path, self.training.model_variant,
+                                                 self.hyperparameters)
 
         await self._start(model, additional_params)
 

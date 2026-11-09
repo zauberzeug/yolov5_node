@@ -10,8 +10,8 @@ Trainer is tested with Nvidia Driver Version: 580.95.05 and CUDA Version: 13.0. 
 
 ## Hyperparameters
 
-We support all native hyperparameters of YOLOv5 (cf. `hyp_det.yaml` for reference).
-The trainer declares every hyperparameter it accepts in [`hyperparameters.py`](trainer/app_code/hyperparameters.py) — type, default, range and a short note — and reports that declaration to the Learning Loop; a hyperparameter the loop does not send takes its default, which for the native ones comes from `hyp_det.yaml`.
+We support all native hyperparameters of YOLOv5. Their defaults are upstream's for the model size: `hyp.scratch-low.yaml` for n and s, `hyp.scratch-med.yaml` for m and `hyp.scratch-high.yaml` for l and x, the P6 variants (`n6` … `x6`) included (cf. `trainer/app_code/yolov5/data/hyps/`). The flips `fliplr` and `flipud` stay off unless a training sets them (cf. `trainer/hyp_det.yaml`).
+The trainer declares every hyperparameter it accepts in [`hyperparameters.py`](trainer/app_code/hyperparameters.py) — type, default, range and a short note — and reports that declaration to the Learning Loop; a hyperparameter the loop does not send takes its default. The six native ones whose upstream default differs between the sizes (`lrf`, `cls`, `obj`, `scale`, `mixup` and `copy_paste`) are declared without a default, their note lists the value per size, and the trainer fills them in when a training starts.
 Standard hyperparameters: `resolution`, `epochs`, `patience`, `max_batch_size`, `lr0`, `fliplr`, `flipud`, `flip_label_pairs` and `compute_validation_set`. All others, the native YOLOv5 ones included, are expert hyperparameters.
 In addition, we support the following hyperparameters:
 
@@ -33,6 +33,7 @@ Further, we support the following hyperparameters for point detection:
 The trainer reports these hyperparameters back to the Learning Loop:
 
 - `batch_size`: The batch size the training actually ran with, which is at most `max_batch_size` when that is set (but never below 2). Output only; never read as input, so a training resumed after a restart of the node measures again instead of taking its first run's result as its bound.
+- `lrf`, `cls`, `obj`, `scale`, `mixup` and `copy_paste`, unless the training sets them: the values the model size gave them, so the model shows what it was trained with. A training that restarts without a checkpoint to resume from reads them back, which gives the same values for the same model size.
 - `trainer_version`: The version of the trainer node, which the release build bakes into the docker image as `NODE_VERSION`. Locally built images report `unknown`. Output only; never read as input.
 
 ## Images
