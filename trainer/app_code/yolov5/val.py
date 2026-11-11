@@ -38,7 +38,7 @@ from .utils.general import (LOGGER, TQDM_BAR_FORMAT, Profile, check_dataset,
                             non_max_suppression, print_args, scale_boxes,
                             xywh2xyxy, xyxy2xywh)
 from .utils.metrics import ConfusionMatrix, ap_per_class, box_iou
-from .utils.plots import plot_val_study  # PATCH (yolov5-node): plot_images and output_to_target are no longer used here
+from .utils.plots import output_to_target, plot_images, plot_val_study
 from .utils.torch_utils import select_device, smart_inference_mode
 
 FILE = Path(__file__).resolve()
@@ -242,7 +242,7 @@ def run(
             if npr == 0:
                 if nl:
                     stats.append((correct, *torch.zeros((2, 0), device=device), labels[:, 0]))
-                    if keep:  # PATCH (yolov5-node): was `if plots`
+                    if plots or keep:  # PATCH (yolov5-node): also for keep
                         confusion_matrix.process_batch(detections=None, labels=labels[:, 0])
                 continue
 
@@ -258,7 +258,7 @@ def run(
                 scale_boxes(im[si].shape[1:], tbox, shape, shapes[si][1])  # native-space labels
                 labelsn = torch.cat((labels[:, 0:1], tbox), 1)  # native-space labels
                 correct = process_batch(predn, labelsn, iouv)
-                if keep:  # PATCH (yolov5-node): was `if plots`
+                if plots or keep:  # PATCH (yolov5-node): also for keep
                     confusion_matrix.process_batch(predn, labelsn)
             stats.append((correct, pred[:, 4], pred[:, 5], labels[:, 0]))  # (correct, conf, pcls, tcls)
 
@@ -269,17 +269,19 @@ def run(
                 save_one_json(predn, jdict, path, class_map)  # append to COCO-JSON dictionary
             callbacks.run('on_val_image_end', pred, predn, path, names, im[si])
 
-        # PATCH (yolov5-node): no val_batch*_labels/pred.jpg images; the node has its own way to look at examples
+        # Plot images
+        if plots and batch_i < 3:
+            plot_images(im, targets, paths, save_dir / f'val_batch{batch_i}_labels.jpg', names)  # labels
+            plot_images(im, output_to_target(preds), paths, save_dir / f'val_batch{batch_i}_pred.jpg', names)  # pred
 
         callbacks.run('on_val_batch_end', batch_i, im, targets, paths, shapes, preds)
 
     # Compute metrics
     stats = [torch.cat(x, 0).cpu().numpy() for x in zip(*stats)]  # to numpy
     if len(stats) and stats[0].any():
-        # PATCH (yolov5-node): plots and curve data named after the set
         tp, fp, p, r, f1, ap, ap_class, reported_conf = ap_per_class(*stats, plot=plots, save_dir=save_dir, names=names,
-                                                                     prefix=f'{task}_', report_conf=report_conf,
-                                                                     task=task if keep else None)
+                                                                     report_conf=report_conf,
+                                                                     task=task if keep else None)  # PATCH (yolov5-node)
         ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
         mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
     nt = np.bincount(stats[3].astype(int), minlength=nc)  # number of targets per class
@@ -312,8 +314,7 @@ def run(
     if keep:
         confusion_matrix.save(save_dir=save_dir, names=list(names.values()), task=task)  # PATCH (yolov5-node): raw counts
     if plots:
-        if keep:  # PATCH (yolov5-node): the plot only where the matrix is counted
-            confusion_matrix.plot(save_dir=save_dir, names=list(names.values()), task=task)
+        confusion_matrix.plot(save_dir=save_dir, names=list(names.values()))
         callbacks.run('on_val_end', nt, tp, fp, p, r, f1, ap, ap50, ap_class, confusion_matrix)
 
     # Save JSON

@@ -208,13 +208,12 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
     async def _clear_training_data(self, training_folder: str) -> None:
         keep_files = ['hyp.yaml', 'dataset.yaml', 'best.pt']
         keep_dirs = ['result', 'weights', 'examples']
-        # keep result/ and its examples; drop only the dataset and the extra weights
-        result_path = Path(training_folder, 'result').resolve()
-        keep_log_dirs = [result_path, result_path / 'examples']
+        result = Path(training_folder, 'result')
         for root, dirs, files in os.walk(training_folder, topdown=False):
+            is_result_dir = Path(root) in (result, result / 'examples')
             for file in files:
-                if file not in keep_files and not file.endswith('.log') \
-                        and not (Path(root).resolve() in keep_log_dirs and not file.endswith('.pt')):
+                keep = file in keep_files or file.endswith('.log') or (is_result_dir and not file.endswith('.pt'))
+                if not keep:
                     os.remove(os.path.join(root, file))
             for dir_ in dirs:
                 if dir_ not in keep_dirs:
@@ -245,12 +244,12 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         await super()._train()
         await self._final_evaluation()
 
-    async def stop(self) -> None:
+    async def _stop_running_training(self) -> None:
         """Ignore a stop during the final evaluation, which the library would turn into an abort."""
-        if self._evaluating and not self.shutdown_event.is_set():
+        if self._evaluating:
             logging.info('Stop during the final evaluation: letting it finish')
             return
-        await super().stop()
+        await super()._stop_running_training()
 
     # ---------------------------------------- ADDITIONAL METHODS ----------------------------------------
 

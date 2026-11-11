@@ -233,7 +233,7 @@ class ConfusionMatrix:
         return tp[:-1], fp[:-1]  # remove background class
 
     @TryExcept('WARNING ⚠️ ConfusionMatrix plot failure')
-    def plot(self, normalize=True, save_dir='', names=(), task='val'):  # PATCH (yolov5-node): task names the file
+    def plot(self, normalize=True, save_dir='', names=()):
         import seaborn as sn
 
         array = self.matrix / ((self.matrix.sum(0).reshape(1, -1) + 1E-9) if normalize else 1)  # normalize columns
@@ -260,7 +260,7 @@ class ConfusionMatrix:
         ax.set_ylabel('True')
         ax.set_ylabel('Predicted')
         ax.set_title('Confusion Matrix')
-        fig.savefig(Path(save_dir) / f'confusion_matrix_{task}.png', dpi=250)
+        fig.savefig(Path(save_dir) / 'confusion_matrix.png', dpi=250)
         plt.close(fig)
 
     def print(self):

@@ -3,6 +3,7 @@
 
 `train_det.py`, `eval_det.py` and :mod:`.batch_size_calculation` all read it from here.
 """
+from learning_loop_node.trainer.hyperparameters import parse_pairs
 from torch.utils.data import DataLoader
 
 from .yolov5.utils.dataloaders import create_dataloader
@@ -38,13 +39,10 @@ def evaluation_loader(path: str, name: str, *, img_size: int, batch_size: int,  
 
 def parse_point_sizes(argument: str) -> dict[int, float]:
     """The point size per category index from ``--point_sizes_by_id``, e.g. ``"1:0.2,3:0.3"``."""
-    return {int(index): float(size) for index, size in _pairs(argument)}
+    return {int(index): float(size) for index, size in parse_pairs(str(argument or ''))}
 
 
 def parse_flip_label_pairs(argument: str) -> list[tuple[int, int]]:
     """The category indices a horizontal flip swaps from ``--flip_label_pairs``, e.g. ``"1:2,3:4"``."""
-    return [(int(left), int(right)) for left, right in _pairs(argument)]
+    return [(int(left), int(right)) for left, right in parse_pairs(str(argument or ''))]
 
-
-def _pairs(argument: str) -> list[list[str]]:
-    return [item.split(':') for item in str(argument).split(',')] if argument else []

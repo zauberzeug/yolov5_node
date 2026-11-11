@@ -424,14 +424,7 @@ class TestWithDetection:
         assert len(files) == 2  # Note: Do not delete last_training.log and best.pt
 
 
-def test_the_training_results_leave_out_dataset_weights_plots_and_temporary_files(tmp_path: Path):
-    for name in ['result/results.csv', 'result/opt.yaml', 'result/hyp.yaml', 'result/confusion_matrix_test.json',
-                 'result/curves_test.json', 'result/results.png', 'result/batch_size.json', 'result/opt.tmp.yaml',
-                 'result/examples/example_0_0.png', 'result/weights/best.pt', 'result/last.pt',
-                 'hyp.yaml', 'dataset.yaml', 'last_training.log', 'train/images/a.jpg', 'train/labels/a.txt']:
-        (tmp_path / name).parent.mkdir(parents=True, exist_ok=True)
-        (tmp_path / name).write_text('0')
-
+def test_the_training_results_name_the_files_of_each_part(tmp_path: Path):
     results = Yolov5TrainerLogic()._get_training_results(tmp_path)  # pylint: disable=protected-access
 
     assert {part: sorted(str(f.relative_to(tmp_path)) for f in files) for part, files in results.items()} == {

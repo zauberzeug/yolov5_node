@@ -219,7 +219,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         options_path.replace(save_dir / 'opt.yaml')
 
     loggers = Loggers(save_dir, weights, opt, hyp, LOGGER)  # loggers instance
-    loggers.csv = False  # training_run.report_epoch writes results.csv, with the per-class columns
 
     # Register actions
     for k in methods(loggers):
@@ -477,7 +476,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                                                           model=ema.ema,
                                                                           single_cls=single_cls,
                                                                           dataloader=val_loader,
-                                                                          task='val',
                                                                           save_dir=save_dir,
                                                                           plots=False,
                                                                           callbacks=callbacks,
@@ -490,8 +488,9 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             best_fitness = fi
         log_vals = list(mloss) + list(results) + lr
         callbacks.run('on_fit_epoch_end', log_vals, epoch, best_fitness, fi)
-        training_run.report_epoch(save_dir, epoch, {**{key: float(value) for key, value in zip(loggers.keys, log_vals, strict=True)},
-                                                    **training_run.class_metrics(names, confusion_matrices, class_aps)})
+        epoch_metrics = dict(zip(loggers.keys, map(float, log_vals), strict=True))
+        training_run.report_epoch(save_dir, epoch,
+                                  epoch_metrics | training_run.class_metrics(names, confusion_matrices, class_aps))
 
         # Save model
         if (not nosave) or (final_epoch and not evolve):  # if save
@@ -555,7 +554,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     # end training -----------------------------------------------------------------------------------------------------
 
     LOGGER.info(f'\n{epoch - start_epoch + 1} epochs completed in {(time.time() - t0) / 3600:.3f} hours.')
-    # the final evaluation of best.pt is eval_det.py, which the node runs after a stop too
 
     callbacks.run('on_train_end', last, best, epoch, results)
 
