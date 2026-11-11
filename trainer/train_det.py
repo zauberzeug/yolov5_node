@@ -194,10 +194,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     # point_sizes_by_id: "1:0.2,3:0.3,4:0.02" (mapping from point id to fractional point size if point_sizes should be overridden during augmentation)
     # flip_label_pairs: "1:2,3:4" (mapping from category id to category id which should be switched when performing h_flip augmentation)
 
-    point_sizes_by_id = {int(k): float(v) for k, v in (item.split(':')
-                         for item in str(opt.point_sizes_by_id).split(','))} if opt.point_sizes_by_id else {}
-    flip_label_pairs = [(int(k), int(v)) for k, v in (item.split(':')
-                        for item in str(opt.flip_label_pairs).split(','))] if opt.flip_label_pairs else []
+    point_sizes_by_id = training_recipe.parse_point_sizes(opt.point_sizes_by_id)
+    flip_label_pairs = training_recipe.parse_flip_label_pairs(opt.flip_label_pairs)
 
     # Directories
     examples = save_dir / 'examples'  # examples dir
@@ -341,31 +339,11 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     mlc = int(labels[:, 0].max())  # max label class
     assert mlc < nc, f'Label class {mlc} exceeds nc={nc} in {data}. Possible class labels are 0-{nc - 1}'
 
-    val_loader = create_dataloader(val_path,
-                                   imgsz,
-                                   batch_size // 2,
-                                   gs,
-                                   single_cls,
-                                   hyp=hyp,
-                                   cache=None if noval else opt.cache,
-                                   rect=True,
-                                   rank=-1,
-                                   workers=workers * 2,
-                                   pad=training_recipe.VAL_PAD,
-                                   prefix=colorstr('val: '),
-                                   point_sizes_by_id=point_sizes_by_id)[0]
-    test_loader = val_loader if test_path == val_path else create_dataloader(test_path,
-                                                                             imgsz,
-                                                                             batch_size // 2,
-                                                                             gs,
-                                                                             single_cls,
-                                                                             hyp=hyp,
-                                                                             rect=True,
-                                                                             rank=-1,
-                                                                             workers=workers * 2,
-                                                                             pad=training_recipe.VAL_PAD,
-                                                                             prefix=colorstr('test: '),
-                                                                             point_sizes_by_id=point_sizes_by_id)[0]
+    evaluation = dict(img_size=imgsz, batch_size=batch_size, stride=gs, single_cls=single_cls, hyp=hyp,
+                      workers=workers, point_sizes_by_id=point_sizes_by_id)
+    val_loader = training_recipe.evaluation_loader(val_path, 'val', cache=opt.cache, **evaluation)
+    test_loader = val_loader if test_path == val_path else \
+        training_recipe.evaluation_loader(test_path, 'test', **evaluation)
 
     if not resume:
         if not opt.noautoanchor:

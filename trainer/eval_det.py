@@ -18,8 +18,7 @@ from learning_loop_node.trainer.cuda import add_vram_limit_argument, limit_cuda_
 from app_code import training_recipe, training_run
 from app_code.yolov5 import val as validate
 from app_code.yolov5.models.experimental import attempt_load
-from app_code.yolov5.utils.dataloaders import create_dataloader
-from app_code.yolov5.utils.general import LOGGER, check_dataset, check_img_size, colorstr
+from app_code.yolov5.utils.general import LOGGER, check_dataset, check_img_size
 from app_code.yolov5.utils.torch_utils import select_device
 
 FILE = Path(__file__).resolve()
@@ -37,8 +36,6 @@ def evaluate(result_dir: Path) -> None:
     opt = argparse.Namespace(**yaml.safe_load((result_dir / 'opt.yaml').read_text()))
     hyp = yaml.safe_load((result_dir / 'hyp.yaml').read_text())
     batch_size = training_run.TrainingRun(result_dir).batch_size or opt.batch_size
-    point_sizes_by_id = {int(k): float(v) for k, v in (item.split(':')
-                         for item in str(opt.point_sizes_by_id).split(','))} if opt.point_sizes_by_id else {}
 
     data_dict = check_dataset(opt.data)
     # the test set may be the validation folder
@@ -55,18 +52,9 @@ def evaluate(result_dir: Path) -> None:
     model = attempt_load(best, device).half()
     gs = max(int(model.stride.max()), 32)  # grid size (max stride)
     imgsz = check_img_size(opt.imgsz, gs, floor=gs * 2)
-    dataloader = create_dataloader(test_path,
-                                   imgsz,
-                                   batch_size // 2,
-                                   gs,
-                                   opt.single_cls,
-                                   hyp=hyp,
-                                   rect=True,
-                                   rank=-1,
-                                   workers=opt.workers * 2,
-                                   pad=training_recipe.VAL_PAD,
-                                   prefix=colorstr('test: '),
-                                   point_sizes_by_id=point_sizes_by_id)[0]
+    dataloader = training_recipe.evaluation_loader(
+        test_path, 'test', img_size=imgsz, batch_size=batch_size, stride=gs, single_cls=opt.single_cls, hyp=hyp,
+        workers=opt.workers, point_sizes_by_id=training_recipe.parse_point_sizes(opt.point_sizes_by_id))
 
     LOGGER.info('\n%s %s...', 'Validating' if test_path == val_path else 'Testing', best)
     validate.run(data_dict,
