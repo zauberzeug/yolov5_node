@@ -197,7 +197,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         return await asyncio.get_event_loop().run_in_executor(None, self._parse, labels_path, images_folder, model_information)
 
     def _get_training_results(self, training_folder: Path) -> dict[str, list[Path]]:
-        """Never the dataset, the weights or the plots."""
+        """Return the files of each part of the training results."""
         result = training_folder / 'result'
         core = [result / name for name in (training_run.RESULTS_FILE, training_run.BATCH_SIZE_FILE, 'opt.yaml',
                                            'hyp.yaml', 'confusion_matrix_test.json', 'curves_test.json')]

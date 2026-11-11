@@ -126,7 +126,7 @@ def run(
         plots=True,
         callbacks=Callbacks(),
         compute_loss=None,
-        # PATCH (yolov5-node): report_conf and the returned reported_conf; keep
+        # PATCH (yolov5-node): report_conf, keep and the returned reported_conf
         report_conf=None,  # confidence the per-class counts are reported at (default: where the mean F1 peaks)
         keep=False,  # count and save the confusion matrix and the curve data, named after the task
 ):
@@ -301,7 +301,7 @@ def run(
     for i, c in enumerate(ap_class):
         fn = tp[i] / r[i] - tp[i] if r[i] != 0 else 0
         confusion_matrices[names[c]] = {'tp': int(tp[i]), 'fp': int(fp[i]), 'fn': int(fn)}
-    # PATCH (yolov5-node): AP per class (only classes with labels), returned for the node's results table
+    # PATCH (yolov5-node): AP per class (only classes with labels)
     class_aps = {names[c]: {'ap50': float(ap50[i]), 'ap50_95': float(ap[i])} for i, c in enumerate(ap_class)}
 
     # Print speeds

@@ -1,8 +1,7 @@
 """The final evaluation of a training's best model on the test set: per-class table, confusion matrix, curve data.
 
-The only writer of `confusion_matrix_test.json` and `curves_test.json`; the test pass in `train_det.py` only counts.
-
-Reads `opt.yaml`, `hyp.yaml`, the measured batch size and `weights/best.pt` from the result folder of `train_det.py`.
+Reads `opt.yaml`, `hyp.yaml`, the measured batch size and `weights/best.pt` from the result folder of `train_det.py`
+and writes `confusion_matrix_test.json` and `curves_test.json` into it.
 
 Usage:
     $ python eval_det.py --result-dir <training folder>/result

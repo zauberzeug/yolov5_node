@@ -578,8 +578,8 @@ def parse_opt(known=False):
     parser.add_argument('--nosave', action='store_true', help='only save final checkpoint')
     parser.add_argument('--noautoanchor', action='store_true', help='disable AutoAnchor')
     parser.add_argument('--noplots', action='store_true', help='save no plot files')
-    # --evolve and --noval are not offered: the evolution in main() is upstream's and unmaintained. It scores a
-    # generation by what train() returns, which is the last epoch's validation since eval_det.py evaluates best.pt.
+    # --evolve and --noval are not offered: the evolution in main() is upstream's and unmaintained. It would score a
+    # generation by the last epoch's validation, which is what train() returns, not by best.pt.
     parser.set_defaults(evolve=None, noval=False)
     parser.add_argument('--bucket', type=str, default='', help='gsutil bucket')
     parser.add_argument('--cache', type=str, nargs='?', const='ram', help='image --cache ram/disk')

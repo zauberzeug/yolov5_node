@@ -42,8 +42,10 @@ def report_batch_size(result_dir: Path, batch_size: int) -> None:
 
 
 def report_epoch(result_dir: Path, epoch: int, metrics: dict[str, float]) -> None:
-    """Add an epoch's losses, metrics and learning rates to the results table, replacing the row of a repeated
-    epoch and any later ones."""
+    """Add an epoch's losses, metrics and learning rates to the results table.
+
+    Rows of this and any later epoch are dropped first, as a resumed run repeats them.
+    """
     path = result_dir / RESULTS_FILE
     try:
         with path.open(newline='') as f:
@@ -59,7 +61,7 @@ def report_epoch(result_dir: Path, epoch: int, metrics: dict[str, float]) -> Non
 
 
 def _is_before(row: list[str], epoch: int) -> bool:
-    """Whether a row of the results table belongs to an earlier epoch; a blank or truncated row does not."""
+    """Return whether a row of the results table belongs to an earlier epoch; a blank or truncated row does not."""
     try:
         return int(row[0]) < epoch
     except (IndexError, ValueError):
@@ -68,7 +70,7 @@ def _is_before(row: list[str], epoch: int) -> bool:
 
 def class_metrics(names: dict[int, str], counts: dict[str, dict[str, int]],
                   aps: dict[str, dict[str, float]]) -> dict[str, float]:
-    """Precision, recall, AP50 and AP50-95 of every class in `names`, in order, as columns for :func:`report_epoch`.
+    """Return precision, recall, AP50 and AP50-95 per class in `names`, in order, as columns for :func:`report_epoch`.
 
     A value without data to compute it from (no labels, or a zero denominator) is NaN.
     """
