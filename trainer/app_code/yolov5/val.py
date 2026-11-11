@@ -126,8 +126,9 @@ def run(
         plots=True,
         callbacks=Callbacks(),
         compute_loss=None,
-        # PATCH (yolov5-node): report_conf and the returned reported_conf
+        # PATCH (yolov5-node): report_conf and the returned reported_conf; keep
         report_conf=None,  # confidence the per-class counts are reported at (default: where the mean F1 peaks)
+        keep=False,  # count and save the confusion matrix and the curve data, named after the task
 ):
     # Initialize/load model and set device
     training = model is not None
@@ -188,7 +189,6 @@ def run(
     seen = 0
     # PATCH (yolov5-node): count at the confidence the per-class counts are reported at, and at IoU 0.5 like them
     confusion_matrix = ConfusionMatrix(nc=nc, conf=0.25 if report_conf is None else report_conf, iou_thres=0.5)
-    keep = task == 'test'  # PATCH (yolov5-node): count and save the confusion matrix and curve data on the test set only
     names = model.names if hasattr(model, 'names') else model.module.names  # get class names
     if isinstance(names, (list, tuple)):  # old format
         names = dict(enumerate(names))
