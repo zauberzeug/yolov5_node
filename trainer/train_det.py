@@ -221,6 +221,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         options_path.replace(save_dir / 'opt.yaml')
 
     loggers = Loggers(save_dir, weights, opt, hyp, LOGGER)  # loggers instance
+    loggers.csv = False  # training_run.report_epoch writes results.csv, with the per-class columns
 
     # Register actions
     for k in methods(loggers):
@@ -391,6 +392,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     maps = np.zeros(nc)  # mAP per class
     results = (0, 0, 0, 0, 0, 0, 0)  # P, R, mAP@.5, mAP@.5-.95, val_loss(box, obj, cls)
     val_conf = None  # confidence where the mean F1 peaked on val; None while nothing is found there
+    confusion_matrices, class_aps = {}, {}  # per-class counts and APs; empty until an epoch is validated
     scheduler.last_epoch = start_epoch - 1  # do not move
     scaler = torch.cuda.amp.GradScaler(enabled=amp)
     stopper, stop = EarlyStopping(patience=opt.patience), False
