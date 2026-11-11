@@ -38,7 +38,7 @@ from .utils.general import (LOGGER, TQDM_BAR_FORMAT, Profile, check_dataset,
                             non_max_suppression, print_args, scale_boxes,
                             xywh2xyxy, xyxy2xywh)
 from .utils.metrics import ConfusionMatrix, ap_per_class, box_iou
-from .utils.plots import plot_val_study
+from .utils.plots import plot_val_study  # PATCH (yolov5-node): plot_images and output_to_target are no longer used here
 from .utils.torch_utils import select_device, smart_inference_mode
 
 FILE = Path(__file__).resolve()
@@ -242,7 +242,7 @@ def run(
             if npr == 0:
                 if nl:
                     stats.append((correct, *torch.zeros((2, 0), device=device), labels[:, 0]))
-                    if keep:
+                    if keep:  # PATCH (yolov5-node): was `if plots`
                         confusion_matrix.process_batch(detections=None, labels=labels[:, 0])
                 continue
 
@@ -258,7 +258,7 @@ def run(
                 scale_boxes(im[si].shape[1:], tbox, shape, shapes[si][1])  # native-space labels
                 labelsn = torch.cat((labels[:, 0:1], tbox), 1)  # native-space labels
                 correct = process_batch(predn, labelsn, iouv)
-                if keep:
+                if keep:  # PATCH (yolov5-node): was `if plots`
                     confusion_matrix.process_batch(predn, labelsn)
             stats.append((correct, pred[:, 4], pred[:, 5], labels[:, 0]))  # (correct, conf, pcls, tcls)
 
@@ -312,7 +312,7 @@ def run(
     if keep:
         confusion_matrix.save(save_dir=save_dir, names=list(names.values()), task=task)  # PATCH (yolov5-node): raw counts
     if plots:
-        if keep:
+        if keep:  # PATCH (yolov5-node): the plot only where the matrix is counted
             confusion_matrix.plot(save_dir=save_dir, names=list(names.values()), task=task)
         callbacks.run('on_val_end', nt, tp, fp, p, r, f1, ap, ap50, ap_class, confusion_matrix)
 
@@ -350,6 +350,7 @@ def run(
     maps = np.zeros(nc) + map
     for i, c in enumerate(ap_class):
         maps[c] = ap[i]
+    # PATCH (yolov5-node): class_aps added to the returned values
     return (mp, mr, map50, map, *(loss.cpu() / len(dataloader)).tolist()), confusion_matrices, maps, t, reported_conf, \
         class_aps
 
@@ -412,7 +413,7 @@ def main(opt):
                 x, y = list(range(256, 1536 + 128, 128)), []  # x axis (image sizes), y axis
                 for opt.imgsz in x:  # img-size
                     LOGGER.info(f'\nRunning {f} --imgsz {opt.imgsz}...')
-                    r, _, _, t, _, _ = run(**vars(opt), plots=False)
+                    r, _, _, t, _, _ = run(**vars(opt), plots=False)  # PATCH (yolov5-node): run returns six values
                     y.append(r + t)  # results and times
                 np.savetxt(f, y, fmt='%10.4g')  # save
             os.system('zip -r study.zip study_*.txt')
