@@ -103,6 +103,18 @@ def test_rows_are_matched_by_epoch_not_by_position(tmp_path: Path):
     ]
 
 
+def test_a_blank_or_truncated_row_is_dropped(tmp_path: Path):
+    (tmp_path / training_run.RESULTS_FILE).write_text('epoch,metrics/mAP_0.5\n0,0.5\n\n   1.\n')
+
+    training_run.report_epoch(tmp_path, 1, {'metrics/mAP_0.5': 0.6})
+
+    assert (tmp_path / training_run.RESULTS_FILE).read_text().splitlines() == [
+        'epoch,metrics/mAP_0.5',
+        '0,0.5',
+        '1,0.6',
+    ]
+
+
 def test_class_metrics_cover_every_class_in_order(tmp_path: Path):
     counts = {'weed': {'tp': 3, 'fp': 1, 'fn': 1}, 'crop': {'tp': 0, 'fp': 0, 'fn': 2}}
     aps = {'weed': {'ap50': 0.8, 'ap50_95': 0.5}, 'crop': {'ap50': 0.0, 'ap50_95': 0.0}}

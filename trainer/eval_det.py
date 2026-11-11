@@ -45,6 +45,11 @@ def evaluate(result_dir: Path) -> None:
     val_path, test_path = data_dict['val'], data_dict['test']
     model_metadata = torch.load(best, map_location='cpu', weights_only=False).get('model_metadata', {})
     report_conf = model_metadata.get('conf_threshold')
+    if report_conf is None:
+        # such a model found nothing on the validation images and was never reported; without the confidence,
+        # the confusion matrix and the curves would be read at two different ones
+        LOGGER.info('No confidence was picked for %s, nothing to evaluate', best)
+        return
 
     device = select_device(opt.device, batch_size=batch_size)
     model = attempt_load(best, device).half()

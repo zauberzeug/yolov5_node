@@ -30,6 +30,9 @@ from learning_loop_node.trainer.hyperparameters import parse_pairs
 from . import batch_size_calculation, model_files, training_run, yolov5_format
 from .hyperparameters import DEFAULT_POINT_SIZE, HYPERPARAMETERS, size_dependent_values
 
+EVALUATION_TIMEOUT = 3600
+"""Seconds the final evaluation may take; a stop is ignored while it runs, so it must not hang."""
+
 
 class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
@@ -258,8 +261,10 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         try:
             await executor.start(f'python /app/eval_det.py --result-dir {self.training.training_folder}/result \
                 --vram-limit-gb {self._vram_limit_gb}', env={'WANDB_MODE': 'disabled'})
-            if (return_code := await executor.wait()) != 0:
+            if (return_code := await asyncio.wait_for(executor.wait(), EVALUATION_TIMEOUT)) != 0:
                 logging.error('Final evaluation failed with return code %s, see the training log', return_code)
+        except TimeoutError:
+            logging.error('Final evaluation took longer than %s s, ending it', EVALUATION_TIMEOUT)
         except Exception:
             logging.exception('Final evaluation failed')
         finally:

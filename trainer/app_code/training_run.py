@@ -50,12 +50,20 @@ def report_epoch(result_dir: Path, epoch: int, metrics: dict[str, float]) -> Non
             header, *rows = list(csv.reader(f))
     except (FileNotFoundError, ValueError):
         header, rows = ['epoch', *metrics], []
-    rows = [row for row in rows if int(row[0]) < epoch]
+    rows = [row for row in rows if _is_before(row, epoch)]
     rows.append([str(epoch), *(f'{value:.5g}' for value in metrics.values())])
     temporary = path.with_name(f'.{path.name}.tmp')
     with temporary.open('w', newline='') as f:
         csv.writer(f).writerows([header, *rows])
     os.replace(temporary, path)
+
+
+def _is_before(row: list[str], epoch: int) -> bool:
+    """Whether a row of the results table belongs to an earlier epoch; a blank or truncated row does not."""
+    try:
+        return int(row[0]) < epoch
+    except (IndexError, ValueError):
+        return False
 
 
 def class_metrics(names: dict[int, str], counts: dict[str, dict[str, int]],
