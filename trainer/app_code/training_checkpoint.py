@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -6,6 +7,8 @@ from typing import Any
 import torch
 
 from .model_files import delete_newer_epochs, metadata_for_weightfile
+
+logger = logging.getLogger(__name__)
 
 
 def save_best(checkpoint: dict[str, Any], folder: Path, model_metadata: dict[str, Any] | None = None) -> None:
@@ -19,6 +22,7 @@ def save_best(checkpoint: dict[str, Any], folder: Path, model_metadata: dict[str
                  'model': checkpoint['ema'], 'ema': None, 'updates': None, 'optimizer': None,
                  'model_metadata': model_metadata or {},
                  'opt': checkpoint['opt'], 'date': checkpoint['date']}, folder / 'best.pt')
+    logger.info('Saved the best model of epoch %d to %s', checkpoint['epoch'], folder / 'best.pt')
 
 
 def report_best(folder: Path, epoch: int, confusion_matrices: dict[str, Any],
