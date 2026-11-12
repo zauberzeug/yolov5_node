@@ -48,7 +48,6 @@ from app_code.training_checkpoint import (
     save_best,
 )
 from app_code.yolov5 import val as validate  # for end-of-epoch mAP
-from app_code.yolov5.models.experimental import attempt_load
 from app_code.yolov5.models.yolo import Model
 from app_code.yolov5.utils.autoanchor import check_anchors
 from app_code.yolov5.utils.callbacks import Callbacks
@@ -195,10 +194,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     # point_sizes_by_id: "1:0.2,3:0.3,4:0.02" (mapping from point id to fractional point size if point_sizes should be overridden during augmentation)
     # flip_label_pairs: "1:2,3:4" (mapping from category id to category id which should be switched when performing h_flip augmentation)
 
-    point_sizes_by_id = {int(k): float(v) for k, v in (item.split(':')
-                         for item in str(opt.point_sizes_by_id).split(','))} if opt.point_sizes_by_id else {}
-    flip_label_pairs = [(int(k), int(v)) for k, v in (item.split(':')
-                        for item in str(opt.flip_label_pairs).split(','))] if opt.flip_label_pairs else []
+    point_sizes_by_id = training_recipe.parse_point_sizes(opt.point_sizes_by_id)
+    flip_label_pairs = training_recipe.parse_flip_label_pairs(opt.flip_label_pairs)
 
     # Directories
     examples = save_dir / 'examples'  # examples dir
@@ -233,7 +230,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         weights, epochs, hyp, batch_size = opt.weights, opt.epochs, opt.hyp, opt.batch_size
 
     # Config
-    plots = not evolve and not opt.noplots  # create plots
     cuda = device.type != 'cpu'
     init_seeds(opt.seed + 1, deterministic=True)
     data_dict = check_dataset(data)
@@ -241,7 +237,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     train_path, val_path, test_path = data_dict['train'], data_dict['val'], data_dict['test']
     nc = 1 if single_cls else int(data_dict['nc'])  # number of classes
     names = {0: 'item'} if single_cls and len(data_dict['names']) != 1 else data_dict['names']  # class names
-    is_coco = isinstance(val_path, str) and val_path.endswith('coco/val2017.txt')  # COCO dataset
 
     # Model
     check_suffix(weights, '.pt')  # check weights
@@ -343,31 +338,11 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     mlc = int(labels[:, 0].max())  # max label class
     assert mlc < nc, f'Label class {mlc} exceeds nc={nc} in {data}. Possible class labels are 0-{nc - 1}'
 
-    val_loader = create_dataloader(val_path,
-                                   imgsz,
-                                   batch_size // 2,
-                                   gs,
-                                   single_cls,
-                                   hyp=hyp,
-                                   cache=None if noval else opt.cache,
-                                   rect=True,
-                                   rank=-1,
-                                   workers=workers * 2,
-                                   pad=training_recipe.VAL_PAD,
-                                   prefix=colorstr('val: '),
-                                   point_sizes_by_id=point_sizes_by_id)[0]
-    test_loader = val_loader if test_path == val_path else create_dataloader(test_path,
-                                                                             imgsz,
-                                                                             batch_size // 2,
-                                                                             gs,
-                                                                             single_cls,
-                                                                             hyp=hyp,
-                                                                             rect=True,
-                                                                             rank=-1,
-                                                                             workers=workers * 2,
-                                                                             pad=training_recipe.VAL_PAD,
-                                                                             prefix=colorstr('test: '),
-                                                                             point_sizes_by_id=point_sizes_by_id)[0]
+    evaluation = dict(img_size=imgsz, batch_size=batch_size, stride=gs, single_cls=single_cls, hyp=hyp,
+                      workers=workers, point_sizes_by_id=point_sizes_by_id)
+    val_loader = training_recipe.evaluation_loader(val_path, 'val', cache=opt.cache, **evaluation)
+    test_loader = val_loader if test_path == val_path else \
+        training_recipe.evaluation_loader(test_path, 'test', **evaluation)
 
     if not resume:
         if not opt.noautoanchor:
@@ -394,6 +369,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     maps = np.zeros(nc)  # mAP per class
     results = (0, 0, 0, 0, 0, 0, 0)  # P, R, mAP@.5, mAP@.5-.95, val_loss(box, obj, cls)
     val_conf = None  # confidence where the mean F1 peaked on val; None while nothing is found there
+    confusion_matrices, class_aps = {}, {}  # per-class counts and APs; empty until an epoch is validated
     scheduler.last_epoch = start_epoch - 1  # do not move
     scaler = torch.cuda.amp.GradScaler(enabled=amp)
     stopper, stop = EarlyStopping(patience=opt.patience), False
@@ -491,7 +467,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         ema.update_attr(model, include=['yaml', 'nc', 'hyp', 'names', 'stride', 'class_weights'])
         final_epoch = (epoch + 1 == epochs) or stopper.possible_stop
         if not noval or final_epoch:  # Calculate mAP
-            results, confusion_matrices, maps, _, val_conf = validate.run(data_dict,
+            results, confusion_matrices, maps, _, val_conf, class_aps = validate.run(data_dict,
                                                                           batch_size=batch_size // 2,
                                                                           imgsz=imgsz,
                                                                           conf_thres=opt.conf_thres,
@@ -512,6 +488,9 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             best_fitness = fi
         log_vals = list(mloss) + list(results) + lr
         callbacks.run('on_fit_epoch_end', log_vals, epoch, best_fitness, fi)
+        epoch_metrics = dict(zip(loggers.keys, map(float, log_vals), strict=True))
+        training_run.report_epoch(save_dir, epoch,
+                                  epoch_metrics | training_run.class_metrics(names, confusion_matrices, class_aps))
 
         # Save model
         if (not nosave) or (final_epoch and not evolve):  # if save
@@ -547,7 +526,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                 save_best(ckpt, w, model_metadata)
                 if val_conf is not None:
                     if test_loader is not val_loader:
-                        _, confusion_matrices, _, _, _ = validate.run(data_dict,
+                        _, confusion_matrices, _, _, _, _ = validate.run(data_dict,
                                                                       batch_size=batch_size // 2,
                                                                       imgsz=imgsz,
                                                                       conf_thres=opt.conf_thres,
@@ -556,6 +535,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                                                       model=ema.ema,
                                                                       single_cls=single_cls,
                                                                       dataloader=test_loader,
+                                                                      task='test',
                                                                       save_dir=save_dir,
                                                                       plots=False,
                                                                       callbacks=callbacks,
@@ -574,33 +554,6 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     # end training -----------------------------------------------------------------------------------------------------
 
     LOGGER.info(f'\n{epoch - start_epoch + 1} epochs completed in {(time.time() - t0) / 3600:.3f} hours.')
-    for f in last, best:
-        if f.exists():
-            # PATCH (yolov5-node): checkpoints retain their resume state after the final epoch.
-            if f is best:
-                # the final evaluation reports on the test set at the confidence picked for the best model;
-                # only hyperparameter evolution keeps selecting on the validation set.
-                LOGGER.info(f"\n{'Validating' if evolve or test_loader is val_loader else 'Testing'} {f}...")
-                model_metadata = torch.load(f, map_location='cpu', weights_only=False).get('model_metadata', {})
-                report_conf = None if evolve else model_metadata.get('conf_threshold')
-                results, _, _, _, _ = validate.run(
-                    data_dict,
-                    batch_size=batch_size // 2,
-                    imgsz=imgsz,
-                    conf_thres=opt.conf_thres,
-                    iou_thres=opt.iou_thres,
-                    model=attempt_load(f, device).half(),
-                    single_cls=single_cls,
-                    dataloader=val_loader if evolve else test_loader,
-                    save_dir=save_dir,
-                    save_json=is_coco,
-                    verbose=True,
-                    plots=plots,
-                    callbacks=callbacks,
-                    compute_loss=compute_loss,
-                    report_conf=report_conf)  # val best model with plots
-                if is_coco:
-                    callbacks.run('on_fit_epoch_end', list(mloss) + list(results) + lr, epoch, best_fitness, fi)
 
     callbacks.run('on_train_end', last, best, epoch, results)
 
@@ -623,10 +576,11 @@ def parse_opt(known=False):
     parser.add_argument('--rect', action='store_true', help='rectangular training')
     parser.add_argument('--resume', nargs='?', const=True, default=False, help='resume most recent training')
     parser.add_argument('--nosave', action='store_true', help='only save final checkpoint')
-    parser.add_argument('--noval', action='store_true', help='only validate final epoch')
     parser.add_argument('--noautoanchor', action='store_true', help='disable AutoAnchor')
     parser.add_argument('--noplots', action='store_true', help='save no plot files')
-    parser.add_argument('--evolve', type=int, nargs='?', const=300, help='evolve hyperparameters for x generations')
+    # --evolve and --noval are not offered: the evolution in main() is upstream's and unmaintained. It would score a
+    # generation by the last epoch's validation, which is what train() returns, not by best.pt.
+    parser.set_defaults(evolve=None, noval=False)
     parser.add_argument('--bucket', type=str, default='', help='gsutil bucket')
     parser.add_argument('--cache', type=str, nargs='?', const='ram', help='image --cache ram/disk')
     parser.add_argument('--image-weights', action='store_true', help='use weighted image selection for training')

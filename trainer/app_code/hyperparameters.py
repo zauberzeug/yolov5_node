@@ -12,6 +12,7 @@ from typing import Any
 import yaml  # type: ignore
 from learning_loop_node.data_classes import Hyperparameter
 from learning_loop_node.trainer.batch_size import REQUESTED_BATCH_SIZE
+from learning_loop_node.trainer.training_results import UPLOAD_EXAMPLES, UPLOAD_LOGS
 from learning_loop_node.trainer.validation_set import COMPUTE_VALIDATION_SET_HYPERPARAMETER
 
 from .batch_size_calculation import MIN_STRIDE
@@ -135,5 +136,9 @@ HYPERPARAMETERS = [
            f'Point size per category as a fraction of the image, "uuid:size,...", used by reset_points; '
            f'{DEFAULT_POINT_SIZE} if unset'),
     COMPUTE_VALIDATION_SET_HYPERPARAMETER,
+    Hyperparameter(name=UPLOAD_EXAMPLES, type='bool', default=False,
+                   notes='Upload the example images with the training results', expert=True),
+    Hyperparameter(name=UPLOAD_LOGS, type='bool', default=False,
+                   notes='Upload the training log with the training results', expert=True),
 ]
 """What this trainer accepts, reported to the loop."""

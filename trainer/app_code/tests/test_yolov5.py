@@ -424,6 +424,16 @@ class TestWithDetection:
         assert len(files) == 2  # Note: Do not delete last_training.log and best.pt
 
 
+def test_the_training_results_name_the_files_of_each_part(tmp_path: Path):
+    results = Yolov5TrainerLogic()._get_training_results(tmp_path)  # pylint: disable=protected-access
+
+    assert {part: sorted(str(f.relative_to(tmp_path)) for f in files) for part, files in results.items()} == {
+        'core': ['dataset.yaml', 'hyp.yaml', 'result/batch_size.json', 'result/confusion_matrix_test.json',
+                 'result/curves_test.json', 'result/hyp.yaml', 'result/opt.yaml', 'result/results.csv'],
+        'examples': ['result/examples'],
+        'logs': ['last_training.log']}
+
+
 def test_update_hyperparameter():
     """The hyperparameter file should be updated with the given hyperparameter"""
     def assert_yaml_content(yaml_path, **kwargs):

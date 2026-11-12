@@ -126,8 +126,9 @@ def run(
         plots=True,
         callbacks=Callbacks(),
         compute_loss=None,
-        # PATCH (yolov5-node): report_conf and the returned reported_conf
+        # PATCH (yolov5-node): report_conf, keep and the returned reported_conf
         report_conf=None,  # confidence the per-class counts are reported at (default: where the mean F1 peaks)
+        keep=False,  # count and save the confusion matrix and the curve data, named after the task
 ):
     # Initialize/load model and set device
     training = model is not None
@@ -186,7 +187,8 @@ def run(
                                        prefix=colorstr(f'{task}: '))[0]
 
     seen = 0
-    confusion_matrix = ConfusionMatrix(nc=nc)
+    # PATCH (yolov5-node): count at the confidence the per-class counts are reported at, and at IoU 0.5 like them
+    confusion_matrix = ConfusionMatrix(nc=nc, conf=0.25 if report_conf is None else report_conf, iou_thres=0.5)
     names = model.names if hasattr(model, 'names') else model.module.names  # get class names
     if isinstance(names, (list, tuple)):  # old format
         names = dict(enumerate(names))
@@ -240,7 +242,7 @@ def run(
             if npr == 0:
                 if nl:
                     stats.append((correct, *torch.zeros((2, 0), device=device), labels[:, 0]))
-                    if plots:
+                    if plots or keep:  # PATCH (yolov5-node): also for keep
                         confusion_matrix.process_batch(detections=None, labels=labels[:, 0])
                 continue
 
@@ -256,7 +258,7 @@ def run(
                 scale_boxes(im[si].shape[1:], tbox, shape, shapes[si][1])  # native-space labels
                 labelsn = torch.cat((labels[:, 0:1], tbox), 1)  # native-space labels
                 correct = process_batch(predn, labelsn, iouv)
-                if plots:
+                if plots or keep:  # PATCH (yolov5-node): also for keep
                     confusion_matrix.process_batch(predn, labelsn)
             stats.append((correct, pred[:, 4], pred[:, 5], labels[:, 0]))  # (correct, conf, pcls, tcls)
 
@@ -278,7 +280,8 @@ def run(
     stats = [torch.cat(x, 0).cpu().numpy() for x in zip(*stats)]  # to numpy
     if len(stats) and stats[0].any():
         tp, fp, p, r, f1, ap, ap_class, reported_conf = ap_per_class(*stats, plot=plots, save_dir=save_dir, names=names,
-                                                                     report_conf=report_conf)
+                                                                     report_conf=report_conf,
+                                                                     task=task if keep else None)  # PATCH (yolov5-node)
         ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
         mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
     nt = np.bincount(stats[3].astype(int), minlength=nc)  # number of targets per class
@@ -298,6 +301,8 @@ def run(
     for i, c in enumerate(ap_class):
         fn = tp[i] / r[i] - tp[i] if r[i] != 0 else 0
         confusion_matrices[names[c]] = {'tp': int(tp[i]), 'fp': int(fp[i]), 'fn': int(fn)}
+    # PATCH (yolov5-node): AP per class (only classes with labels)
+    class_aps = {names[c]: {'ap50': float(ap50[i]), 'ap50_95': float(ap[i])} for i, c in enumerate(ap_class)}
 
     # Print speeds
     t = tuple(x.t / seen * 1E3 for x in dt)  # speeds per image
@@ -306,6 +311,8 @@ def run(
         LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {shape}' % t)
 
     # Plots
+    if keep:
+        confusion_matrix.save(save_dir=save_dir, names=list(names.values()), task=task)  # PATCH (yolov5-node): raw counts
     if plots:
         confusion_matrix.plot(save_dir=save_dir, names=list(names.values()))
         callbacks.run('on_val_end', nt, tp, fp, p, r, f1, ap, ap50, ap_class, confusion_matrix)
@@ -344,7 +351,9 @@ def run(
     maps = np.zeros(nc) + map
     for i, c in enumerate(ap_class):
         maps[c] = ap[i]
-    return (mp, mr, map50, map, *(loss.cpu() / len(dataloader)).tolist()), confusion_matrices, maps, t, reported_conf
+    # PATCH (yolov5-node): class_aps added to the returned values
+    return (mp, mr, map50, map, *(loss.cpu() / len(dataloader)).tolist()), confusion_matrices, maps, t, reported_conf, \
+        class_aps
 
 
 def parse_opt():
@@ -405,7 +414,7 @@ def main(opt):
                 x, y = list(range(256, 1536 + 128, 128)), []  # x axis (image sizes), y axis
                 for opt.imgsz in x:  # img-size
                     LOGGER.info(f'\nRunning {f} --imgsz {opt.imgsz}...')
-                    r, _, _, t, _ = run(**vars(opt), plots=False)
+                    r, _, _, t, _, _ = run(**vars(opt), plots=False)  # PATCH (yolov5-node): run returns six values
                     y.append(r + t)  # results and times
                 np.savetxt(f, y, fmt='%10.4g')  # save
             os.system('zip -r study.zip study_*.txt')
