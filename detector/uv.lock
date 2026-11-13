@@ -534,7 +534,7 @@ wheels = [
 
 [[package]]
 name = "learning-loop-node"
-version = "0.29.0"
+version = "0.29.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles" },
@@ -554,9 +554,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "uvicorn", extra = ["standard"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/14/cd/448d0391777d4e9622fd7d3deae8b65c4bd4aba0a59b23de0fefbe56828b/learning_loop_node-0.29.0.tar.gz", hash = "sha256:a785f7c3616bbea57e1f58bf82eb1ee0ab9f636dce8a7c906d615fab02b3ea8c", size = 94880, upload-time = "2026-11-09T09:42:41.927Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cd/d8/0aa7718884a2a38e56da0b1c9132529572307c0915d85ba1b9236194aac3/learning_loop_node-0.29.1.tar.gz", hash = "sha256:ac8d5f22f3163a5bac315a71b89957e3f979ee6c25c5bdc191cb471456f0e6b6", size = 94991, upload-time = "2026-11-13T20:06:20.176Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d5/b2/b3f42a7b5326c4cbe0e55b3c0a172eb4971e2c5a5761e61c3dd80fe0ee17/learning_loop_node-0.29.0-py3-none-any.whl", hash = "sha256:dc05fedec335189809207cb91af905642727ede040c56c8dba508903d9de268c", size = 110425, upload-time = "2026-11-09T09:42:40.484Z" },
+    { url = "https://files.pythonhosted.org/packages/5d/c3/67461010925aa18ffca2bd5aaa5422f1b75c5733b2db42db0f34d25daf60/learning_loop_node-0.29.1-py3-none-any.whl", hash = "sha256:17f745573c653446c7e89fc15bf8b1949b7de10f0be025254251630b6bb97dba", size = 110554, upload-time = "2026-11-13T20:06:18.68Z" },
 ]
 
 [[package]]
@@ -1711,7 +1711,7 @@ requires-dist = [
     { name = "async-timeout" },
     { name = "attrs" },
     { name = "idna-ssl" },
-    { name = "learning-loop-node", specifier = "==0.29.0" },
+    { name = "learning-loop-node", specifier = "==0.29.1" },
     { name = "multidict" },
     { name = "numpy" },
     { name = "pillow" },
