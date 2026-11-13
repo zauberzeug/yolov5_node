@@ -28,7 +28,7 @@ from learning_loop_node.trainer.executor import Executor
 from learning_loop_node.trainer.hyperparameters import parse_pairs
 
 from . import batch_size_calculation, model_files, training_run, yolov5_format
-from .hyperparameters import DEFAULT_POINT_SIZE, HYPERPARAMETERS, size_dependent_values
+from .hyperparameters import DEFAULT_POINT_SIZE, HYPERPARAMETERS
 
 EVALUATION_TIMEOUT = 3600
 """Seconds the final evaluation may take; a stop is ignored while it runs, so it must not hang."""
@@ -276,8 +276,6 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         yolov5_format.create_file_structure(self.training)
         additional_params = ' --clear'
 
-        for name, value in size_dependent_values(self.training.model_variant).items():
-            self.hyperparameters.setdefault(name, value)  # reported with the training, so the model shows them
         yolov5_format.create_hyperparameter_file(self.hyperparameter_path, self.training.model_variant,
                                                  self.hyperparameters)
 
