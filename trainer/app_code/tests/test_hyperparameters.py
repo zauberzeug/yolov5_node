@@ -1,11 +1,11 @@
 import pytest
 import yaml  # type: ignore
 from learning_loop_node.trainer.exceptions import CriticalError
-from learning_loop_node.trainer.hyperparameters import check_declaration, resolve
+from learning_loop_node.trainer.hyperparameters import check_declaration, for_variant, resolve
 
-from ..hyperparameters import _TEMPLATE, _UPSTREAM_BY_SIZE, HYPERPARAMETERS, SIZE_DEPENDENT, size_dependent_values
+from ..hyperparameters import _TEMPLATE, _UPSTREAM_BY_VARIANT, HYPERPARAMETERS, MODEL_VARIANTS
 from ..yolov5_format import FLIP_PROBABILITY, create_hyperparameter_file
-from ..yolov5_trainer import _parse_point_sizes
+from ..yolov5_trainer import Yolov5TrainerLogic, _parse_point_sizes
 
 
 def test_every_template_key_is_declared_with_the_template_default():
@@ -15,38 +15,34 @@ def test_every_template_key_is_declared_with_the_template_default():
         assert declared[name].default == value, name
 
 
-def test_every_upstream_key_is_declared_with_upstream_default_unless_it_depends_on_the_size():
-    declared = {h.name: h for h in HYPERPARAMETERS}
-    for name, value in _UPSTREAM_BY_SIZE['s'].items():
+@pytest.mark.parametrize('variant', MODEL_VARIANTS)
+def test_every_upstream_key_is_declared_with_the_upstream_default_of_each_variant(variant: str):
+    declared = {h.name: h for h in for_variant(HYPERPARAMETERS, variant)}
+    for name, value in _UPSTREAM_BY_VARIANT[variant].items():
         assert name in declared, f'{name} from the upstream hyperparameters is not declared'
         if name in _TEMPLATE:
             continue  # hyp_det.yaml overrides it, see above
-        assert declared[name].default == (None if name in SIZE_DEPENDENT else value), name
+        assert declared[name].default == value, f'{name} for {variant}'
 
 
-def test_the_size_dependent_hyperparameters_are_the_ones_upstream_tunes_per_size():
-    assert SIZE_DEPENDENT == ['lrf', 'cls', 'obj', 'scale', 'mixup', 'copy_paste']
-    assert next(h for h in HYPERPARAMETERS if h.name == 'scale').notes.endswith('0.5 for n and s, 0.9 for m, l and x')
+def test_the_variant_defaults_are_the_ones_upstream_tunes_per_size():
+    by_variant = {h.name: h.default_by_variant for h in HYPERPARAMETERS if h.default_by_variant}
+    assert list(by_variant) == ['lrf', 'cls', 'obj', 'scale', 'mixup', 'copy_paste']
+    assert set(by_variant['scale']) == {'m', 'l', 'x', 'm6', 'l6', 'x6'}, 'n and s take the default'
 
 
-@pytest.mark.parametrize('variant, scale, copy_paste', [('s', 0.5, 0.0), ('m6', 0.9, 0.0), ('x', 0.9, 0.1)])
-def test_the_size_dependent_values_follow_the_model_size(variant: str, scale: float, copy_paste: float):
-    values = size_dependent_values(variant)
-    assert values.keys() == set(SIZE_DEPENDENT)
-    assert values['scale'] == scale
-    assert values['copy_paste'] == copy_paste
+def test_the_model_variants_are_the_pretrained_models():
+    assert MODEL_VARIANTS == [model.name for model in Yolov5TrainerLogic.provided_pretrained_models.fget(None)]
 
 
-def test_the_declared_defaults_keep_upstream_values_for_the_model_size(tmp_path):
-    """What the trainer writes: the resolved hyperparameters, filled with the size-dependent values."""
-    hyperparameters = resolve(HYPERPARAMETERS, {'mixup': 0.0})
-    for name, value in size_dependent_values('l').items():
-        hyperparameters.setdefault(name, value)
+def test_a_training_of_a_large_variant_writes_upstream_values_for_its_size(tmp_path):
+    """What the trainer writes: the hyperparameters the node library resolved for the training's variant."""
+    hyperparameters = resolve(for_variant(HYPERPARAMETERS, 'l'), {'mixup': 0.0})
     hyp = tmp_path / 'hyp.yaml'
     create_hyperparameter_file(str(hyp), 'l', hyperparameters)
     written = yaml.safe_load(hyp.read_text())
-    high = _UPSTREAM_BY_SIZE['l']
-    assert high['scale'] != _UPSTREAM_BY_SIZE['s']['scale'], 'the test needs a value that differs by size'
+    high = _UPSTREAM_BY_VARIANT['l']
+    assert high['scale'] != _UPSTREAM_BY_VARIANT['s']['scale'], 'the test needs a value that differs by size'
     assert written['scale'] == high['scale']
     assert written['copy_paste'] == high['copy_paste']
     assert written['mixup'] == 0.0, "the training's own value"
@@ -55,7 +51,7 @@ def test_the_declared_defaults_keep_upstream_values_for_the_model_size(tmp_path)
 
 def test_the_declaration_passes_the_check_the_node_runs_when_it_starts():
     """No name twice, no contradiction, every default fits; a failure here would stop the trainer node."""
-    check_declaration(HYPERPARAMETERS)
+    check_declaration(HYPERPARAMETERS, MODEL_VARIANTS)
 
 
 def test_the_declared_defaults_resolve_to_themselves():
