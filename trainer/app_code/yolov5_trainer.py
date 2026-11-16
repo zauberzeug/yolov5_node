@@ -30,16 +30,22 @@ from learning_loop_node.trainer.hyperparameters import parse_pairs
 from . import batch_size_calculation, model_files, training_run, yolov5_format
 from .hyperparameters import DEFAULT_POINT_SIZE, HYPERPARAMETERS
 
+EVALUATION_TIMEOUT = 3600
+"""Seconds the final evaluation may take; a stop is ignored while it runs, so it must not hang."""
+
 
 class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
 
-    def __init__(self, vram_limit_gb: float = 0) -> None:
+    def __init__(self, vram_limit_gb: float = 0, dataloader_workers: int = 8) -> None:
         super().__init__(model_format='yolov5_pytorch')
 
         self._vram_limit_gb = vram_limit_gb
+        self._dataloader_workers = dataloader_workers
 
         logging.info('------ STARTING YOLOV5 TRAINER LOGIC ------')
         self.inference_batch_size = 100  # yolo processes images one by one
+
+        self._evaluating = False
 
     # ---------------------------------------- IMPLEMENTED ABSTRACT PROPERTIES ----------------------------------------
 
@@ -91,7 +97,8 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         self.hyperparameters['trainer_version'] = os.environ.get('NODE_VERSION') or 'unknown'
         self._training_run.clear_failure()
         await self.executor.start(f'python /app/train_det.py --resume {shlex.quote(str(checkpoint))} \
-            --project {self.training.training_folder} --name result --vram-limit-gb {self._vram_limit_gb}',
+            --project {self.training.training_folder} --name result --vram-limit-gb {self._vram_limit_gb} \
+            --workers {self._dataloader_workers}',
                                   env={'WANDB_MODE': 'disabled'})
 
     def _get_new_best_training_state(self) -> TrainingStateData | None:
@@ -191,12 +198,24 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         # NOTE: parse function is blocking by IO operations, so we need to run it in a separate thread (default executor is ThreadPoolExecutor)
         return await asyncio.get_event_loop().run_in_executor(None, self._parse, labels_path, images_folder, model_information)
 
+    def _get_training_results(self, training_folder: Path) -> dict[str, list[Path]]:
+        """Return the files of each part of the training results."""
+        result = training_folder / 'result'
+        core = [result / name for name in (training_run.RESULTS_FILE, training_run.BATCH_SIZE_FILE, 'opt.yaml',
+                                           'hyp.yaml', 'confusion_matrix_test.json', 'curves_test.json')]
+        return {'core': [*core, training_folder / 'hyp.yaml', training_folder / 'dataset.yaml'],
+                'examples': [result / 'examples'],
+                'logs': [training_folder / 'last_training.log']}
+
     async def _clear_training_data(self, training_folder: str) -> None:
         keep_files = ['hyp.yaml', 'dataset.yaml', 'best.pt']
-        keep_dirs = ['result', 'weights']
+        keep_dirs = ['result', 'weights', 'examples']
+        result = Path(training_folder, 'result')
         for root, dirs, files in os.walk(training_folder, topdown=False):
+            is_result_dir = Path(root) in (result, result / 'examples')
             for file in files:
-                if file not in keep_files and not file.endswith('.log'):
+                keep = file in keep_files or file.endswith('.log') or (is_result_dir and not file.endswith('.pt'))
+                if not keep:
                     os.remove(os.path.join(root, file))
             for dir_ in dirs:
                 if dir_ not in keep_dirs:
@@ -222,7 +241,38 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         self._training_run.raise_failure()
         return super()._get_executor_error_from_log()
 
+    async def _train(self) -> None:
+        """Train, then evaluate the best model, also after a stop."""
+        await super()._train()
+        await self._final_evaluation()
+
+    async def _stop_running_training(self) -> None:
+        """Ignore a stop during the final evaluation, which the library would turn into an abort."""
+        if self._evaluating:
+            logging.info('Stop during the final evaluation: letting it finish')
+            return
+        await super()._stop_running_training()
+
     # ---------------------------------------- ADDITIONAL METHODS ----------------------------------------
+
+    async def _final_evaluation(self) -> None:
+        """Run `eval_det.py` on the best model; a failure is logged, not raised."""
+        executor = Executor(self.training.training_folder)  # appends to the training's log
+        self._evaluating = True
+        try:
+            await executor.start(f'python /app/eval_det.py --result-dir {self.training.training_folder}/result \
+                --vram-limit-gb {self._vram_limit_gb}', env={'WANDB_MODE': 'disabled'})
+            if (return_code := await asyncio.wait_for(executor.wait(), EVALUATION_TIMEOUT)) != 0:
+                logging.error('Final evaluation failed with return code %s, see the training log', return_code)
+        except TimeoutError:
+            logging.error('Final evaluation took longer than %s s, ending it', EVALUATION_TIMEOUT)
+        except Exception:
+            logging.exception('Final evaluation failed')
+        finally:
+            self._evaluating = False
+            # shield so the evaluation is stopped even when the task is cancelled (e.g. on abort())
+            if executor.is_running():
+                await asyncio.shield(executor.stop_and_wait())
 
     async def _start_training_from_model(self, model: str) -> None:
         yolov5_format.create_file_structure(self.training)
@@ -256,7 +306,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
             --project {self.training.training_folder} --name result --hyp {self.hyperparameter_path} \
             --epochs {hyperparameters["epochs"]} --conf-thres {hyperparameters["detect_nms_conf_thres"]} \
             --iou-thres {hyperparameters["detect_nms_iou_thres"]} \
-            --vram-limit-gb {self._vram_limit_gb} \
+            --vram-limit-gb {self._vram_limit_gb} --workers {self._dataloader_workers} \
             {additional_parameters}'
         if p_sizes_by_id:
             cmd += f' --point_sizes_by_id {p_sizes_by_id}'
