@@ -633,6 +633,7 @@ def main(opt, callbacks=Callbacks()):
         last = Path(check_file(opt.resume) if isinstance(opt.resume, str) else get_latest_run())
         opt_yaml = last.parent.parent / 'opt.yaml'  # train options yaml
         opt_data = opt.data  # original dataset
+        workers = opt.workers
         result_dir = Path(opt.project) / opt.name  # PATCH (yolov5-node): the folder the node passed.
         if opt_yaml.is_file():
             with open(opt_yaml, errors='ignore') as f:
@@ -642,6 +643,7 @@ def main(opt, callbacks=Callbacks()):
         opt = argparse.Namespace(**d)  # replace
         opt.cfg, opt.weights, opt.resume = '', str(last), True  # reinstate
         opt.clear = False  # PATCH (yolov5-node): --clear belongs only to a fresh training.
+        opt.workers = workers  # PATCH (yolov5-node): the node's current worker count, not the interrupted run's.
         if opt.batch_size == -1:  # PATCH (yolov5-node): keep the batch size the interrupted run measured.
             opt.batch_size = training_run.TrainingRun(result_dir).batch_size or -1
         if is_url(opt_data):
