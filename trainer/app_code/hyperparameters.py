@@ -74,7 +74,7 @@ HYPERPARAMETERS = [
     Hyperparameter(name='flipud', type='bool', default=False, notes='Flip half of the images vertically'),
     _pairs('flip_label_pairs', 'Categories swapped by a horizontal flip, as "uuid:uuid,..."', expert=False),
     _from_template('detect_nms_conf_thres', minimum=0, maximum=1,
-                   notes='Minimum confidence of a detection, in validation and in detection'),
+                   notes='Minimum confidence of a detection in validation; the published confidence is picked at or above it'),
     _from_template('detect_nms_iou_thres', minimum=0, maximum=1,
                    notes='IoU above which the weaker of two detections is dropped, in validation and in detection'),
     _native('lr0', notes='Initial learning rate', minimum=0, expert=False),
