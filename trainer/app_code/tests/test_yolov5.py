@@ -472,7 +472,7 @@ def test_hyperparameter_file_layers_upstream_node_and_training(tmp_path: Path):
     assert content['lr0'] == 0.01  # upstream
     assert content['scale'] == 0.9  # upstream, med for m
     assert content['flipud'] == 0.0  # hyp_det.yaml over upstream's 0.5
-    assert content['detect_nms_conf_thres'] == 0.2  # hyp_det.yaml
+    assert content['detect_nms_conf_thres'] == 0.001  # hyp_det.yaml
     assert content['fliplr'] == yolov5_format.FLIP_PROBABILITY  # training over hyp_det.yaml
     assert content['mixup'] == 0.0  # training over upstream's 0.1
     assert content['patience'] == 50  # training over hyp_det.yaml's 300
