@@ -82,7 +82,9 @@ does not survive a spawn, the node hands the same number to `train_det.py` and `
 
 **The trainer never trains in-process.** `Yolov5TrainerLogic` (`trainer/app_code/yolov5_trainer.py`)
 implements the library's abstract `TrainerLogic` hooks and shells out through the library's
-`Executor` to `trainer/train_det.py` (and `pred_det.py` for `_detect`). What a hook has to return is
+`Executor` to `trainer/train_det.py` (and `pred_det.py` for `_detect`). `_train` then runs
+`eval_det.py`, the final evaluation of `best.pt`, after a stop too; a stop during it is ignored,
+because the library would turn it into an abort. What a hook has to return is
 therefore recovered *from the subprocess log and from files on disk*, never from a return value:
 `_get_progress_from_log` scrapes the `epoch/total` column, `_get_executor_error_from_log` greps for
 CUDA messages, `_get_new_best_training_state` picks up the newest weight file through
@@ -96,12 +98,17 @@ with one `class x y w h` text file per image — encoding each category uuid as 
 that same ordering.
 
 **Models are selected on validation images and reported on the test images.** When they are the same,
-we optimize data loading by creating only one folder and loader for both sets.
+we optimize data loading by creating only one folder and loader for both sets. The confidence picked on
+the validation images travels with the reported epoch as `epoch<n>.model.json` → `published/latest.model.json`
+into the uploaded `model.json` (`conf_threshold`, via `_get_model_metadata`). The node library hands it to the
+detectors as `model_info.conf_threshold`, replaced by `CONF_THRESHOLD` when that is set.
 
 **Point detection rides on boxes.** A point annotation is written as a box of `point_size` and turned
 back into a point by category type. The point hyperparameters are not handed to yolov5 as
-hyperparameters; `_save_additional_hyperparameters` parses them out of `hyp.yaml` and re-encodes them
-as index-based command line arguments.
+hyperparameters. They are declared as `pairs`, so the node library refuses a malformed item before
+the training starts; `_start` reads them with `parse_pairs`, ends the training with a `CriticalError`
+on a point size that is not a positive number, and re-encodes them as index-based command line
+arguments.
 
 **Model handoff between sub-projects.** The trainer publishes `yolov5_pytorch` (`model.pt`) *and*
 `yolov5_wts` (built by `generate_wts.py`); the TensorRT detector declares
@@ -153,8 +160,8 @@ cd trainer && uv run --no-sync ruff check .
   `trainer/app_code/yolov5`, must carry a `PATCH (yolov5-node)` comment stating what deviates, so
   `grep -rn "PATCH (yolov5-node)"` lists every deviation. Only `detector/tensorrtx` follows this
   today; `trainer/app_code/yolov5` carries older unmarked deviations (the point-detection support in
-  `utils/dataloaders.py`), so do not read a clean grep there as "unmodified". `trainer/train_det.py`
-  and `trainer/pred_det.py` are not vendored: they started as upstream's `train.py` and `detect.py`
-  but are our own entry scripts now, so changes there carry no marker.
+  `utils/dataloaders.py`), so do not read a clean grep there as "unmodified". `trainer/train_det.py`,
+  `trainer/eval_det.py` and `trainer/pred_det.py` are not vendored: they started as upstream's
+  `train.py` and `detect.py` but are our own entry scripts now, so changes there carry no marker.
 - Each sub-project pins its own `learning_loop_node` version; the image tag `A.B.C-nlvX.Y.Z`
   encodes the node version and the library version it was built against.

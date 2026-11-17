@@ -3,6 +3,7 @@
 Model validation metrics
 """
 
+import json
 import math
 import warnings
 from pathlib import Path
@@ -28,7 +29,8 @@ def smooth(y, f=0.05):
     return np.convolve(yp, np.ones(nf) / nf, mode='valid')  # y-smoothed
 
 
-def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='.', names=(), eps=1e-16, prefix="", report_conf=None):
+def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='.', names=(), eps=1e-16, prefix="", report_conf=None,
+                 task=None):
     """ Compute the average precision, given the recall and precision curves.
     Source: https://github.com/rafaelpadilla/Object-Detection-Metrics.
     # Arguments
@@ -39,6 +41,7 @@ def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='.', names
         plot:  Plot precision-recall curve at mAP@0.5
         save_dir:  Plot save directory
         report_conf:  Confidence at which p, r, f1, tp and fp are reported (default: where the mean F1 peaks)
+        task:  The set evaluated ('val' or 'test'); if given, the curve data is saved as curves_<task>.json
     # Returns
         The average precision as computed in py-faster-rcnn, plus the confidence p, r, f1, tp and fp are reported at.
     """
@@ -52,8 +55,9 @@ def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='.', names
     nc = unique_classes.shape[0]  # number of classes, number of detections
 
     # Create Precision-Recall curve and compute AP for each class
-    px, py = np.linspace(0, 1, 1000), []  # for plotting
+    px = np.linspace(0, 1, 1000)  # for plotting
     ap, p, r = np.zeros((nc, tp.shape[1])), np.zeros((nc, 1000)), np.zeros((nc, 1000))
+    pr = np.zeros((nc, 1000))  # PATCH (yolov5-node): precision over recall per class, also for save_curves
     for ci, c in enumerate(unique_classes):
         i = pred_cls == c
         n_l = nt[ci]  # number of labels
@@ -76,15 +80,16 @@ def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='.', names
         # AP from recall-precision curve
         for j in range(tp.shape[1]):
             ap[ci, j], mpre, mrec = compute_ap(recall[:, j], precision[:, j])
-            if plot and j == 0:
-                py.append(np.interp(px, mrec, mpre))  # precision at mAP@0.5
+            if j == 0:  # PATCH (yolov5-node): kept for save_curves, not only for the plot
+                pr[ci] = np.interp(px, mrec, mpre)  # precision at mAP@0.5
 
     # Compute F1 (harmonic mean of precision and recall)
     f1 = 2 * p * r / (p + r + eps)
     names = [v for k, v in names.items() if k in unique_classes]  # list: only classes that have data
     names = dict(enumerate(names))  # to dict
     if plot:
-        plot_pr_curve(px, py, ap, Path(save_dir) / f'{prefix}PR_curve.png', names)
+        # PATCH (yolov5-node): one row per class, also for a class without predictions, so the names stay aligned
+        plot_pr_curve(px, list(pr), ap, Path(save_dir) / f'{prefix}PR_curve.png', names)
         plot_mc_curve(px, f1, Path(save_dir) / f'{prefix}F1_curve.png', names, ylabel='F1')
         plot_mc_curve(px, p, Path(save_dir) / f'{prefix}P_curve.png', names, ylabel='Precision')
         plot_mc_curve(px, r, Path(save_dir) / f'{prefix}R_curve.png', names, ylabel='Recall')
@@ -94,10 +99,37 @@ def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='.', names
         i = smooth(f1.mean(0), 0.1).argmax()  # max F1 index
     else:
         i = np.abs(px - report_conf).argmin()  # index of the given confidence
+    if task is not None:  # PATCH (yolov5-node): the data behind the plots
+        save_curves(Path(save_dir) / f'curves_{task}.json', task, px, i, p, r, f1, pr, ap, names, nt)
     p, r, f1 = p[:, i], r[:, i], f1[:, i]
     tp = (r * nt).round()  # true positives
     fp = (tp / (p + eps) - tp).round()  # false positives
     return tp, fp, p, r, f1, ap, unique_classes.astype(int), px[i]
+
+
+def save_curves(path, task, px, i, p, r, f1, pr, ap, names, nt):
+    # PATCH (yolov5-node): the data behind the PR, F1, P and R plots, per class and as the mean over the classes yolov5
+    # reports (classes with labels), each also at the reported confidence (index i)
+    def curve(y):
+        return [round(float(v), 4) for v in y]
+
+    def metrics(precision, recall, f1_, pr_precision, ap50, ap50_95):
+        return {'ap50': round(float(ap50), 4), 'ap50_95': round(float(ap50_95), 4),
+                'at_reported_conf': {'precision': round(float(precision[i]), 4), 'recall': round(float(recall[i]), 4),
+                                     'f1': round(float(f1_[i]), 4)},
+                'precision': curve(precision), 'recall': curve(recall), 'f1': curve(f1_), 'pr_precision': curve(pr_precision)}
+
+    content = {
+        'set': task,
+        'iou': 0.5,
+        'reported_conf': round(float(px[i]), 4),
+        'x': curve(px),
+        'axes': 'x is the confidence for precision, recall and f1, and the recall for pr_precision',
+        'classes': [{'name': names[ci], 'labels': int(nt[ci]), **metrics(p[ci], r[ci], f1[ci], pr[ci], ap[ci, 0], ap[ci].mean())}
+                    for ci in range(len(nt))],
+        'all': {'labels': int(nt.sum()),
+                **metrics(p.mean(0), r.mean(0), f1.mean(0), pr.mean(0), ap[:, 0].mean(), ap.mean())}}
+    Path(path).write_text(json.dumps(content))
 
 
 def compute_ap(recall, precision):
@@ -181,6 +213,18 @@ class ConfusionMatrix:
             for i, dc in enumerate(detection_classes):
                 if not any(m1 == i):
                     self.matrix[dc, self.nc] += 1  # predicted background
+
+    def save(self, save_dir='', names=(), task='val'):
+        # PATCH (yolov5-node): the raw counts and what they mean, as JSON
+        names = list(names) if len(names) == self.nc else [str(i) for i in range(self.nc)]
+        content = {
+            'set': task,
+            'conf': float(self.conf),
+            'iou': float(self.iou_thres),
+            'axes': 'rows: predicted, columns: true; the last row and column are background',
+            'names': [*names, 'background'],
+            'matrix': self.matrix.astype(int).tolist()}
+        (Path(save_dir) / f'confusion_matrix_{task}.json').write_text(json.dumps(content))
 
     def tp_fp(self):
         tp = self.matrix.diagonal()  # true positives

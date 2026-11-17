@@ -10,15 +10,20 @@ Trainer is tested with Nvidia Driver Version: 580.95.05 and CUDA Version: 13.0. 
 
 ## Hyperparameters
 
-We support all native hyperparameters of YOLOv5 (cf. `hyp_det.yaml` for reference).
+We support all native hyperparameters of YOLOv5. Their defaults are upstream's for the model variant: `hyp.scratch-low.yaml` for n and s, `hyp.scratch-med.yaml` for m and `hyp.scratch-high.yaml` for l and x, the P6 variants (`n6` … `x6`) included (cf. `trainer/app_code/yolov5/data/hyps/`). The flips `fliplr` and `flipud` stay off unless a training sets them (cf. `trainer/hyp_det.yaml`).
+The trainer declares every hyperparameter it accepts in [`hyperparameters.py`](trainer/app_code/hyperparameters.py) — type, default, range and a short note — and reports that declaration to the Learning Loop; a hyperparameter the loop does not send takes its default. The six native ones whose upstream default differs between the sizes (`lrf`, `cls`, `obj`, `scale`, `mixup` and `copy_paste`) carry the defaults of the other variants in `default_by_variant`, so the loop shows the default of the variant a training uses.
+Standard hyperparameters: `resolution`, `epochs`, `patience`, `max_batch_size`, `lr0`, `fliplr`, `flipud`, `flip_label_pairs` and `compute_validation_set`. All others, the native YOLOv5 ones included, are expert hyperparameters.
 In addition, we support the following hyperparameters:
 
-- `resolution`: The input size of the model. It must be a multiple of the model's largest stride (32, or 64 for the P6 `*6` variants) and at least twice that; otherwise the training fails before its first epoch.
+- `resolution`: The input size of the model, `832` by default. It must be a multiple of the model's largest stride (32, or 64 for the P6 `*6` variants) and at least twice that; otherwise the training fails before its first epoch.
 - `epochs`: The number of epochs to train the model.
+- `fliplr` and `flipud`: Flip half of the images horizontally or vertically. They are on or off rather than a probability.
+- `patience`: The number of epochs without improvement after which the training stops early, `300` by default. `0` disables early stopping.
 - `max_batch_size`: The largest batch size the training may use. It is measured rather than trusted: if it fits it is used as given, and if it does not, the largest power of two below it that does is used instead. `0` (the default) means 128. The training set bounds it as well: by an eighth of the training images, but never below 64. A training of fewer than 1 024 images therefore uses at most 64, and a `max_batch_size` above that bound is not tried as given. The training never uses fewer than 2 samples per batch, because validation halves the batch, so a `max_batch_size` of 1 is raised to 2. The value that was actually used is reported back as `batch_size` (see below).
 - `detect_nms_conf_thres`: The confidence threshold for the NMS during inference and validation (not relevant for training).
 - `detect_nms_iou_thres`: The IoU threshold for the NMS during inference and validation (not used for training).
-- `compute_validation_set`: Whether to split a validation set off the train images to select models on (default `false`). The best model, the early stopping and the confidence threshold are chosen on the validation set, and the counts the Learning Loop shows are read on the test set at that confidence. By default both are the same images, which makes the reported scores optimistic. With `true`, about a tenth of the train images (chosen by image id, so the same images stay out when new ones arrive) becomes the validation set instead, and the test set is only ever reported on. A validation set sent by the Learning Loop is used whatever this parameter says. Must be `true` or `false` (`1`/`0` and `yes`/`no` work too); anything else stops the training. Needs at least two train images; with fewer the training stops.
+- `compute_validation_set`: Whether to split a validation set off the train images to select models on (default `false`). The best model, the early stopping and the confidence threshold are chosen on the validation set, and the counts the Learning Loop shows are read on the test set at that confidence. By default both are the same images, which makes the reported scores optimistic. With `true`, about a tenth of the train images (chosen by image id, so the same images stay out when new ones arrive) becomes the validation set instead, and the test set is only ever reported on. A validation set sent by the Learning Loop is used whatever this parameter says. Must be `true` or `false` (`1`/`0` and `yes`/`no` work too); anything else stops the training. Needs at least two train images; with fewer the training stops. Detectors without their own `CONF_THRESHOLD` filter at the picked confidence.
+- `upload_examples`, `upload_logs`: Also upload the example images or the training log with the [training results](#training-results) (default `false`).
 
 Further, we support the following hyperparameters for point detection:
 
@@ -52,6 +57,7 @@ When using the script it is required to set up a .env file in the trainer folder
 | UVICORN_RELOAD              | Enable hot-reload                                    | TRUE/FALSE/0/1 | FALSE   | No                           |
 | RESTART_AFTER_TRAINING      | Auto-restart after training                          | TRUE/FALSE/0/1 | FALSE   | No                           |
 | KEEP_OLD_TRAININGS          | Do not remove old trainings, when starting a new one | TRUE/FALSE/0/1 | FALSE   | No                           |
+| DATALOADER_WORKERS          | Dataloader worker processes `train_det.py` uses, for training, validation and test alike. The node passes it as `--workers`, also when it resumes an interrupted training | Integer | available CPUs − 8, between 8 and 16; fewer than 10 CPUs: CPUs − 2 | No |
 | IMAGE_CACHE                 | `ram` keeps the decoded images of a training in RAM, so each is decoded once instead of in every epoch. The caches of the training, validation and test images together take at most half of the memory available when the training starts, counting a container memory limit; a set that does not fit is loaded from disk as without the cache. `off` disables it | ram/off | ram | No |
 | VRAM_LIMIT_GB               | Gigabytes of GPU memory a training may use. The batch size is probed against this limit instead of the whole card, and `train_det.py` and `pred_det.py` cap themselves to it, so a lower limit yields a smaller batch size rather than an out-of-memory error. Useful to share one GPU between processes. The limit is relative to the card's *total* memory, not to what is currently free | Number | 0 (no limit) | No |
 
@@ -83,6 +89,11 @@ The other trainers on the machine — a second container of this image, or a tra
 The kernel drops the lock with the container, so a crash frees it by itself.
 Set `TRAINING_SLOT_DIR` in `.env` to use another directory, or to the empty string for a trainer that has its GPU to itself.
 
+## Training results
+
+With each model, the trainer uploads the results of its training to the Learning Loop (see the node library's README): `results.csv`, `batch_size.json`, `opt.yaml`, `hyp.yaml`, `confusion_matrix_test.json` and `curves_test.json` from `result/`, and the training's `hyp.yaml` and `dataset.yaml`.
+With `upload_examples: true` also `result/examples/`, with `upload_logs: true` also `last_training.log`.
+
 # Detector Node
 
 This node is used to run Yolov5 Models for object detection.
@@ -106,7 +117,7 @@ Besides, the following parameters may be set:
 | HOST_PORT                   | Port on this machine mapped to the container | Integer               | 8004    | Yes                            |
 | WEIGHT_TYPE                 | Data type to convert weights to           | String [FP32, FP16, INT8] | FP16    | No                             |
 | IOU_THRESHOLD               | IoU threshold for NMS                     | Float                     | 0.45    | No                             |
-| CONF_THRESHOLD              | Confidence threshold for NMS              | Float                     | 0.2     | No                             |
+| CONF_THRESHOLD              | Minimum confidence of a detection, overriding the one the model was trained with (0.2 for a model without one) | Float | unset | No |
 | BUILDER_OPTIMIZATION_LEVEL  | TensorRT builder optimization level       | Integer [0-5]             | 4       | No                             |
 
 Each of these is also a command line flag — `--weight-type`, `--iou-threshold`, `--conf-threshold`,

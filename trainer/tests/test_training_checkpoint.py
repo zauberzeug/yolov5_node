@@ -7,10 +7,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import torch
+from learning_loop_node.data_classes import TrainingStateData
 
 import train_det
 from app_code import training_run
-from app_code.model_files import resume_checkpoint
+from app_code.model_files import delete_newer_epochs, resume_checkpoint
 from app_code.training_checkpoint import (
     atomic_save,
     discard_unfinished_epochs,
@@ -61,6 +62,43 @@ def test_best_carries_its_model_metadata_for_the_final_evaluation(tmp_path: Path
 
     save_best(full_checkpoint(5), tmp_path)
     assert torch.load(tmp_path / 'best.pt', weights_only=False)['model_metadata'] == {}
+
+
+def trainer_logic(training_folder: Path, **options: Any) -> Yolov5TrainerLogic:
+    logic = Yolov5TrainerLogic(**options)
+    logic._training = SimpleNamespace(training_folder=str(training_folder), training_folder_path=training_folder,
+                                      hyperparameters={})
+    return logic
+
+
+def best_epoch(weights: Path, epoch: int, model_metadata: dict[str, Any] | None = None) -> TrainingStateData:
+    save_best(full_checkpoint(epoch), weights, model_metadata)
+    report_best(weights, epoch, {'cat': {'tp': epoch}}, model_metadata)
+    return TrainingStateData(confusion_matrix={}, meta_information={'weightfile': str(weights / f'epoch{epoch}.pt')})
+
+
+def test_the_published_model_carries_the_metadata_of_its_epoch(tmp_path: Path) -> None:
+    weights = tmp_path / 'result/weights'
+    weights.mkdir(parents=True)
+    logic = trainer_logic(tmp_path)
+    assert logic._get_model_metadata() == {}
+
+    logic._on_metrics_published(best_epoch(weights, 4, {'conf_threshold': 0.4}))
+    assert (weights / 'published/latest.pt').exists()
+    assert not (weights / 'epoch4.model.json').exists()
+    assert logic._get_model_metadata() == {'conf_threshold': 0.4}
+
+    logic._on_metrics_published(best_epoch(weights, 5))
+    assert logic._get_model_metadata() == {}
+
+
+def test_discarded_epochs_take_their_metadata_along(tmp_path: Path) -> None:
+    best_epoch(tmp_path, 4, {'conf_threshold': 0.4})
+
+    delete_newer_epochs(tmp_path, 3)
+
+    assert not (tmp_path / 'epoch4.pt').exists()
+    assert not (tmp_path / 'epoch4.model.json').exists()
 
 
 def test_restart_discards_best_of_an_epoch_without_last(tmp_path: Path) -> None:
@@ -192,8 +230,7 @@ def test_node_resumes_from_last_checkpoint_into_the_result_folder(tmp_path: Path
     (weights / 'last.pt').touch()
     (weights / 'published/latest.pt').touch()
     (tmp_path / 'hyp.yaml').write_text('epochs: 10\n')
-    logic = Yolov5TrainerLogic()
-    logic._training = SimpleNamespace(training_folder=str(tmp_path), training_folder_path=tmp_path, hyperparameters={})
+    logic = trainer_logic(tmp_path, dataloader_workers=12)
     logic._executor = MagicMock(start=AsyncMock())
     assert logic._can_resume()
 
@@ -204,7 +241,30 @@ def test_node_resumes_from_last_checkpoint_into_the_result_folder(tmp_path: Path
     assert command[command.index('--project') + 1] == str(tmp_path)
     assert command[command.index('--name') + 1] == 'result'
     assert '--vram-limit-gb' in command
+    assert command[command.index('--workers') + 1] == '12'
     assert command[command.index('--cache') + 1] == 'ram'
+
+
+def test_main_resumes_with_the_current_worker_count(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    weights = tmp_path / 'result/weights'
+    weights.mkdir(parents=True)
+    checkpoint = weights / 'last.pt'
+    checkpoint.touch()
+    monkeypatch.setattr('sys.argv', ['train_det.py'])
+    options = train_det.parse_opt()
+    options.workers = 8
+    options.save_dir = str(weights.parent)
+    train_det.yaml_save(str(weights.parent / 'opt.yaml'), vars(options))
+    options.resume = str(checkpoint)
+    options.workers = current_workers = 16
+    train = MagicMock()
+    monkeypatch.setattr(train_det, 'train', train)
+    monkeypatch.setattr(train_det, 'select_device', lambda *_a, **_kw: torch.device('cpu'))
+    monkeypatch.setattr(train_det, 'check_comet_resume', lambda _: False)
+
+    train_det.main(options)
+
+    assert train.call_args.args[1].workers == current_workers
 
 
 def test_main_resumes_with_the_current_image_cache_setting(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

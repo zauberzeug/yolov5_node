@@ -1,10 +1,12 @@
-"""What `train_det.py` leaves in its result folder for the trainer node, and for its own resume, to read.
+"""What `train_det.py` leaves in its result folder for the trainer node, its own resume and the training results.
 
-`train_det.py` writes through :func:`report_batch_size` and :func:`reporting`; the node reads
-through :class:`TrainingRun`, and so does a resumed `train_det.py` for the batch size the
+`train_det.py` writes through :func:`report_batch_size`, :func:`report_epoch` and :func:`reporting`; the node
+reads through :class:`TrainingRun`, and so does a resumed `train_det.py` for the batch size the
 interrupted run measured. The file names and their format stay inside this module.
 """
+import csv
 import json
+import math
 import os
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -16,6 +18,7 @@ from .batch_size_calculation import InvalidResolutionError
 
 BATCH_SIZE_FILE = 'batch_size.json'
 FAILURE_FILE = 'failure.json'
+RESULTS_FILE = 'results.csv'
 
 
 class NoGpuError(CriticalError):
@@ -36,6 +39,51 @@ _ERRORS: dict[str, Callable[[str], CriticalError]] = {
 
 def report_batch_size(result_dir: Path, batch_size: int) -> None:
     _write_json(result_dir / BATCH_SIZE_FILE, {'batch_size': batch_size})
+
+
+def report_epoch(result_dir: Path, epoch: int, metrics: dict[str, float]) -> None:
+    """Add an epoch's losses, metrics and learning rates to the results table.
+
+    Rows of this and any later epoch are dropped first, as a resumed run repeats them.
+    """
+    path = result_dir / RESULTS_FILE
+    try:
+        with path.open(newline='') as f:
+            header, *rows = list(csv.reader(f))
+    except (FileNotFoundError, ValueError):
+        header, rows = ['epoch', *metrics], []
+    rows = [row for row in rows if _is_before(row, epoch)]
+    rows.append([str(epoch), *(f'{value:.5g}' for value in metrics.values())])
+    temporary = path.with_name(f'.{path.name}.tmp')
+    with temporary.open('w', newline='') as f:
+        csv.writer(f).writerows([header, *rows])
+    os.replace(temporary, path)
+
+
+def _is_before(row: list[str], epoch: int) -> bool:
+    """Return whether a row of the results table belongs to an earlier epoch; a blank or truncated row does not."""
+    try:
+        return int(row[0]) < epoch
+    except (IndexError, ValueError):
+        return False
+
+
+def class_metrics(names: dict[int, str], counts: dict[str, dict[str, int]],
+                  aps: dict[str, dict[str, float]]) -> dict[str, float]:
+    """Return precision, recall, AP50 and AP50-95 per class in `names`, in order, as columns for :func:`report_epoch`.
+
+    A value without data to compute it from (no labels, or a zero denominator) is NaN.
+    """
+    metrics = {}
+    for name in names.values():
+        class_counts = counts.get(name, {})
+        tp, fp, fn = (class_counts.get(key, 0) for key in ('tp', 'fp', 'fn'))
+        class_aps = aps.get(name, {})
+        metrics[f'metrics/precision/{name}'] = tp / (tp + fp) if tp + fp else math.nan
+        metrics[f'metrics/recall/{name}'] = tp / (tp + fn) if tp + fn else math.nan
+        metrics[f'metrics/mAP_0.5/{name}'] = class_aps.get('ap50', math.nan)
+        metrics[f'metrics/mAP_0.5:0.95/{name}'] = class_aps.get('ap50_95', math.nan)
+    return metrics
 
 
 @contextmanager

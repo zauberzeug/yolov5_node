@@ -19,8 +19,10 @@ jobs:
           LOOP_HOST: ${{ secrets.LOOP_HOST }}
           LOOP_USERNAME: "admin"
           LOOP_PASSWORD: ${{ secrets.LEARNING_LOOP_ADMIN_PASSWORD }}
+          # one test project per run on the shared loop; cleanup_test_projects parses this format
+          LOOP_TEST_PROJECT_SUFFIX: ${{ github.run_id }}_${{ github.run_attempt }}
         run: |
-          docker run -d -it --rm -v /home/zauberzeug/data:/data -h n6 -e LOOP_HOST=$LOOP_HOST -e LOOP_USERNAME=$LOOP_USERNAME -e LOOP_PASSWORD=$LOOP_PASSWORD --name yolov5_trainer_node_github_action --device=nvidia.com/gpu=all --ipc host zauberzeug/yolov5-trainer:latest
+          docker run -d -it --rm -v /home/zauberzeug/data:/data -h n6 -e LOOP_HOST=$LOOP_HOST -e LOOP_USERNAME=$LOOP_USERNAME -e LOOP_PASSWORD=$LOOP_PASSWORD -e LOOP_TEST_PROJECT_SUFFIX=$LOOP_TEST_PROJECT_SUFFIX --name yolov5_trainer_node_github_action --device=nvidia.com/gpu=all --ipc host zauberzeug/yolov5-trainer:latest
       - name: tests
         run: |
           docker exec yolov5_trainer_node_github_action uv sync --frozen --group dev
@@ -29,6 +31,18 @@ jobs:
         if: always() # also execute when pytest fails
         run: |
           docker stop yolov5_trainer_node_github_action || echo "Nothing to do. No container running."
+
+  cleanup_test_projects:
+    # a job of its own on a hosted runner, so it also runs when the GPU runner is lost
+    needs: pytest
+    if: always()
+    permissions:
+      contents: read
+      actions: read # the sweep looks up runs
+    uses: zauberzeug/learning_loop_node/.github/workflows/cleanup-test-projects.yml@main
+    with:
+      projects: pytest_yolo5det
+    secrets: inherit
 
   pytest_detector_cpu:
     runs-on: ubuntu-latest

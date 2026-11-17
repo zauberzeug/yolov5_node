@@ -14,10 +14,13 @@ from learning_loop_node.enums import TrainerState
 from learning_loop_node.helpers.misc import create_image_folder
 from learning_loop_node.loop_communication import LoopCommunicator
 from learning_loop_node.trainer.downloader import TrainingsDownloader
+from learning_loop_node.trainer.exceptions import CriticalError
 from learning_loop_node.trainer.executor import Executor
+from learning_loop_node.trainer.hyperparameters import resolve
 from ruamel.yaml import YAML
 
 from .. import batch_size_calculation, model_files, yolov5_format
+from ..hyperparameters import HYPERPARAMETERS
 from ..yolov5_format import set_hyperparameters_in_file
 from ..yolov5_trainer import Yolov5TrainerLogic
 
@@ -26,12 +29,15 @@ from ..yolov5_trainer import Yolov5TrainerLogic
 logging.basicConfig(level=logging.DEBUG)
 yaml = YAML()
 
+_SUFFIX = os.environ.get('LOOP_TEST_PROJECT_SUFFIX')
+PROJECT = f'pytest_yolo5det_{_SUFFIX}' if _SUFFIX else 'pytest_yolo5det'
+
 project_configuration = {
-    'project_name': 'pytest_yolo5det', 'box_categories': 2, 'point_categories': 2, 'inbox': 4, 'annotate': 0, 'review': 0,
+    'project_name': PROJECT, 'box_categories': 2, 'point_categories': 2, 'inbox': 4, 'annotate': 0, 'review': 0,
     'complete': 14, 'image_style': 'beautiful', 'thumbs': False, 'trainings': 1}
 
 
-@pytest.mark.environment(organization='zauberzeug', project='pytest_yolo5det', mode='DETECTION')
+@pytest.mark.environment(organization='zauberzeug', project=PROJECT, mode='DETECTION')
 @pytest.mark.generate_project(configuration=project_configuration)
 class TestWithLoop:
     """This test environment sets up the environment vars and
@@ -49,7 +55,7 @@ class TestWithLoop:
                             training_folder=project_folder + '/training',
                             images_folder=images_folder,
                             model_variant='',
-                            context=Context(project='pytest_yolo5det', organization='zauberzeug'),
+                            context=Context(project=PROJECT, organization='zauberzeug'),
                             categories=categories, hyperparameters={}, training_number=1,
                             training_state=TrainerState.Initialized.value,
                             image_data=image_data)
@@ -79,7 +85,7 @@ class TestWithLoop:
             training_folder=project_folder + '/training',
             images_folder=images_folder,
             model_variant='',
-            context=Context(project='pytest_yolo5det', organization='zauberzeug'),
+            context=Context(project=PROJECT, organization='zauberzeug'),
             categories=categories, hyperparameters={}, training_number=1,
             training_state=TrainerState.Initialized.value,
             image_data=image_data,
@@ -111,7 +117,7 @@ class TestWithLoop:
             training_folder=project_folder + '/training',
             images_folder=images_folder,
             model_variant='',
-            context=Context(project='pytest_yolo5det', organization='zauberzeug'),
+            context=Context(project=PROJECT, organization='zauberzeug'),
             categories=categories, hyperparameters={}, training_number=1,
             training_state=TrainerState.Initialized.value,
             image_data=image_data,
@@ -133,7 +139,7 @@ class TestWithLoop:
     async def test_parse_progress_from_log(self, data_exchanger: DataExchanger, glc: LoopCommunicator):
         """Test if progress is parsed correctly from log"""
         trainer = Yolov5TrainerLogic()
-        trainer.epochs = 2
+        epochs = 2
         project_folder = os.getcwd()
         images_folder = create_image_folder(project_folder)
         categories, image_data = await download_training_data(images_folder, data_exchanger, glc)
@@ -143,8 +149,8 @@ class TestWithLoop:
             training_folder=project_folder + '/training',
             images_folder=images_folder,
             model_variant='',
-            context=Context(project='pytest_yolo5det', organization='zauberzeug'),
-            categories=categories, hyperparameters={}, training_number=1,
+            context=Context(project=PROJECT, organization='zauberzeug'),
+            categories=categories, hyperparameters=resolve(HYPERPARAMETERS, {'epochs': epochs}), training_number=1,
             training_state=TrainerState.Initialized.value,
             image_data=image_data,
         )
@@ -152,13 +158,13 @@ class TestWithLoop:
 
         trainer._executor = Executor(os.getcwd())
         ROOT = Path(__file__).resolve().parents[2]
-        cmd = f'python {ROOT/"train_det.py"} --project training --name result --batch 4 --img 416 --data training/dataset.yaml --weights model.pt --epochs {trainer.epochs}'
+        cmd = f'python {ROOT/"train_det.py"} --project training --name result --batch 4 --img 416 --data training/dataset.yaml --weights model.pt --epochs {epochs}'
         await trainer.executor.start(cmd, env={'WANDB_MODE': 'disabled'})
         while trainer.executor.is_running():
             await asyncio.sleep(1)
 
         logging.info(trainer.executor.get_log())
-        assert f'{trainer.epochs} epochs completed' in trainer.executor.get_log()
+        assert f'{epochs} epochs completed' in trainer.executor.get_log()
         assert trainer.training_progress == 1.0
 
 # =======================================================================================================================
@@ -418,6 +424,16 @@ class TestWithDetection:
         assert len(files) == 2  # Note: Do not delete last_training.log and best.pt
 
 
+def test_the_training_results_name_the_files_of_each_part(tmp_path: Path):
+    results = Yolov5TrainerLogic()._get_training_results(tmp_path)  # pylint: disable=protected-access
+
+    assert {part: sorted(str(f.relative_to(tmp_path)) for f in files) for part, files in results.items()} == {
+        'core': ['dataset.yaml', 'hyp.yaml', 'result/batch_size.json', 'result/confusion_matrix_test.json',
+                 'result/curves_test.json', 'result/hyp.yaml', 'result/opt.yaml', 'result/results.csv'],
+        'examples': ['result/examples'],
+        'logs': ['last_training.log']}
+
+
 def test_update_hyperparameter():
     """The hyperparameter file should be updated with the given hyperparameter"""
     def assert_yaml_content(yaml_path, **kwargs):
@@ -434,6 +450,32 @@ def test_update_hyperparameter():
     assert_yaml_content('/tmp/hyp.yaml', fliplr=0.0, flipud=0.0)
     set_hyperparameters_in_file('/tmp/hyp.yaml', hyperparameter)
     assert_yaml_content('/tmp/hyp.yaml', fliplr=0.5, flipud=0.5)
+
+
+@pytest.mark.parametrize('variant, level', [('n', 'low'), ('s', 'low'), ('s6', 'low'), ('m', 'med'), ('m6', 'med'),
+                                            ('l', 'high'), ('x6', 'high')])
+def test_upstream_hyperparameters_follow_the_model_size(variant: str, level: str):
+    assert yolov5_format.upstream_hyperparameter_file(variant).name == f'hyp.scratch-{level}.yaml'
+
+
+def test_unknown_model_variant_has_no_hyperparameters():
+    with pytest.raises(CriticalError):
+        yolov5_format.upstream_hyperparameter_file('xl')
+
+
+def test_hyperparameter_file_layers_upstream_node_and_training(tmp_path: Path):
+    target = tmp_path / 'hyp.yaml'
+    yolov5_format.create_hyperparameter_file(str(target), 'm6', {'fliplr': True, 'mixup': 0.0, 'patience': 50})
+
+    with open(target) as f:
+        content = yaml.load(f)
+    assert content['lr0'] == 0.01  # upstream
+    assert content['scale'] == 0.9  # upstream, med for m
+    assert content['flipud'] == 0.0  # hyp_det.yaml over upstream's 0.5
+    assert content['detect_nms_conf_thres'] == 0.2  # hyp_det.yaml
+    assert content['fliplr'] == yolov5_format.FLIP_PROBABILITY  # training over hyp_det.yaml
+    assert content['mixup'] == 0.0  # training over upstream's 0.1
+    assert content['patience'] == 50  # training over hyp_det.yaml's 300
 
 # =======================================================================================================================
 # ---------------------------------------------- HELPERS ----------------------------------------------------------------
