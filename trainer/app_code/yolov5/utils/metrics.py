@@ -95,12 +95,12 @@ def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='.', names
         plot_mc_curve(px, p, Path(save_dir) / f'{prefix}P_curve.png', names, ylabel='Precision')
         plot_mc_curve(px, r, Path(save_dir) / f'{prefix}R_curve.png', names, ylabel='Recall')
 
-    # PATCH (yolov5-node): report at a given confidence (picked on the validation set) and return it
-    # Below min_conf there are no predictions and the curves are flat, so a peak there says nothing about the
-    # detections a model filtering at that lower confidence would add.
+    # PATCH (yolov5-node): pick the F1 peak at or above min_conf, or report at a given confidence (picked on the
+    # validation set), and return it. Below min_conf there are no predictions and the curves are flat, so a peak
+    # there is not evidence for a lower threshold.
     if report_conf is None:
         lowest = np.searchsorted(px, min_conf)
-        i = lowest + smooth(f1.mean(0), 0.1)[lowest:].argmax()  # max F1 index at or above min_conf
+        i = lowest + smooth(f1.mean(0), 0.1)[lowest:].argmax()  # max F1 index
     else:
         i = np.abs(px - report_conf).argmin()  # index of the given confidence
     if task is not None:  # PATCH (yolov5-node): the data behind the plots

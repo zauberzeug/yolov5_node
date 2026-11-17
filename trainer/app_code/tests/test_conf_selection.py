@@ -31,7 +31,7 @@ def test_the_conf_is_not_pulled_below_the_nms_conf_by_smoothing():
     assert picked_conf(tp_confs, fp_confs, labels=10, min_conf=NMS_CONF) >= NMS_CONF
 
 
-def test_a_peak_above_the_nms_conf_is_picked_as_before():
+def test_a_peak_above_the_nms_conf_does_not_depend_on_min_conf():
     tp_confs = list(np.linspace(0.6, 0.7, 10))
     fp_confs = list(np.linspace(NMS_CONF, 0.3, 10))
 
