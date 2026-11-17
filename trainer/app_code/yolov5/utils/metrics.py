@@ -30,7 +30,7 @@ def smooth(y, f=0.05):
 
 
 def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='.', names=(), eps=1e-16, prefix="", report_conf=None,
-                 task=None):
+                 task=None, min_conf=0.0):
     """ Compute the average precision, given the recall and precision curves.
     Source: https://github.com/rafaelpadilla/Object-Detection-Metrics.
     # Arguments
@@ -40,8 +40,9 @@ def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='.', names
         target_cls:  True object classes (nparray).
         plot:  Plot precision-recall curve at mAP@0.5
         save_dir:  Plot save directory
-        report_conf:  Confidence at which p, r, f1, tp and fp are reported (default: where the mean F1 peaks)
+        report_conf:  Confidence at which p, r, f1, tp and fp are reported (default: where the mean F1 peaks at or above min_conf)
         task:  The set evaluated ('val' or 'test'); if given, the curve data is saved as curves_<task>.json
+        min_conf:  The confidence the predictions were filtered at
     # Returns
         The average precision as computed in py-faster-rcnn, plus the confidence p, r, f1, tp and fp are reported at.
     """
@@ -95,8 +96,11 @@ def ap_per_class(tp, conf, pred_cls, target_cls, plot=False, save_dir='.', names
         plot_mc_curve(px, r, Path(save_dir) / f'{prefix}R_curve.png', names, ylabel='Recall')
 
     # PATCH (yolov5-node): report at a given confidence (picked on the validation set) and return it
+    # Below min_conf there are no predictions and the curves are flat, so a peak there says nothing about the
+    # detections a model filtering at that lower confidence would add.
     if report_conf is None:
-        i = smooth(f1.mean(0), 0.1).argmax()  # max F1 index
+        lowest = np.searchsorted(px, min_conf)
+        i = lowest + smooth(f1.mean(0), 0.1)[lowest:].argmax()  # max F1 index at or above min_conf
     else:
         i = np.abs(px - report_conf).argmin()  # index of the given confidence
     if task is not None:  # PATCH (yolov5-node): the data behind the plots

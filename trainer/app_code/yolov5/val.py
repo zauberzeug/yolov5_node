@@ -127,7 +127,7 @@ def run(
         callbacks=Callbacks(),
         compute_loss=None,
         # PATCH (yolov5-node): report_conf, keep and the returned reported_conf
-        report_conf=None,  # confidence the per-class counts are reported at (default: where the mean F1 peaks)
+        report_conf=None,  # confidence the per-class counts are reported at (default: where the mean F1 peaks at or above conf_thres)
         keep=False,  # count and save the confusion matrix and the curve data, named after the task
 ):
     # Initialize/load model and set device
@@ -281,7 +281,8 @@ def run(
     if len(stats) and stats[0].any():
         tp, fp, p, r, f1, ap, ap_class, reported_conf = ap_per_class(*stats, plot=plots, save_dir=save_dir, names=names,
                                                                      report_conf=report_conf,
-                                                                     task=task if keep else None)  # PATCH (yolov5-node)
+                                                                     task=task if keep else None,
+                                                                     min_conf=conf_thres)  # PATCH (yolov5-node)
         ap50, ap = ap[:, 0], ap.mean(1)  # AP@0.5, AP@0.5:0.95
         mp, mr, map50, map = p.mean(), r.mean(), ap50.mean(), ap.mean()
     nt = np.bincount(stats[3].astype(int), minlength=nc)  # number of targets per class
