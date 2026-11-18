@@ -339,8 +339,8 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     assert mlc < nc, f'Label class {mlc} exceeds nc={nc} in {data}. Possible class labels are 0-{nc - 1}'
 
     evaluation = dict(img_size=imgsz, batch_size=batch_size, stride=gs, single_cls=single_cls, hyp=hyp,
-                      workers=workers, point_sizes_by_id=point_sizes_by_id)
-    val_loader = training_recipe.evaluation_loader(val_path, 'val', cache=opt.cache, **evaluation)
+                      workers=workers, point_sizes_by_id=point_sizes_by_id, cache=opt.cache)
+    val_loader = training_recipe.evaluation_loader(val_path, 'val', **evaluation)
     test_loader = val_loader if test_path == val_path else \
         training_recipe.evaluation_loader(test_path, 'test', **evaluation)
 
@@ -635,6 +635,7 @@ def main(opt, callbacks=Callbacks()):
         opt_data = opt.data  # original dataset
         workers = opt.workers
         result_dir = Path(opt.project) / opt.name  # PATCH (yolov5-node): the folder the node passed.
+        cache = opt.cache
         if opt_yaml.is_file():
             with open(opt_yaml, errors='ignore') as f:
                 d = yaml.safe_load(f)
@@ -644,6 +645,7 @@ def main(opt, callbacks=Callbacks()):
         opt.cfg, opt.weights, opt.resume = '', str(last), True  # reinstate
         opt.clear = False  # PATCH (yolov5-node): --clear belongs only to a fresh training.
         opt.workers = workers  # PATCH (yolov5-node): the node's current worker count, not the interrupted run's.
+        opt.cache = cache  # PATCH (yolov5-node): the node's current image cache setting, not the interrupted run's.
         if opt.batch_size == -1:  # PATCH (yolov5-node): keep the batch size the interrupted run measured.
             opt.batch_size = training_run.TrainingRun(result_dir).batch_size or -1
         if is_url(opt_data):
