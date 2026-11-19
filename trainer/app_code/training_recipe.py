@@ -5,6 +5,7 @@ Kept in one place so that they cannot drift apart from the training.
 from learning_loop_node.trainer.hyperparameters import parse_pairs
 from torch.utils.data import DataLoader
 
+from .image_cache import CacheBudget
 from .yolov5.utils.dataloaders import create_dataloader
 from .yolov5.utils.general import colorstr
 
@@ -25,15 +26,16 @@ def scale_loss_weights(hyp: dict, *, layers: int, categories: int, img_size: int
 def evaluation_loader(path: str, name: str, *, img_size: int, batch_size: int,  # noqa: PLR0913
                       stride: int, single_cls: bool, hyp: dict, workers: int,
                       point_sizes_by_id: dict[int, float],
-                      cache: str | None = None) -> DataLoader:
+                      cache: str | None = None, cache_budget: CacheBudget | None = None) -> DataLoader:
     """Return the loader of the images a model is validated or tested on.
 
     :param name: The set, ``'val'`` or ``'test'``, as the log names it.
     :param batch_size: The batch size of the training; the loader takes half of it.
+    :param cache_budget: The budget a RAM cache of the images claims from.
     """
     return create_dataloader(path, img_size, batch_size // 2, stride, single_cls, hyp=hyp, cache=cache, rect=True,
                              rank=-1, workers=workers * 2, pad=VAL_PAD, prefix=colorstr(f'{name}: '),
-                             point_sizes_by_id=point_sizes_by_id)[0]
+                             point_sizes_by_id=point_sizes_by_id, cache_budget=cache_budget)[0]
 
 
 def parse_point_sizes(argument: str) -> dict[int, float]:

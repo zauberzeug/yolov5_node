@@ -1,7 +1,11 @@
 import logging
+import subprocess
+import sys
 from dataclasses import asdict
+from pathlib import Path
 
 import numpy as np
+import pytest
 import torch
 from fastapi.encoders import jsonable_encoder
 from learning_loop_node.data_classes import Category, ModelInformation
@@ -10,6 +14,16 @@ from learning_loop_node.enums import CategoryType
 from ..yolov5_detector import Yolov5Detector
 
 # pylint: disable=protected-access
+
+YOLOV5_IN_IMAGE = Path(__file__).parents[1] / 'app_code' / 'yolov5'
+
+
+@pytest.mark.skipif(not YOLOV5_IN_IMAGE.is_dir(), reason='only the built image holds the yolov5 code')
+def test_yolov5_code_loads_without_the_trainer() -> None:
+    """The image holds the trainer's yolov5 folder but nothing else of the trainer."""
+    # the modules torch.hub.load imports through hubconf.py when the detector loads a model
+    modules = 'models.common, models.experimental, models.yolo, utils.downloads, utils.general, utils.torch_utils'
+    subprocess.run([sys.executable, '-c', f'import {modules}'], cwd=YOLOV5_IN_IMAGE, check=True)
 
 
 def _make_detector(input_size: int = 0) -> Yolov5Detector:
