@@ -37,6 +37,7 @@ from torch.optim import lr_scheduler
 from tqdm import tqdm
 
 from app_code import batch_size_calculation, training_recipe, training_run
+from app_code.image_cache import CacheBudget
 from app_code.training_checkpoint import (
     atomic_save,
     discard_unfinished_epochs,
@@ -316,6 +317,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         del ckpt, csd
 
     # Trainloader
+    cache_budget = CacheBudget()
     train_loader, dataset = create_dataloader(train_path,
                                               imgsz,
                                               batch_size,
@@ -332,14 +334,16 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                               prefix=colorstr('train: '),
                                               shuffle=True,
                                               point_sizes_by_id=point_sizes_by_id,
-                                              flip_label_pairs=flip_label_pairs)
+                                              flip_label_pairs=flip_label_pairs,
+                                              cache_budget=cache_budget)
 
     labels = np.concatenate(dataset.labels, 0)
     mlc = int(labels[:, 0].max())  # max label class
     assert mlc < nc, f'Label class {mlc} exceeds nc={nc} in {data}. Possible class labels are 0-{nc - 1}'
 
     evaluation = dict(img_size=imgsz, batch_size=batch_size, stride=gs, single_cls=single_cls, hyp=hyp,
-                      workers=workers, point_sizes_by_id=point_sizes_by_id, cache=opt.cache)
+                      workers=workers, point_sizes_by_id=point_sizes_by_id, cache=opt.cache,
+                      cache_budget=cache_budget)
     val_loader = training_recipe.evaluation_loader(val_path, 'val', **evaluation)
     test_loader = val_loader if test_path == val_path else \
         training_recipe.evaluation_loader(test_path, 'test', **evaluation)

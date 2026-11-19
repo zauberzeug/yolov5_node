@@ -29,8 +29,6 @@ from PIL import ExifTags, Image, ImageOps
 from torch.utils.data import DataLoader, Dataset, dataloader, distributed
 from tqdm import tqdm
 
-from app_code import image_cache  # PATCH (yolov5-node): one budget for every image cache of a training.
-
 from .augmentations import (
     Albumentations,
     augment_hsv,
@@ -144,7 +142,8 @@ def create_dataloader(path,
                       prefix='',
                       shuffle=False,
                       point_sizes_by_id: dict[int, float] | None = None,
-                      flip_label_pairs: list[tuple[int, int]] | None = None):
+                      flip_label_pairs: list[tuple[int, int]] | None = None,
+                      cache_budget=None):  # PATCH (yolov5-node): the budget a RAM cache claims from.
     if rect and shuffle:
         LOGGER.warning('WARNING ⚠️ --rect is incompatible with DataLoader shuffle, setting shuffle=False')
         shuffle = False
@@ -163,7 +162,8 @@ def create_dataloader(path,
             image_weights=image_weights,
             prefix=prefix,
             point_sizes_by_id=point_sizes_by_id,
-            flip_label_pairs=flip_label_pairs)
+            flip_label_pairs=flip_label_pairs,
+            cache_budget=cache_budget)
 
     batch_size = min(batch_size, len(dataset))
     nd = torch.cuda.device_count()  # number of CUDA devices
@@ -492,8 +492,10 @@ class LoadImagesAndLabels(Dataset):
                  min_items=0,
                  prefix='',
                  point_sizes_by_id: dict[int, float] | None = None,
-                 flip_label_pairs: list[tuple[int, int]] | None = None):
+                 flip_label_pairs: list[tuple[int, int]] | None = None,
+                 cache_budget=None):
 
+        self.cache_budget = cache_budget  # PATCH (yolov5-node): the budget a RAM cache claims from.
         self.img_size = img_size
         self.augment = augment
         self.hyp = hyp
@@ -642,12 +644,20 @@ class LoadImagesAndLabels(Dataset):
             ratio = self.img_size / max(im.shape[0], im.shape[1])  # max(h, w)  # ratio
             b += im.nbytes * ratio ** 2
         mem_required = b * self.n / n  # GB required to cache dataset into RAM
-        # PATCH (yolov5-node): claims from image_cache.budget instead of comparing with psutil's available memory.
-        left = image_cache.budget.remaining
-        cache = image_cache.budget.claim(mem_required * (1 + safety_margin))
+        # PATCH (yolov5-node): claims from cache_budget, when one was passed, instead of comparing with psutil's
+        # available memory.
+        if self.cache_budget is not None:
+            left = self.cache_budget.remaining
+            cache = self.cache_budget.claim(mem_required * (1 + safety_margin))
+            if not cache:
+                LOGGER.info(f"{prefix}{mem_required / gb:.1f}GB RAM required, "
+                            f"{left / gb:.1f}GB of the image cache budget left, not caching images ⚠️")
+            return cache
+        mem = psutil.virtual_memory()
+        cache = mem_required * (1 + safety_margin) < mem.available  # to cache or not to cache, that is the question
         if not cache:
             LOGGER.info(f"{prefix}{mem_required / gb:.1f}GB RAM required, "
-                        f"{left / gb:.1f}GB of the image cache budget left, "
+                        f"{mem.available / gb:.1f}/{mem.total / gb:.1f}GB available, "
                         f"{'caching images ✅' if cache else 'not caching images ⚠️'}")
         return cache
 

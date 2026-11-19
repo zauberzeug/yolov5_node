@@ -58,6 +58,3 @@ def _cgroup_headroom() -> int | None:
         return None
     used = current - int(stat.get('inactive_file', 0))
     return max(0, int(limit) - used)
-
-
-budget = CacheBudget()

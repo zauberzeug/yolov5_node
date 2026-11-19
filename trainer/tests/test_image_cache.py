@@ -31,13 +31,12 @@ def test_cgroup_limit_caps_the_available_memory(tmp_path: Path, monkeypatch: pyt
 
 
 @pytest.mark.parametrize(('available', 'cached'), [(10 << 20, True), (1 << 20, False)])
-def test_dataset_is_cached_only_within_the_budget(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-                                                  available: int, cached: bool) -> None:
+def test_dataset_is_cached_only_within_the_budget(tmp_path: Path, available: int, cached: bool) -> None:
     files = []
     for i in range(4):
         files.append(str(tmp_path / f'{i}.jpg'))
         cv2.imwrite(files[-1], np.zeros((480, 640, 3), dtype=np.uint8))
-    monkeypatch.setattr(image_cache, 'budget', CacheBudget(lambda: available))
-    dataset = SimpleNamespace(n=len(files), im_files=files, img_size=640)
+    dataset = SimpleNamespace(n=len(files), im_files=files, img_size=640,
+                              cache_budget=CacheBudget(lambda: available))
 
     assert LoadImagesAndLabels.check_cache_ram(dataset) is cached  # 4 x 0.9 MB, plus the 10 % margin
