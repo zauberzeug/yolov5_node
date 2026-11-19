@@ -180,7 +180,7 @@ class Yolov5TrainerLogic(trainer_logic.TrainerLogic):
         img_size = model_information.resolution
 
         cmd = f'python /app/pred_det.py --weights {model_folder}/model.pt --source {images_folder}'
-        cmd += f' --img-size {img_size} --conf-thres {hyperparameters["detect_nms_conf_thres"]}'
+        cmd += f' --img-size {img_size} --conf-thres {model_information.conf_threshold}'
         cmd += f' --iou-thres {hyperparameters["detect_nms_iou_thres"]}'
         cmd += f' --vram-limit-gb {self._vram_limit_gb}'
 
