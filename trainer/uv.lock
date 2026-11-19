@@ -1007,7 +1007,7 @@ wheels = [
 
 [[package]]
 name = "learning-loop-node"
-version = "0.29.2"
+version = "0.30.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles" },
@@ -1026,9 +1026,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "uvicorn", extra = ["standard"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ad/64/52108b022a079eef5cbe00fabb7531d6b20e9d1ffd2c2ec0bfbc225ea17c/learning_loop_node-0.29.2.tar.gz", hash = "sha256:b33de10b547f96eb4aee55ca1ed3150642e139bae4bc2914887266944ad56a2a", size = 96745, upload-time = "2026-11-16T14:33:01.083Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c2/91/9e91c218690a63ff02e962d0c8f340d2ff2705e6069784d43ce614b12491/learning_loop_node-0.30.1.tar.gz", hash = "sha256:9bb188873fccbe92944e57fa7e2f5cec7151a4f6cb948675dc6df74d7568623c", size = 96676, upload-time = "2026-11-19T15:30:38.07Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/62/46/97829558e56c7de2bf2d958dfe00327cba238a1630cc01ada3e513e373c4/learning_loop_node-0.29.2-py3-none-any.whl", hash = "sha256:c7e03a3dc7fc199720e4736cc037d79bb2745484b66f2d113e48357d4ddf73cc", size = 112546, upload-time = "2026-11-16T14:32:59.703Z" },
+    { url = "https://files.pythonhosted.org/packages/34/c3/69abe10584c59c058a14a155ad364881fe927e0b6823b47469cd8452153a/learning_loop_node-0.30.1-py3-none-any.whl", hash = "sha256:6001e2af35d6cf194b08f9e41105982745fec3b96c0afcff82f7158aa147bffe", size = 112440, upload-time = "2026-11-19T15:30:36.859Z" },
 ]
 
 [[package]]
@@ -3080,7 +3080,7 @@ yolo = [
 
 [package.metadata]
 requires-dist = [
-    { name = "learning-loop-node", specifier = "==0.29.2" },
+    { name = "learning-loop-node", specifier = "==0.30.1" },
     { name = "ruamel-yaml" },
 ]
 
