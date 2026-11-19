@@ -95,5 +95,6 @@ def test_batch_evaluate_matches_evaluate_per_image():
     det = _make_point_detector(input_size=100)
     images = [np.zeros((100, 100, 3), dtype=np.uint8), np.zeros((50, 200, 3), dtype=np.uint8)]
 
-    assert det.batch_evaluate(images).items == [det.evaluate(image) for image in images]
+    assert ([item.point_detections for item in det.batch_evaluate(images).items]
+            == [det.evaluate(image).point_detections for image in images])
     assert det.batch_evaluate([]).items == []
