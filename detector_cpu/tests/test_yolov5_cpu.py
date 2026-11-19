@@ -56,12 +56,7 @@ def test_postprocess_conf_thresh_not_filtered():
     assert len(class_id) == 2
 
 
-def test_evaluate_returns_serializable_point_detections():
-    """Point coordinates must be Python floats, not numpy scalars.
-
-    The node library sends detections with fastapi's jsonable_encoder, which fails on numpy.float32.
-    """
-    input_size = 100
+def _make_point_detector(input_size: int) -> Yolov5Detector:
     categories = [Category(id='a', name='Links', type=CategoryType.Point, point_size=10),
                   Category(id='b', name='Rechts', type=CategoryType.Point, point_size=10)]
     det = _make_detector(input_size=input_size)
@@ -73,6 +68,16 @@ def test_evaluate_returns_serializable_point_detections():
     # one prediction in the model output format [cx, cy, w, h, conf, class0, class1] as float32
     pred = torch.tensor([[[[50.0, 40.0, 10.0, 10.0, 0.95, 0.1, 0.9]]]], dtype=torch.float32)
     det.yolov5 = lambda _: pred
+    return det
+
+
+def test_evaluate_returns_serializable_point_detections():
+    """Point coordinates must be Python floats, not numpy scalars.
+
+    The node library sends detections with fastapi's jsonable_encoder, which fails on numpy.float32.
+    """
+    input_size = 100
+    det = _make_point_detector(input_size)
 
     image = np.zeros((input_size, input_size, 3), dtype=np.uint8)
     metadata = det.evaluate(image)
@@ -84,3 +89,11 @@ def test_evaluate_returns_serializable_point_detections():
     assert type(point.confidence) is float
     assert point.category_name == 'Rechts'
     jsonable_encoder(asdict(metadata))  # must not raise
+
+
+def test_batch_evaluate_matches_evaluate_per_image():
+    det = _make_point_detector(input_size=100)
+    images = [np.zeros((100, 100, 3), dtype=np.uint8), np.zeros((50, 200, 3), dtype=np.uint8)]
+
+    assert det.batch_evaluate(images).items == [det.evaluate(image) for image in images]
+    assert det.batch_evaluate([]).items == []

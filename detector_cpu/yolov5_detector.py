@@ -236,4 +236,4 @@ class Yolov5Detector(DetectorLogic):
 
     @override
     def batch_evaluate(self, images: list[np.ndarray]) -> ImagesMetadata:
-        raise NotImplementedError('batch_evaluate is not implemented yet')
+        return ImagesMetadata(items=[self.evaluate(image) for image in images])
