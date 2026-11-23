@@ -57,7 +57,7 @@ class TestWithLoop:
                             model_variant='',
                             context=Context(project=PROJECT, organization='zauberzeug'),
                             categories=categories, hyperparameters={}, training_number=1,
-                            training_state=TrainerState.Initialized.value,
+                            training_state=TrainerState.DataDownloading.value,
                             image_data=image_data)
         yolov5_format.create_file_structure(training)
         executor = Executor(os.getcwd())
@@ -87,7 +87,7 @@ class TestWithLoop:
             model_variant='',
             context=Context(project=PROJECT, organization='zauberzeug'),
             categories=categories, hyperparameters={}, training_number=1,
-            training_state=TrainerState.Initialized.value,
+            training_state=TrainerState.DataDownloading.value,
             image_data=image_data,
         )
         yolov5_format.create_file_structure(trainer.training)
@@ -119,7 +119,7 @@ class TestWithLoop:
             model_variant='',
             context=Context(project=PROJECT, organization='zauberzeug'),
             categories=categories, hyperparameters={}, training_number=1,
-            training_state=TrainerState.Initialized.value,
+            training_state=TrainerState.DataDownloading.value,
             image_data=image_data,
         )
         yolov5_format.create_file_structure(trainer.training)
@@ -151,7 +151,7 @@ class TestWithLoop:
             model_variant='',
             context=Context(project=PROJECT, organization='zauberzeug'),
             categories=categories, hyperparameters=resolve(HYPERPARAMETERS, {'epochs': epochs}), training_number=1,
-            training_state=TrainerState.Initialized.value,
+            training_state=TrainerState.DataDownloading.value,
             image_data=image_data,
         )
         yolov5_format.create_file_structure(trainer.training)
@@ -190,7 +190,7 @@ class TestWithDetection:
             project_folder='./', images_folder='./', training_folder='./',
             image_data=image_data, categories=categories, hyperparameters={},
             model_variant='', training_number=1,
-            training_state=TrainerState.Initialized.value)
+            training_state=TrainerState.DataDownloading.value)
 
         yolov5_format.create_file_structure(trainer.training)
 
@@ -210,7 +210,7 @@ class TestWithDetection:
             project_folder='./', images_folder='./', training_folder='./',
             image_data=image_data, categories=[], hyperparameters={},
             model_variant='', training_number=1,
-            training_state=TrainerState.Initialized.value)
+            training_state=TrainerState.DataDownloading.value)
 
     @staticmethod
     def _image(image_id: str, image_set: str) -> dict:
@@ -267,7 +267,7 @@ class TestWithDetection:
             project_folder=os.getcwd(), images_folder=os.getcwd(), training_folder=os.getcwd(), image_data=[],
             categories=[Category(name='class_a', id='uuid_of_class_a', type='box')],
             hyperparameters={'resolution': resolution}, model_variant='', training_number=1,
-            training_state=TrainerState.Initialized.value)
+            training_state=TrainerState.DataDownloading.value)
 
         with pytest.raises(batch_size_calculation.InvalidResolutionError):
             await trainer._start(os.path.abspath('model.pt'))
@@ -281,7 +281,7 @@ class TestWithDetection:
             project_folder='./', images_folder='./', training_folder='./', image_data=[],
             categories=[Category(name='class_a', id='uuid_of_class_a', type='box')],
             hyperparameters={}, model_variant='', training_number=1,
-            training_state=TrainerState.Initialized.value)
+            training_state=TrainerState.DataDownloading.value)
 
         assert trainer._get_new_best_training_state() is None, 'should not find any models'
 
@@ -325,7 +325,7 @@ class TestWithDetection:
             project_folder='./', images_folder='./', training_folder='./', image_data=[],
             categories=[Category(name='class_a', id='uuid_of_class_a', type='box')],
             hyperparameters={}, model_variant='', training_number=1,
-            training_state=TrainerState.Initialized.value)
+            training_state=TrainerState.DataDownloading.value)
 
         # create some models.
         mock_epoch(10, {})
@@ -344,7 +344,7 @@ class TestWithDetection:
             project_folder='./', images_folder='./', training_folder='./', image_data=[],
             categories=[Category(name='class_a', id='uuid_of_class_a', type='box')],
             hyperparameters={}, model_variant='', training_number=1,
-            training_state=TrainerState.Initialized.value)
+            training_state=TrainerState.DataDownloading.value)
 
         assert trainer._get_new_best_training_state() is None, 'should not find any models'
 
@@ -376,7 +376,7 @@ class TestWithDetection:
             project_folder='./', images_folder='./', training_folder='./', image_data=[],
             categories=[Category(name='class_a', id='uuid_of_class_a', type='box')],
             hyperparameters={}, model_variant='', training_number=1,
-            training_state=TrainerState.Initialized.value)
+            training_state=TrainerState.DataDownloading.value)
 
         # create some models.
         mock_epoch(10, {})
@@ -398,7 +398,7 @@ class TestWithDetection:
         trainer._training = Training(id='someid', context=Context(organization='o', project='p'),
                                      project_folder='./', images_folder='./', training_folder='./',
                                      categories=[], hyperparameters={}, model_variant='',
-                                     image_data=[], training_number=1, training_state=TrainerState.Initialized.value)
+                                     image_data=[], training_number=1, training_state=TrainerState.DataDownloading.value)
         os.makedirs(f'{trainer.training.training_folder}/result/weights/', exist_ok=True)
         os.makedirs(f'{trainer.training.training_folder}/result/weights/published/', exist_ok=True)
 
