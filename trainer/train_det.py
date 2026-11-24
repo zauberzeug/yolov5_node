@@ -308,9 +308,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
             ema.updates = ckpt['updates']
 
         # Epochs
-        if opt.clear:
-            ckpt['epoch'] = 0
-        start_epoch = ckpt['epoch'] + 1
+        start_epoch = 0 if opt.clear else ckpt['epoch'] + 1
         if resume:
             best_fitness, start_epoch, epochs = smart_resume(ckpt, optimizer, ema, weights, epochs, resume)
             state = resume_state(ckpt)  # PATCH (yolov5-node): what the restore below needs after `del ckpt`
