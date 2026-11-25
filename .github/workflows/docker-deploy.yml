@@ -7,6 +7,9 @@ on:
 env:
   VERSION: ${{ github.event.release.tag_name }}
 
+permissions:
+  contents: read
+
 jobs:
   is-latest:
     runs-on: [self-hosted, cpu, X64]
@@ -15,7 +18,7 @@ jobs:
     steps:
       - name: Check whether this is GitHub's latest release
         id: check
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         with:
           result-encoding: string
           script: |
@@ -31,6 +34,9 @@ jobs:
     needs: is-latest
     if: github.event.action == 'published'
     runs-on: [self-hosted, cpu, X64]
+    environment: docker
+    permissions:
+      contents: read
     env:
       LATEST: ${{ needs.is-latest.outputs.result }}
     strategy:
@@ -54,11 +60,15 @@ jobs:
             tag_suffix: "-cloud-cpu"
             build_args: ""
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
       - name: Log in to Docker Hub
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: echo "$DOCKERHUB_TOKEN" | docker login -u zauberzeug --password-stdin
       - name: Build and push
         run: |
           tags=(-t ${{ matrix.image }}:${VERSION#v}${{ matrix.tag_suffix }})
@@ -73,17 +83,28 @@ jobs:
             --build-arg VERSION=${VERSION#v} \
             "${tags[@]}" \
             --push
+      - name: Log out of Docker Hub
+        # self-hosted runners keep ~/.docker/config.json, where later jobs could read the token
+        if: always()
+        run: docker logout
 
   detector-jetson:
     needs: is-latest
     if: github.event.action == 'published'
     runs-on: [self-hosted, arm64]
+    environment: docker
+    permissions:
+      contents: read
     env:
       LATEST: ${{ needs.is-latest.outputs.result }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - name: Log in to Docker Hub
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: echo "$DOCKERHUB_TOKEN" | docker login -u zauberzeug --password-stdin
       - name: Build and push
         run: |
           docker build detector/ \
@@ -97,14 +118,23 @@ jobs:
             docker tag zauberzeug/yolov5-detector:${VERSION#v}-jetson zauberzeug/yolov5-detector:latest-jetson
             docker push zauberzeug/yolov5-detector:latest-jetson
           fi
+      - name: Log out of Docker Hub
+        # self-hosted runners keep ~/.docker/config.json, where later jobs could read the token
+        if: always()
+        run: docker logout
 
   promote:
     needs: is-latest
     if: github.event.action != 'published' && needs.is-latest.outputs.result == 'true'
     runs-on: [self-hosted, cpu, X64]
+    environment: docker
+    permissions:
+      contents: read
     steps:
       - name: Log in to Docker Hub
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: echo "$DOCKERHUB_TOKEN" | docker login -u zauberzeug --password-stdin
       - name: Point latest at the already built version
         run: |
           while read -r image suffix; do
@@ -120,3 +150,7 @@ jobs:
           zauberzeug/yolov5-detector -cloud-cpu
           zauberzeug/yolov5-detector -jetson
           EOF
+      - name: Log out of Docker Hub
+        # self-hosted runners keep ~/.docker/config.json, where later jobs could read the token
+        if: always()
+        run: docker logout
