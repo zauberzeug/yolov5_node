@@ -57,26 +57,3 @@ jobs:
       - name: run tests
         run: |
           docker run --rm zauberzeug/yolov5-detector:latest-cpu pytest -vv
-
-  slack:
-    needs:
-      - pytest
-    if: always() # also execute when pytest fails
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read # look up the workflow runs to report
-    steps:
-      - name: Determine if we need to notify
-        uses: Jimdo/should-i-notify-action@9aee547b15880738c7adf27760b1a7360d1311e8 # main
-        id: should_notify
-        with:
-          needs_context: ${{ toJson(needs) }}
-          github_token: ${{ github.token }}
-      - name: Slack workflow notification
-        if: steps.should_notify.outputs.should_send_message == 'yes'
-        uses: Gamesight/slack-workflow-status@2e709ce51fd47f02b7221db8547e6e6f49f81f1d # v2.0.0
-        with:
-          repo_token: ${{ github.token }}
-          slack_webhook_url: ${{ secrets.SLACK_DEEPLEARNING_CI_WEBHOOK }}
-          channel: "deeplearning-ci"
-          name: "yolo v5 trainer"
