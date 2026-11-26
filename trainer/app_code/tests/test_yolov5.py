@@ -35,6 +35,7 @@ PROJECT = f'pytest_yolo5det_{_SUFFIX}' if _SUFFIX else 'pytest_yolo5det'
 project_configuration = {
     'project_name': PROJECT, 'box_categories': 2, 'point_categories': 2, 'inbox': 4, 'annotate': 0, 'review': 0,
     'complete': 14, 'image_style': 'beautiful', 'thumbs': False, 'trainings': 1}
+GENERATED_TRAINING = 1  # the training the generated project has; the loop lists its images for the download
 
 
 @pytest.mark.environment(organization='zauberzeug', project=PROJECT, mode='DETECTION')
@@ -56,7 +57,7 @@ class TestWithLoop:
                             images_folder=images_folder,
                             model_variant='',
                             context=Context(project=PROJECT, organization='zauberzeug'),
-                            categories=categories, hyperparameters={}, training_number=1,
+                            categories=categories, hyperparameters={}, training_number=GENERATED_TRAINING,
                             training_state=TrainerState.Initialized.value,
                             image_data=image_data)
         yolov5_format.create_file_structure(training)
@@ -86,7 +87,7 @@ class TestWithLoop:
             images_folder=images_folder,
             model_variant='',
             context=Context(project=PROJECT, organization='zauberzeug'),
-            categories=categories, hyperparameters={}, training_number=1,
+            categories=categories, hyperparameters={}, training_number=GENERATED_TRAINING,
             training_state=TrainerState.Initialized.value,
             image_data=image_data,
         )
@@ -118,7 +119,7 @@ class TestWithLoop:
             images_folder=images_folder,
             model_variant='',
             context=Context(project=PROJECT, organization='zauberzeug'),
-            categories=categories, hyperparameters={}, training_number=1,
+            categories=categories, hyperparameters={}, training_number=GENERATED_TRAINING,
             training_state=TrainerState.Initialized.value,
             image_data=image_data,
         )
@@ -150,7 +151,8 @@ class TestWithLoop:
             images_folder=images_folder,
             model_variant='',
             context=Context(project=PROJECT, organization='zauberzeug'),
-            categories=categories, hyperparameters=resolve(HYPERPARAMETERS, {'epochs': epochs}), training_number=1,
+            categories=categories, hyperparameters=resolve(HYPERPARAMETERS, {'epochs': epochs}),
+            training_number=GENERATED_TRAINING,
             training_state=TrainerState.Initialized.value,
             image_data=image_data,
         )
@@ -485,7 +487,8 @@ def test_hyperparameter_file_layers_upstream_node_and_training(tmp_path: Path):
 async def download_training_data(images_folder: str, data_exchanger: DataExchanger, glc: LoopCommunicator
                                  ) -> tuple[list[Category], list[dict]]:
 
-    image_data, _ = await TrainingsDownloader(data_exchanger).download_training_data(images_folder)
+    downloader = TrainingsDownloader(data_exchanger, training_number=GENERATED_TRAINING)
+    image_data, _ = await downloader.download_training_data(images_folder)
 
     response = await glc.get(f"/{os.environ['LOOP_ORGANIZATION']}/projects/{os.environ['LOOP_PROJECT']}/data")
     assert response.status_code != 401, 'Authentification error - did you set LOOP_USERNAME and LOOP_PASSWORD in your environment?'
